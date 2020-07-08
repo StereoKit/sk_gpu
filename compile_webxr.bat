@@ -1,0 +1,1 @@
+emcc main.cpp sk_renderer_gl.cpp -std=c++11 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s WASM=1 -s -Oz -o index.js -s EXTRA_EXPORTED_RUNTIME_METHODS=['UTF8ToString']

@@ -232,7 +232,6 @@ int      gl_height      = 0;
 size_t      skr_el_to_size        (skr_fmt_ desc);
 const char *skr_semantic_to_d3d   (skr_el_semantic_ semantic);
 uint32_t    skr_buffer_type_to_gl (skr_buffer_type_ type);
-uint32_t    skr_tex_fmt_to_gl_internal(skr_tex_fmt_ format);
 uint32_t    skr_tex_fmt_to_gl_type    (skr_tex_fmt_ format);
 uint32_t    skr_tex_fmt_to_gl_layout  (skr_tex_fmt_ format);
 
@@ -251,7 +250,7 @@ void console_log(const char *str) {
 ///////////////////////////////////////////
 
 // Some nice reference: https://gist.github.com/nickrolfe/1127313ed1dbf80254b614a721b3ee9c
-int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t app_width, int32_t app_height) {
+int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 #ifdef __EMSCRIPTEN__
 	EmscriptenWebGLContextAttributes attrs;
 	emscripten_webgl_init_context_attributes(&attrs);
@@ -262,9 +261,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context("canvas", &attrs);
 	emscripten_webgl_make_context_current(ctx);
 #else
-	gl_hwnd = (HWND)app_hwnd;
-	gl_hdc  = GetDC(gl_hwnd);
-
+	
 	///////////////////////////////////////////
 	// Dummy initialization for pixel format //
 	///////////////////////////////////////////
@@ -327,6 +324,9 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 	// Real OpenGL initialization            //
 	///////////////////////////////////////////
 
+	gl_hwnd = (HWND)app_hwnd;
+	gl_hdc  = GetDC(gl_hwnd);
+
 	// Find a pixel format
 	const int format_attribs[] = {
 		WGL_DRAW_TO_WINDOW_ARB, true,
@@ -375,7 +375,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 	gl_load_extensions();
 
 	const char *version = glGetString(GL_VERSION);
-	printf("OpenGL version: %s\n", version);
+	printf("sk_gpu: Using OpenGL %s\n", version);
 
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
@@ -399,11 +399,6 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 
 ///////////////////////////////////////////
 
-void skr_resize_swapchain(int32_t width, int32_t height) {
-}
-
-///////////////////////////////////////////
-
 void skr_shutdown() {
 #ifdef __EMSCRIPTEN__
 #else
@@ -416,17 +411,13 @@ void skr_shutdown() {
 ///////////////////////////////////////////
 
 void skr_draw_begin() {
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 ///////////////////////////////////////////
 
-void skr_present() {
-#ifdef __EMSCRIPTEN__
-#else
-	SwapBuffers(gl_hdc);
-#endif
+void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
+	glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 ///////////////////////////////////////////
@@ -606,6 +597,44 @@ void skr_shader_program_destroy(skr_shader_program_t *program) {
 	*program = {};
 }
 
+///////////////////////////////////////////
+
+skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height) {
+	skr_swapchain_t result = {};
+	return result;
+}
+
+/////////////////////////////////////////// 
+
+void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t height) {
+}
+
+/////////////////////////////////////////// 
+
+void skr_swapchain_present(const skr_swapchain_t *swapchain) {
+#ifdef __EMSCRIPTEN__
+#else
+	SwapBuffers(gl_hdc);
+#endif
+}
+
+/////////////////////////////////////////// 
+
+const skr_tex_t *skr_swapchain_get_target(const skr_swapchain_t *swapchain) {
+	return nullptr;
+}
+
+/////////////////////////////////////////// 
+
+const skr_tex_t *skr_swapchain_get_depth(const skr_swapchain_t *swapchain) {
+	return nullptr;
+}
+
+/////////////////////////////////////////// 
+
+void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
+}
+
 /////////////////////////////////////////// 
 
 skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps) {
@@ -657,7 +686,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 	tex->height = height;
 	glBindTexture(GL_TEXTURE_2D, tex->texture);
 
-	uint32_t format = skr_tex_fmt_to_gl_internal(tex->format);
+	uint32_t format = (uint32_t)skr_tex_fmt_to_native(tex->format);
 	uint32_t type   = skr_tex_fmt_to_gl_type    (tex->format);
 	uint32_t layout = skr_tex_fmt_to_gl_layout  (tex->format);
 	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames[0]);
@@ -742,7 +771,7 @@ uint32_t skr_buffer_type_to_gl(skr_buffer_type_ type) {
 
 /////////////////////////////////////////// 
 
-uint32_t skr_tex_fmt_to_gl_internal(skr_tex_fmt_ format) {
+int64_t skr_tex_fmt_to_native(skr_tex_fmt_ format) {
 	switch (format) {
 	case skr_tex_fmt_rgba32:        return GL_SRGB8_ALPHA8;
 	case skr_tex_fmt_rgba32_linear: return GL_RGBA8;

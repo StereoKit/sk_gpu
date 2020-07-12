@@ -107,8 +107,8 @@ bool app_init() {
 		nullptr, nullptr, wc.hInstance, nullptr);
 
 	if( !app_hwnd ) return false;
-	if (!skr_init(app_name, nullptr)) return false;
-	app_swapchain = skr_swapchain_create(app_hwnd, skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, app_width, app_height);
+	if (!skr_init(app_name, app_hwnd, nullptr)) return false;
+	app_swapchain = skr_swapchain_create(skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, app_width, app_height);
 #endif
 
 	

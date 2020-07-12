@@ -9,6 +9,8 @@
 #include <d3dcompiler.h>
 #include <math.h>
 
+#include <stdio.h>
+
 ///////////////////////////////////////////
 
 ID3D11Device             *d3d_device      = nullptr;
@@ -16,6 +18,7 @@ ID3D11DeviceContext      *d3d_context     = nullptr;
 ID3D11InfoQueue          *d3d_info        = nullptr;
 ID3D11InputLayout        *d3d_vert_layout = nullptr;
 ID3D11RasterizerState    *d3d_rasterstate = nullptr;
+void                     *d3d_hwnd        = nullptr;
 
 ///////////////////////////////////////////
 
@@ -33,7 +36,8 @@ void skr_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 
 ///////////////////////////////////////////
 
-int32_t skr_init(const char *app_name, void *adapter_id) {
+int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
+	d3d_hwnd = hwnd;
 	UINT creation_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
 	creation_flags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -64,6 +68,7 @@ int32_t skr_init(const char *app_name, void *adapter_id) {
 	if (FAILED(D3D11CreateDevice(final_adapter, final_adapter == nullptr ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_UNKNOWN, 0, creation_flags, feature_levels, _countof(feature_levels), D3D11_SDK_VERSION, &d3d_device, nullptr, &d3d_context))) {
 		return -1;
 	}
+	printf("sk_gpu: Using Direct3D 11\n");
 
 	if (final_adapter != nullptr)
 		final_adapter->Release();
@@ -311,7 +316,7 @@ void skr_shader_program_destroy(skr_shader_program_t *program) {
 
 /////////////////////////////////////////// 
 
-skr_swapchain_t skr_swapchain_create(void *hwnd, skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height) {
+skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height) {
 	skr_swapchain_t result = {};
 	result.width  = width;
 	result.height = height;
@@ -329,7 +334,7 @@ skr_swapchain_t skr_swapchain_create(void *hwnd, skr_tex_fmt_ format, skr_tex_fm
 	IDXGIAdapter  *dxgi_adapter; dxgi_device ->GetParent     (__uuidof(IDXGIAdapter),  (void **)&dxgi_adapter);
 	IDXGIFactory2 *dxgi_factory; dxgi_adapter->GetParent     (__uuidof(IDXGIFactory2), (void **)&dxgi_factory);
 
-	dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)hwnd, &swapchain_desc, nullptr, nullptr, &result.d3d_swapchain);
+	dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result.d3d_swapchain);
 
 	ID3D11Texture2D *back_buffer;
 	result.d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));

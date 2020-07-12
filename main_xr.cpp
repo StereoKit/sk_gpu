@@ -33,6 +33,18 @@
 #define XrGraphicsBinding XrGraphicsBindingOpenGLWin32KHR
 #define XR_TYPE_GRAPHICS_BINDING XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR
 
+#elif defined(SKR_VULKAN)
+#define XR_USE_GRAPHICS_API_VULKAN
+#define XR_GFX_EXTENSION XR_KHR_VULKAN_ENABLE_EXTENSION_NAME
+#define XrSwapchainImage XrSwapchainImageVulkanKHR
+#define XR_TYPE_SWAPCHAIN_IMAGE XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR
+#define XrGraphicsRequirements XrGraphicsRequirementsVulkanKHR
+#define XR_TYPE_GRAPHICS_REQUIREMENTS XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR
+#define PFN_xrGetGraphicsRequirementsKHR PFN_xrGetVulkanGraphicsRequirementsKHR
+#define NAME_xrGetGraphicsRequirementsKHR "xrGetVulkanGraphicsRequirementsKHR"
+#define XrGraphicsBinding XrGraphicsBindingVulkanKHR
+#define XR_TYPE_GRAPHICS_BINDING XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR
+
 #elif defined(SKR_OPENGL_ES)
 #define XR_USE_GRAPHICS_API_OPENGL_ES
 #define XR_GFX_EXTENSION XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME
@@ -471,7 +483,12 @@ bool openxr_init(const char *app_name, void *hwnd, int32_t screen_width, int32_t
 		xrEnumerateSwapchainImages(swapchain.handle, surface_count, &surface_count, (XrSwapchainImageBaseHeader*)swapchain.surface_images.data());
 		for (uint32_t i = 0; i < surface_count; i++) {
 			swapchain_surfdata_t result = {};
-			result.render_tex = skr_tex_from_native(swapchain.surface_images[i].texture, skr_tex_type_rendertarget, xr_swapchain_fmt);
+#if defined(SKR_DIRECT3D11)
+			void *tex = swapchain.surface_images[i].texture;
+#elif defined(SKR_OPENGL)
+			void *tex = &swapchain.surface_images[i].image;
+#endif
+			result.render_tex = skr_tex_from_native(tex, skr_tex_type_rendertarget, xr_swapchain_fmt);
 			result.depth_tex  = skr_tex_create(skr_tex_type_depth, skr_use_static, skr_tex_fmt_depth32, skr_mip_none);
 			skr_tex_set_data(&result.depth_tex, nullptr, 1, swapchain_info.width, swapchain_info.height);
 			swapchain.surface_data[i] = result;

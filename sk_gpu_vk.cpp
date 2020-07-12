@@ -17,7 +17,7 @@ struct skr_device_t {
 	uint32_t         queue_index;
 };
 
-struct skr_swapchain_t {
+struct vk_swapchain_t {
 	VkSurfaceFormatKHR format;
 	VkSwapchainKHR     swapchain;
 	uint32_t           img_count;
@@ -36,8 +36,8 @@ VkFence            vk_frame_fences        [D3D_FRAME_COUNT];
 VkSemaphore        vk_available_semaphores[D3D_FRAME_COUNT];
 VkSemaphore        vk_finished_semaphores [D3D_FRAME_COUNT];
 
-skr_device_t    skr_device    = {};
-skr_swapchain_t skr_swapchain = {};
+skr_device_t   skr_device    = {};
+vk_swapchain_t skr_swapchain = {};
 
 ///////////////////////////////////////////
 
@@ -172,7 +172,7 @@ VkPresentModeKHR vk_get_presentation_mode(skr_device_t &device) {
 
 ///////////////////////////////////////////
 
-bool vk_create_swapchain(skr_device_t &device, int32_t app_width, int32_t app_height, skr_swapchain_t *out_swapchain) {
+bool vk_create_swapchain(skr_device_t &device, int32_t app_width, int32_t app_height, vk_swapchain_t *out_swapchain) {
 	*out_swapchain = {};
 
 	out_swapchain->format = vk_get_preferred_fmt(device);
@@ -222,12 +222,12 @@ bool vk_create_swapchain(skr_device_t &device, int32_t app_width, int32_t app_he
 
 ///////////////////////////////////////////
 
-int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t app_width, int32_t app_height) {
+int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	VkResult result = VK_ERROR_INITIALIZATION_FAILED;
 
 	if (!vk_create_instance (app_name, &vk_inst)) return -1;
 	if (!vk_create_device   (vk_inst, app_hwnd, &skr_device)) return -2;
-	if (!vk_create_swapchain(skr_device, app_width, app_height, &skr_swapchain)) return -3;
+	if (!vk_create_swapchain(skr_device, 1280, 720, &skr_swapchain)) return -3;
 
 	// Initialize the renderer
 	VkCommandPoolCreateInfo cmd_pool_info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
@@ -257,11 +257,6 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 
 ///////////////////////////////////////////
 
-void skr_resize_swapchain(int32_t width, int32_t height) {
-}
-
-///////////////////////////////////////////
-
 void skr_shutdown() {
 	vkDeviceWaitIdle(skr_device.device);
 	vkDestroyFence(skr_device.device, vk_frame_fences[0], 0);
@@ -279,7 +274,15 @@ void skr_shutdown() {
 
 ///////////////////////////////////////////
 
-void skr_draw() {
+void skr_draw_begin() {
+	/*uint32_t index = (vk_frame_count++) % D3D_FRAME_COUNT;
+	vkWaitForFences(skr_device.device, 1, &vk_frame_fences[index], VK_TRUE, UINT64_MAX);
+	vkResetFences  (skr_device.device, 1, &vk_frame_fences[index]);*/
+}
+
+///////////////////////////////////////////
+
+void skr_draw_hack() {
 	uint32_t index = (vk_frame_count++) % D3D_FRAME_COUNT;
 	vkWaitForFences(skr_device.device, 1, &vk_frame_fences[index], VK_TRUE, UINT64_MAX);
 	vkResetFences  (skr_device.device, 1, &vk_frame_fences[index]);
@@ -344,5 +347,106 @@ void skr_draw() {
 	present_info.pImageIndices      = &image_index;
 	vkQueuePresentKHR(skr_device.queue, &present_info);
 }
+
+///////////////////////////////////////////
+
+void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
+	skr_draw_hack();
+}
+
+///////////////////////////////////////////
+
+void skr_draw (int32_t index_start, int32_t index_count, int32_t instance_count) {
+}
+
+///////////////////////////////////////////
+// Buffer                                //
+///////////////////////////////////////////
+
+skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
+	skr_buffer_t result = {};
+	return result;
+}
+
+///////////////////////////////////////////
+
+void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
+}
+
+///////////////////////////////////////////
+
+void skr_buffer_set(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
+}
+
+///////////////////////////////////////////
+
+void skr_buffer_destroy(skr_buffer_t *buffer) {
+}
+
+///////////////////////////////////////////
+// Mesh                                  //
+///////////////////////////////////////////
+
+skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer) {
+	skr_mesh_t result = {};
+	return result;
+}
+void skr_mesh_set(const skr_mesh_t *mesh) {
+}
+void skr_mesh_destroy(skr_mesh_t *mesh) {
+}
+
+///////////////////////////////////////////
+// Shader                                //
+///////////////////////////////////////////
+
+skr_shader_t         skr_shader_create(const char *file_data, skr_shader_ type) {
+	skr_shader_t result = {};
+	return result;
+}
+void                 skr_shader_destroy(skr_shader_t *shader) {
+}
+
+///////////////////////////////////////////
+// Shader Program                        //
+///////////////////////////////////////////
+
+skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const skr_shader_t *pixel) {
+	return {};
+}
+void                 skr_shader_program_set(const skr_shader_program_t *program) {}
+void                 skr_shader_program_destroy(skr_shader_program_t *program) {}
+
+///////////////////////////////////////////
+// Swapchain                             //
+///////////////////////////////////////////
+
+skr_swapchain_t      skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height) {
+	return {};
+}
+void                 skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t height) {}
+void                 skr_swapchain_present(const skr_swapchain_t *swapchain) {}
+const skr_tex_t *skr_swapchain_get_target(const skr_swapchain_t *swapchain) {
+	return nullptr;
+}
+const skr_tex_t *skr_swapchain_get_depth(const skr_swapchain_t *swapchain) {
+	return nullptr;
+}
+void                 skr_swapchain_destroy(skr_swapchain_t *swapchain) {}
+
+///////////////////////////////////////////
+// Texture                               //
+///////////////////////////////////////////
+
+skr_tex_t            skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format) {
+	return {};
+}
+skr_tex_t            skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps) {
+	return {};
+}
+void                 skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {}
+void                 skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {}
+void                 skr_tex_set_active(const skr_tex_t *tex, int32_t slot) {}
+void                 skr_tex_destroy(skr_tex_t *tex) {}
 
 #endif

@@ -41,8 +41,8 @@ typedef struct skr_tex_t {
 } skr_tex_t;
 
 typedef struct skr_swapchain_t {
-	int32_t width;
-	int32_t height;
+	int32_t   width;
+	int32_t   height;
 	skr_tex_t target;
 	skr_tex_t depth;
 	IDXGISwapChain1 *d3d_swapchain;

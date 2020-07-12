@@ -68,6 +68,9 @@ HGLRC gl_hrc;
 #define GL_TEXTURE_MIN_FILTER 0x2801
 #define GL_TEXTURE_WRAP_S 0x2802
 #define GL_TEXTURE_WRAP_T 0x2803
+#define GL_TEXTURE_WIDTH 0x1000
+#define GL_TEXTURE_HEIGHT 0x1001
+#define GL_TEXTURE_INTERNAL_FORMAT 0x1003
 #define GL_REPEAT 0x2901
 #define GL_CLAMP_TO_EDGE 0x812F
 #define GL_MIRRORED_REPEAT 0x8370
@@ -179,6 +182,8 @@ typedef void (WINAPI *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
 	GLE(void,     DeleteTextures,          int32_t n, const uint32_t *textures) \
 	GLE(void,     BindTexture,             uint32_t target, uint32_t texture) \
     GLE(void,     TexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
+	GLE(void,     GetInternalformativ,     uint32_t target, uint32_t internalformat, uint32_t pname, int32_t bufSize, int32_t *params)\
+	GLE(void,     GetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
 	GLE(void,     TexParameterf,           uint32_t target, uint32_t pname, float param) \
 	GLE(void,     TexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
     GLE(void,     ActiveTexture,           uint32_t texture) \
@@ -637,6 +642,24 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
+skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format) {
+	skr_tex_t result = {};
+	result.type    = type;
+	result.use     = skr_use_static;
+	result.mips    = skr_mip_none;
+	result.texture = *(uint32_t *)native_tex;
+
+	int32_t t_fmt;
+	glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_INTERNAL_FORMAT, &t_fmt);
+	glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_WIDTH,  &result.width);
+	glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_HEIGHT, &result.height);
+	result.format = override_format ? override_format : skr_gl_to_skr_fmt( t_fmt );
+
+	return result;
+}
+
+/////////////////////////////////////////// 
+
 skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps) {
 	skr_tex_t result = {};
 	result.type   = type;
@@ -784,6 +807,24 @@ int64_t skr_tex_fmt_to_native(skr_tex_fmt_ format) {
 	case skr_tex_fmt_r16:           return GL_R16UI;
 	case skr_tex_fmt_r32:           return GL_R32F;
 	default: return 0;
+	}
+}
+
+/////////////////////////////////////////// 
+
+skr_tex_fmt_ skr_gl_to_skr_fmt(uint32_t format) {
+	switch (format) {
+	case GL_SRGB8_ALPHA8:       return skr_tex_fmt_rgba32;
+	case GL_RGBA8:              return skr_tex_fmt_rgba32_linear;
+	case GL_RGBA16UI:           return skr_tex_fmt_rgba64;
+	case GL_RGBA32F:            return skr_tex_fmt_rgba128;
+	case GL_DEPTH_COMPONENT16:  return skr_tex_fmt_depth16;
+	case GL_DEPTH_COMPONENT32F: return skr_tex_fmt_depth32;
+	case GL_DEPTH24_STENCIL8:   return skr_tex_fmt_depthstencil;
+	case GL_R8:                 return skr_tex_fmt_r8;
+	case GL_R16UI:              return skr_tex_fmt_r16;
+	case GL_R32F:               return skr_tex_fmt_r32;
+	default: return skr_tex_fmt_none;
 	}
 }
 

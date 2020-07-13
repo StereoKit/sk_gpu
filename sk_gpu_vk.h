@@ -27,6 +27,9 @@ typedef struct skr_tex_t {
 	skr_tex_type_             type;
 	skr_tex_fmt_              format;
 	skr_mip_                  mips;
+
+	VkImage     texture;
+	VkImageView view;
 } skr_tex_t;
 
 typedef struct skr_swapchain_t {
@@ -37,8 +40,11 @@ typedef struct skr_swapchain_t {
 
 	VkSurfaceFormatKHR format;
 	VkSwapchainKHR     swapchain;
+	//VkFence           *fence;
 	uint32_t           img_count;
 	VkImage           *imgs;
+	skr_tex_t         *texutres;
+	uint32_t           img_curr;
 	VkExtent2D         extents;
 } skr_swapchain_t;
 

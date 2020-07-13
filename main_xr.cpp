@@ -5,9 +5,9 @@
 
 // Also see here for OpenXR GL reference:
 // https://github.com/jherico/OpenXR-Samples/blob/master/src/examples/sdl2_gl_single_file_example.cpp
-
+/*
 // OpenXR platform defines
-/*#define XR_USE_PLATFORM_WIN32
+#define XR_USE_PLATFORM_WIN32
 
 #if defined(SKR_DIRECT3D11)
 #define XR_USE_GRAPHICS_API_D3D11

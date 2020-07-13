@@ -136,6 +136,7 @@ void                 skr_shader_program_destroy(      skr_shader_program_t *prog
 skr_swapchain_t      skr_swapchain_create      (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);
 void                 skr_swapchain_resize      (      skr_swapchain_t *swapchain, int32_t width, int32_t height);
 void                 skr_swapchain_present     (const skr_swapchain_t *swapchain);
+void                 skr_swapchain_get_next    (const skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth);
 const skr_tex_t     *skr_swapchain_get_target  (const skr_swapchain_t *swapchain);
 const skr_tex_t     *skr_swapchain_get_depth   (const skr_swapchain_t *swapchain);
 void                 skr_swapchain_destroy     (      skr_swapchain_t *swapchain);

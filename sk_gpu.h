@@ -126,7 +126,7 @@ skr_mesh_t           skr_mesh_create           (const skr_buffer_t *vert_buffer,
 void                 skr_mesh_set              (const skr_mesh_t *mesh);
 void                 skr_mesh_destroy          (      skr_mesh_t *mesh);
 
-skr_shader_t         skr_shader_create         (const char *file_data, skr_shader_ type);
+skr_shader_t         skr_shader_create         (const uint8_t *shader_data, size_t shader_size, skr_shader_ type);
 void                 skr_shader_destroy        (skr_shader_t *shader);
 
 skr_shader_program_t skr_shader_program_create (const skr_shader_t *vertex, const skr_shader_t *pixel);

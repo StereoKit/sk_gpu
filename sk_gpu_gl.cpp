@@ -521,7 +521,7 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 
 /////////////////////////////////////////// 
 
-skr_shader_t skr_shader_create(const char *file_data, skr_shader_ type) {
+skr_shader_t skr_shader_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
 	skr_shader_t result = {}; 
 	result.type = type;
 

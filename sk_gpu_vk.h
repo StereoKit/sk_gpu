@@ -14,7 +14,8 @@ typedef struct skr_mesh_t {
 } skr_mesh_t;
 
 typedef struct skr_shader_t {
-	skr_shader_  type;
+	skr_shader_    type;
+	VkShaderModule module;
 } skr_shader_t;
 
 typedef struct skr_shader_program_t {
@@ -43,7 +44,7 @@ typedef struct skr_swapchain_t {
 	//VkFence           *fence;
 	uint32_t           img_count;
 	VkImage           *imgs;
-	skr_tex_t         *texutres;
+	skr_tex_t         *textures;
 	uint32_t           img_curr;
 	VkExtent2D         extents;
 } skr_swapchain_t;

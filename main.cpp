@@ -158,12 +158,15 @@ bool app_init() {
 	skr_tex_settings(&app_tex, skr_tex_address_repeat, skr_tex_sample_linear, 0);
 	skr_tex_set_data(&app_tex, color_arr, 1, w, h);
 
-#ifdef SKR_OPENGL
-	app_ps = skr_shader_create(shader_glsl_ps, skr_shader_pixel);
-	app_vs = skr_shader_create(shader_glsl_vs, skr_shader_vertex);
-#else
-	app_ps = skr_shader_create(shader_hlsl, skr_shader_pixel);
-	app_vs = skr_shader_create(shader_hlsl, skr_shader_vertex);
+#if defined(SKR_OPENGL)
+	app_ps = skr_shader_create((uint8_t*)shader_glsl_ps, strlen(shader_glsl_ps), skr_shader_pixel);
+	app_vs = skr_shader_create((uint8_t*)shader_glsl_vs, strlen(shader_glsl_vs), skr_shader_vertex);
+#elif defined(SKR_DIRECT3D11)
+	app_ps = skr_shader_create((uint8_t*)shader_hlsl, strlen(shader_hlsl), skr_shader_pixel);
+	app_vs = skr_shader_create((uint8_t*)shader_hlsl, strlen(shader_hlsl), skr_shader_vertex);
+#elif defined(SKR_VULKAN)
+	app_ps = skr_shader_create(shader_spirv_ps, _countof(shader_spirv_ps), skr_shader_pixel);
+	app_vs = skr_shader_create(shader_spirv_vs, _countof(shader_spirv_vs), skr_shader_vertex);
 #endif
 	app_shader = skr_shader_program_create(&app_vs, &app_ps);
 

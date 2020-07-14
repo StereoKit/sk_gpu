@@ -43,6 +43,8 @@ VkSemaphore        vk_finished_semaphores [D3D_FRAME_COUNT];
 skr_device_t skr_device = {};
 vk_swapchain_t skr_swapchain = {};
 
+skr_tex_fmt_ skr_native_to_tex_fmt(VkFormat format);
+
 ///////////////////////////////////////////
 
 bool vk_create_instance(const char *app_name, VkInstance *out_inst) {
@@ -394,6 +396,19 @@ void skr_draw_hack() {
 ///////////////////////////////////////////
 
 void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
+	/*VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width  = (float) render_target->width;
+	viewport.height = (float) render_target->height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor{};
+	scissor.offset = {0, 0};
+	scissor.extent.width  = render_target->width;
+	scissor.extent.height = render_target->height;*/
+
 	skr_draw_hack();
 }
 
@@ -443,11 +458,23 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 // Shader                                //
 ///////////////////////////////////////////
 
-skr_shader_t         skr_shader_create(const char *file_data, skr_shader_ type) {
+skr_shader_t skr_shader_create(const uint8_t *shader_data, size_t shader_size, skr_shader_ type) {
 	skr_shader_t result = {};
+	result.type = type;
+
+	VkShaderModuleCreateInfo shader_info = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+	shader_info.codeSize = shader_size;
+	shader_info.pCode    = (uint32_t*)shader_data;
+
+	if (vkCreateShaderModule(skr_device.device, &shader_info, nullptr, &result.module) != VK_SUCCESS) {
+		printf("Failed to create shader module!");
+	}
+
 	return result;
 }
-void                 skr_shader_destroy(skr_shader_t *shader) {
+void skr_shader_destroy(skr_shader_t *shader) {
+	vkDestroyShaderModule(skr_device.device, shader->module, nullptr);
+	*shader = {};
 }
 
 ///////////////////////////////////////////
@@ -455,7 +482,21 @@ void                 skr_shader_destroy(skr_shader_t *shader) {
 ///////////////////////////////////////////
 
 skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const skr_shader_t *pixel) {
-	return {};
+	skr_shader_program_t result = {};
+
+	VkPipelineShaderStageCreateInfo vs_info = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+	vs_info.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+	vs_info.module = vertex->module;
+	vs_info.pName  = "vs";
+
+	VkPipelineShaderStageCreateInfo fs_info = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+	fs_info.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fs_info.module = pixel->module;
+	fs_info.pName  = "ps";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = {vs_info, fs_info};
+
+	return result;
 }
 void                 skr_shader_program_set(const skr_shader_program_t *program) {}
 void                 skr_shader_program_destroy(skr_shader_program_t *program) {}

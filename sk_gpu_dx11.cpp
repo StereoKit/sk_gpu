@@ -239,7 +239,7 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 /////////////////////////////////////////// 
 
 #include <stdio.h>
-skr_shader_t skr_shader_create(const char *file_data, skr_shader_ type) {
+skr_shader_t skr_shader_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
 	skr_shader_t result = {};
 	result.type = type;
 
@@ -251,7 +251,7 @@ skr_shader_t skr_shader_create(const char *file_data, skr_shader_ type) {
 #endif
 
 	ID3DBlob *compiled, *errors;
-	if (FAILED(D3DCompile(file_data, strlen(file_data), nullptr, nullptr, nullptr, type == skr_shader_pixel ? "ps" : "vs", type == skr_shader_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors)))
+	if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_shader_pixel ? "ps" : "vs", type == skr_shader_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors)))
 		printf("Error: D3DCompile failed %s", (char*)errors->GetBufferPointer());
 	if (errors) errors->Release();
 

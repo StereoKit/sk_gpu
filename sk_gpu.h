@@ -136,12 +136,12 @@ void                 skr_shader_program_destroy(      skr_shader_program_t *prog
 skr_swapchain_t      skr_swapchain_create      (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);
 void                 skr_swapchain_resize      (      skr_swapchain_t *swapchain, int32_t width, int32_t height);
 void                 skr_swapchain_present     (const skr_swapchain_t *swapchain);
-void                 skr_swapchain_get_next    (const skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth);
+void                 skr_swapchain_get_next    (      skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth);
 const skr_tex_t     *skr_swapchain_get_target  (const skr_swapchain_t *swapchain);
 const skr_tex_t     *skr_swapchain_get_depth   (const skr_swapchain_t *swapchain);
 void                 skr_swapchain_destroy     (      skr_swapchain_t *swapchain);
 
-skr_tex_t            skr_tex_from_native       (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format);
+skr_tex_t            skr_tex_from_native       (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height);
 skr_tex_t            skr_tex_create            (skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps);
 void                 skr_tex_settings          (      skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy);
 void                 skr_tex_set_data          (      skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);

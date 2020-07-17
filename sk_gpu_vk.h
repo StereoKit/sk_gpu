@@ -19,29 +19,36 @@ typedef struct skr_shader_t {
 } skr_shader_t;
 
 typedef struct skr_shader_program_t {
+	int64_t pipeline;
+	VkPipelineLayout pipeline_layout;
 } skr_shader_program_t;
 
 typedef struct skr_tex_t {
-	int32_t width;
-	int32_t height;
-	skr_use_                  use;
-	skr_tex_type_             type;
-	skr_tex_fmt_              format;
-	skr_mip_                  mips;
+	int32_t         width;
+	int32_t         height;
+	skr_use_        use;
+	skr_tex_type_   type;
+	skr_tex_fmt_    format;
+	skr_mip_        mips;
 
-	VkImage     texture;
-	VkImageView view;
+	VkImage         texture;
+	VkImageView     view;
+
+	VkFramebuffer   rt_framebuffer;
+	int64_t         rt_renderpass;
+	VkCommandBuffer rt_commandbuffer;
 } skr_tex_t;
 
 typedef struct skr_swapchain_t {
 	int32_t width;
 	int32_t height;
-	skr_tex_t target;
-	skr_tex_t depth;
+	//skr_tex_t target;
+	//skr_tex_t depth;
 
 	VkSurfaceFormatKHR format;
 	VkSwapchainKHR     swapchain;
 	//VkFence           *fence;
+	uint32_t           img_active;
 	uint32_t           img_count;
 	VkImage           *imgs;
 	skr_tex_t         *textures;

@@ -200,9 +200,9 @@ bool app_step() {
 
 	skr_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skr_set_render_target(clear_color,
-		skr_swapchain_get_target(&app_swapchain),
-		skr_swapchain_get_depth (&app_swapchain));
+	const skr_tex_t *target, *depth;
+	skr_swapchain_get_next(&app_swapchain, &target, &depth);
+	skr_set_render_target(clear_color, target, depth);
 
 	static int32_t frame = 0;
 	frame++;

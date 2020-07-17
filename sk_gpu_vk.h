@@ -54,6 +54,12 @@ typedef struct skr_swapchain_t {
 	skr_tex_t         *textures;
 	uint32_t           img_curr;
 	VkExtent2D         extents;
+	VkFence           *img_fence;
+
+	VkSemaphore sem_available[2];
+	VkSemaphore sem_finished[2];
+	VkFence     fence_flight[2];
+	int32_t     sync_index;
 } skr_swapchain_t;
 
 typedef struct skr_platform_data_t {

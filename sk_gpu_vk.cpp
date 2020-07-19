@@ -616,30 +616,40 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 	case skr_buffer_type_constant: usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; break;
 	}
 
-	VkBuffer       stage_buffer;
-	VkDeviceMemory stage_memory;
-	vk_create_buffer(size_bytes, 
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&stage_buffer, &stage_memory);
+	if (use == skr_use_static) {
+		VkBuffer       stage_buffer;
+		VkDeviceMemory stage_memory;
+		vk_create_buffer(size_bytes,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&stage_buffer, &stage_memory);
 
-	void* gpu_data;
-	vkMapMemory(skr_device.device, stage_memory, 0, size_bytes, 0, &gpu_data);
-	memcpy(gpu_data, data, (size_t)size_bytes);
-	vkUnmapMemory(skr_device.device, stage_memory);
+		void *gpu_data;
+		vkMapMemory(skr_device.device, stage_memory, 0, size_bytes, 0, &gpu_data);
+		memcpy(gpu_data, data, (size_t)size_bytes);
+		vkUnmapMemory(skr_device.device, stage_memory);
 
-	vk_create_buffer(size_bytes, 
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-		usage,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&result.buffer, &result.memory);
+		vk_create_buffer(size_bytes,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+			usage,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&result.buffer, &result.memory);
 
-	vk_copy_buffer(stage_buffer, result.buffer, size_bytes);
+		vk_copy_buffer(stage_buffer, result.buffer, size_bytes);
 
-	vkDestroyBuffer(skr_device.device, stage_buffer, nullptr);
-	vkFreeMemory   (skr_device.device, stage_memory, nullptr);
+		vkDestroyBuffer(skr_device.device, stage_buffer, nullptr);
+		vkFreeMemory(skr_device.device, stage_memory, nullptr);
+	} else {
+		vk_create_buffer(size_bytes,
+			usage,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&result.buffer, &result.memory);
+
+		skr_buffer_update(&result, data, size_bytes);
+	}
 
 	return result;
 }
@@ -647,6 +657,13 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 ///////////////////////////////////////////
 
 void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
+	if (buffer->use != skr_use_dynamic)
+		return;
+
+	void *gpu_data;
+	vkMapMemory(skr_device.device, buffer->memory, 0, size_bytes, 0, &gpu_data);
+	memcpy(gpu_data, data, (size_t)size_bytes);
+	vkUnmapMemory(skr_device.device, buffer->memory);
 }
 
 ///////////////////////////////////////////
@@ -654,7 +671,6 @@ void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_byt
 void skr_buffer_set(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
 	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
 
-	
 	switch (buffer->type) {
 	case skr_buffer_type_vertex: {
 		VkBuffer     buffers[] = {buffer->buffer};

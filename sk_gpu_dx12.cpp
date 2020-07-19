@@ -53,7 +53,7 @@ struct skr_tex_t {
 	ID3D12DescriptorHeap *heap;
 };
 
-struct skr_shader_t {
+struct skr_shader_stage_t {
 };
 
 ///////////////////////////////////////////

@@ -118,11 +118,11 @@ void       app_mesh_destroy(app_mesh_t *mesh);
 ///////////////////////////////////////////
 
 app_shader_data_t    app_shader_data = {};
-app_mesh_t           app_mesh1 = {};
-app_mesh_t           app_mesh2 = {};
-skr_shader_t         app_ps    = {};
-skr_shader_t         app_vs    = {};
-skr_shader_program_t app_shader = {};
+app_mesh_t           app_mesh1  = {};
+app_mesh_t           app_mesh2  = {};
+skr_shader_stage_t   app_ps     = {};
+skr_shader_stage_t   app_vs     = {};
+skr_shader_t         app_shader = {};
 skr_buffer_t         app_shader_buffer = {};
 skr_tex_t            app_tex = {};
 
@@ -258,13 +258,13 @@ bool app_init() {
 	skr_tex_set_data(&app_tex, color_arr, 1, w, h);
 
 #ifdef SKR_OPENGL
-	app_ps = skr_shader_create(shader_glsl_ps, skr_shader_pixel);
-	app_vs = skr_shader_create(shader_glsl_vs, skr_shader_vertex);
+	app_ps = skr_shader_stage_create(shader_glsl_ps, skr_shader_pixel);
+	app_vs = skr_shader_stage_create(shader_glsl_vs, skr_shader_vertex);
 #else
-	app_ps = skr_shader_create(shader_hlsl, skr_shader_pixel);
-	app_vs = skr_shader_create(shader_hlsl, skr_shader_vertex);
+	app_ps = skr_shader_stage_create(shader_hlsl, skr_shader_pixel);
+	app_vs = skr_shader_stage_create(shader_hlsl, skr_shader_vertex);
 #endif
-	app_shader = skr_shader_program_create(&app_vs, &app_ps);
+	app_shader = skr_shader_create(&app_vs, &app_ps);
 
 	app_shader_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t), skr_buffer_type_constant, skr_use_dynamic);
 	return true;
@@ -274,9 +274,9 @@ bool app_init() {
 
 void app_shutdown() {
 	skr_buffer_destroy(&app_shader_buffer);
-	skr_shader_program_destroy(&app_shader);
-	skr_shader_destroy(&app_ps);
-	skr_shader_destroy(&app_vs);
+	skr_shader_destroy(&app_shader);
+	skr_shader_stage_destroy(&app_ps);
+	skr_shader_stage_destroy(&app_vs);
 	skr_tex_destroy(&app_tex);
 	app_mesh_destroy(&app_mesh1);
 	app_mesh_destroy(&app_mesh2);
@@ -323,7 +323,7 @@ bool app_step() {
 
 	skr_buffer_set(&app_shader_buffer, 0, sizeof(app_shader_data_t), 0);
 	skr_mesh_set(&app_mesh1.mesh);
-	skr_shader_program_set(&app_shader);
+	skr_shader_set(&app_shader);
 	skr_tex_set_active(&app_tex, 0);
 	skr_draw(0, app_mesh1.ind_count, 1);
 
@@ -332,7 +332,7 @@ bool app_step() {
 	memcpy(app_shader_data.world, &world, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_buffer, &app_shader_data, sizeof(app_shader_data));
 	skr_mesh_set(&app_mesh2.mesh);
-	skr_shader_program_set(&app_shader);
+	skr_shader_set(&app_shader);
 	skr_draw(0, app_mesh2.ind_count, 1);
 
 	return true;
@@ -843,7 +843,7 @@ void app_render_layer(XrCompositionLayerProjectionView &view, swapchain_surfdata
 
 	skr_buffer_set(&app_shader_buffer, 0, sizeof(app_shader_data_t), 0);
 	skr_mesh_set(&app_mesh1.mesh);
-	skr_shader_program_set(&app_shader);
+	skr_shader_set(&app_shader);
 	skr_tex_set_active(&app_tex, 0);
 	skr_draw(0, app_mesh1.ind_count, 1);
 
@@ -852,7 +852,7 @@ void app_render_layer(XrCompositionLayerProjectionView &view, swapchain_surfdata
 	memcpy(app_shader_data.world, &world, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_buffer, &app_shader_data, sizeof(app_shader_data));
 	skr_mesh_set(&app_mesh2.mesh);
-	skr_shader_program_set(&app_shader);
+	skr_shader_set(&app_shader);
 	skr_draw(0, app_mesh2.ind_count, 1);
 }
 

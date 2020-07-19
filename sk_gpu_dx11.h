@@ -16,15 +16,15 @@ typedef struct skr_mesh_t {
 	ID3D11Buffer *vert_buffer;
 } skr_mesh_t;
 
-typedef struct skr_shader_t {
+typedef struct skr_shader_stage_t {
 	skr_shader_  type;
 	void        *shader;
-} skr_shader_t;
+} skr_shader_stage_t;
 
-typedef struct skr_shader_program_t {
+typedef struct skr_shader_t {
 	ID3D11VertexShader *vertex;
 	ID3D11PixelShader  *pixel;
-} skr_shader_program_t;
+} skr_shader_t;
 
 typedef struct skr_tex_t {
 	int32_t width;

@@ -21,14 +21,14 @@ typedef struct skr_gl_attr_t {
 	void    *offset;
 } skr_gl_attr_t;
 
-typedef struct skr_shader_t {
+typedef struct skr_shader_stage_t {
 	skr_shader_ type;
 	uint32_t    shader;
-} skr_shader_t;
+} skr_shader_stage_t;
 
-typedef struct skr_shader_program_t {
+typedef struct skr_shader_t {
 	uint32_t program;
-} skr_shader_program_t;
+} skr_shader_t;
 
 typedef struct skr_tex_t {
 	int32_t       width;

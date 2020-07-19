@@ -239,8 +239,8 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 /////////////////////////////////////////// 
 
 #include <stdio.h>
-skr_shader_t skr_shader_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
-	skr_shader_t result = {};
+skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
+	skr_shader_stage_t result = {};
 	result.type = type;
 
 	DWORD flags = D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
@@ -277,7 +277,7 @@ skr_shader_t skr_shader_create(const uint8_t *file_data, size_t shader_size, skr
 
 /////////////////////////////////////////// 
 
-void skr_shader_destroy(skr_shader_t *shader) {
+void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 	switch(shader->type) {
 	case skr_shader_vertex: ((ID3D11VertexShader*)shader->shader)->Release(); break;
 	case skr_shader_pixel : ((ID3D11PixelShader *)shader->shader)->Release(); break;
@@ -286,8 +286,8 @@ void skr_shader_destroy(skr_shader_t *shader) {
 
 /////////////////////////////////////////// 
 
-skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const skr_shader_t *pixel) {
-	skr_shader_program_t result = {};
+skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel) {
+	skr_shader_t result = {};
 	if (pixel) {
 		result.pixel = (ID3D11PixelShader *)pixel->shader;
 		result.pixel->AddRef();
@@ -301,14 +301,14 @@ skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const
 
 /////////////////////////////////////////// 
 
-void skr_shader_program_set(const skr_shader_program_t *program) {
+void skr_shader_set(const skr_shader_t *program) {
 	d3d_context->VSSetShader(program->vertex, nullptr, 0);
 	d3d_context->PSSetShader(program->pixel,  nullptr, 0);
 }
 
 /////////////////////////////////////////// 
 
-void skr_shader_program_destroy(skr_shader_program_t *program) {
+void skr_shader_destroy(skr_shader_t *program) {
 	if (program->pixel ) program->pixel ->Release();
 	if (program->vertex) program->vertex->Release();
 	*program = {};

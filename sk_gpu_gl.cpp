@@ -521,8 +521,8 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 
 /////////////////////////////////////////// 
 
-skr_shader_t skr_shader_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
-	skr_shader_t result = {}; 
+skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
+	skr_shader_stage_t result = {}; 
 	result.type = type;
 
 	uint32_t gl_type = 0;
@@ -556,15 +556,15 @@ skr_shader_t skr_shader_create(const uint8_t *file_data, size_t shader_size, skr
 
 /////////////////////////////////////////// 
 
-void skr_shader_destroy(skr_shader_t *shader) {
+void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 	glDeleteShader(shader->shader);
 	*shader = {};
 }
 
 /////////////////////////////////////////// 
 
-skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const skr_shader_t *pixel) {
-	skr_shader_program_t result = {};
+skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel) {
+	skr_shader_t result = {};
 
 	result.program = glCreateProgram();
 	if (vertex) glAttachShader(result.program, vertex->shader);
@@ -591,13 +591,13 @@ skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const
 
 /////////////////////////////////////////// 
 
-void skr_shader_program_set(const skr_shader_program_t *program) {
+void skr_shader_set(const skr_shader_t *program) {
 	glUseProgram(program->program);
 }
 
 /////////////////////////////////////////// 
 
-void skr_shader_program_destroy(skr_shader_program_t *program) {
+void skr_shader_destroy(skr_shader_t *program) {
 	glDeleteProgram(program->program);
 	*program = {};
 }

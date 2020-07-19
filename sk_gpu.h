@@ -126,12 +126,12 @@ skr_mesh_t           skr_mesh_create           (const skr_buffer_t *vert_buffer,
 void                 skr_mesh_set              (const skr_mesh_t *mesh);
 void                 skr_mesh_destroy          (      skr_mesh_t *mesh);
 
-skr_shader_t         skr_shader_create         (const uint8_t *shader_data, size_t shader_size, skr_shader_ type);
-void                 skr_shader_destroy        (skr_shader_t *shader);
+skr_shader_stage_t   skr_shader_stage_create   (const uint8_t *shader_data, size_t shader_size, skr_shader_ type);
+void                 skr_shader_stage_destroy  (skr_shader_stage_t *stage);
 
-skr_shader_program_t skr_shader_program_create (const skr_shader_t *vertex, const skr_shader_t *pixel);
-void                 skr_shader_program_set    (const skr_shader_program_t *program);
-void                 skr_shader_program_destroy(      skr_shader_program_t *program);
+skr_shader_t         skr_shader_create         (const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel);
+void                 skr_shader_set            (const skr_shader_t *shader);
+void                 skr_shader_destroy        (      skr_shader_t *shader);
 
 skr_swapchain_t      skr_swapchain_create      (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);
 void                 skr_swapchain_resize      (      skr_swapchain_t *swapchain, int32_t width, int32_t height);

@@ -703,11 +703,11 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
-// Shader                                //
+// Shader Stage                          //
 ///////////////////////////////////////////
 
-skr_shader_t skr_shader_create(const uint8_t *shader_data, size_t shader_size, skr_shader_ type) {
-	skr_shader_t result = {};
+skr_shader_stage_t skr_shader_stage_create(const uint8_t *shader_data, size_t shader_size, skr_shader_ type) {
+	skr_shader_stage_t result = {};
 	result.type = type;
 
 	VkShaderModuleCreateInfo shader_info = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -720,17 +720,17 @@ skr_shader_t skr_shader_create(const uint8_t *shader_data, size_t shader_size, s
 
 	return result;
 }
-void skr_shader_destroy(skr_shader_t *shader) {
-	vkDestroyShaderModule(skr_device.device, shader->module, nullptr);
-	*shader = {};
+void skr_shader_stage_destroy(skr_shader_stage_t *stage) {
+	vkDestroyShaderModule(skr_device.device, stage->module, nullptr);
+	*stage = {};
 }
 
 ///////////////////////////////////////////
-// Shader Program                        //
+// Shader                                //
 ///////////////////////////////////////////
 
-skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const skr_shader_t *pixel) {
-	skr_shader_program_t result = {};
+skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel) {
+	skr_shader_t result = {};
 
 	vk_pipeline_info_t info = {};
 
@@ -847,14 +847,14 @@ skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const
 
 	return result;
 }
-void skr_shader_program_set(const skr_shader_program_t *program) {
-	vk_active_pipeline = &vk_pipeline_cache[program->pipeline].pipelines[skr_active_rendertarget->rt_renderpass];
+void skr_shader_set(const skr_shader_t *shader) {
+	vk_active_pipeline = &vk_pipeline_cache[shader->pipeline].pipelines[skr_active_rendertarget->rt_renderpass];
 	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
 }
-void skr_shader_program_destroy(skr_shader_program_t *program) {
-	if (program->pipeline)        vk_pipeline_release(program->pipeline);
-	if (program->pipeline_layout) vkDestroyPipelineLayout(skr_device.device, program->pipeline_layout, nullptr);
-	*program = {};
+void skr_shader_destroy(skr_shader_t *shader) {
+	if (shader->pipeline)        vk_pipeline_release(shader->pipeline);
+	if (shader->pipeline_layout) vkDestroyPipelineLayout(skr_device.device, shader->pipeline_layout, nullptr);
+	*shader = {};
 }
 
 ///////////////////////////////////////////

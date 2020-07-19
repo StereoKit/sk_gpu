@@ -15,15 +15,15 @@ typedef struct skr_buffer_t {
 typedef struct skr_mesh_t {
 } skr_mesh_t;
 
-typedef struct skr_shader_t {
+typedef struct skr_shader_stage_t {
 	skr_shader_    type;
 	VkShaderModule module;
-} skr_shader_t;
+} skr_shader_stage_t;
 
-typedef struct skr_shader_program_t {
+typedef struct skr_shader_t {
 	int64_t pipeline;
 	VkPipelineLayout pipeline_layout;
-} skr_shader_program_t;
+} skr_shader_t;
 
 typedef struct skr_tex_t {
 	int32_t         width;

@@ -8,6 +8,8 @@
 typedef struct skr_buffer_t {
 	skr_use_         use;
 	skr_buffer_type_ type;
+	VkBuffer         buffer;
+	VkDeviceMemory   memory;
 };
 
 typedef struct skr_mesh_t {

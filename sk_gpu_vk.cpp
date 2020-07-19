@@ -223,10 +223,24 @@ void vk_renderpass_release(int64_t id) {
 
 #define D3D_FRAME_COUNT 2
 
-VkInstance    vk_inst         = VK_NULL_HANDLE;
-VkCommandPool vk_cmd_pool     = VK_NULL_HANDLE;
+VkInstance    vk_inst               = VK_NULL_HANDLE;
+VkCommandPool vk_cmd_pool           = VK_NULL_HANDLE;
+VkCommandPool vk_cmd_pool_transient = VK_NULL_HANDLE;
+
+// Vertex layout info
+VkVertexInputBindingDescription      skr_vert_bind    = { 0, sizeof(skr_vert_t), VK_VERTEX_INPUT_RATE_VERTEX };
+VkVertexInputAttributeDescription    skr_vert_attrs[] = {
+	{ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(skr_vert_t, pos)  },
+	{ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(skr_vert_t, norm) },
+	{ 2, 0, VK_FORMAT_R32G32_SFLOAT,    offsetof(skr_vert_t, uv)   },
+	{ 3, 0, VK_FORMAT_R8G8B8A8_UNORM,   offsetof(skr_vert_t, col)  }, };
+VkPipelineVertexInputStateCreateInfo skr_vertex_layout = { 
+	VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, nullptr, 0,
+	1,                       &skr_vert_bind,
+	_countof(skr_vert_attrs), skr_vert_attrs };
 
 const skr_tex_t *skr_active_rendertarget = nullptr;
+VkPipeline *vk_active_pipeline = nullptr;
 
 skr_tex_fmt_ skr_native_to_tex_fmt(VkFormat format);
 
@@ -261,7 +275,7 @@ bool vk_create_instance(const char *app_name, VkInstance *out_inst) {
 
 	VkDebugReportCallbackCreateInfoEXT callback_info = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT };
 	callback_info.flags = 
-		VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
+		//VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
 		VK_DEBUG_REPORT_WARNING_BIT_EXT | 
 		VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT  | 
 		VK_DEBUG_REPORT_ERROR_BIT_EXT  | 
@@ -436,19 +450,25 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	if (!vk_create_instance (app_name, &vk_inst)) return -1;
 	if (!vk_create_device   (vk_inst, app_hwnd, &skr_device)) return -2;
 
-	// Initialize the renderer
 	VkCommandPoolCreateInfo cmd_pool_info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 	cmd_pool_info.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	cmd_pool_info.queueFamilyIndex = skr_device.queue_gfx_index;
 	vkCreateCommandPool(skr_device.device, &cmd_pool_info, 0, &vk_cmd_pool);
 
-	return result == VK_SUCCESS ? 1 : -4;
+	// A command pool for short-lived command buffers
+	cmd_pool_info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+	cmd_pool_info.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+	cmd_pool_info.queueFamilyIndex = skr_device.queue_gfx_index;
+	vkCreateCommandPool(skr_device.device, &cmd_pool_info, 0, &vk_cmd_pool_transient);
+
+	return 1;
 }
 
 ///////////////////////////////////////////
 
 void skr_shutdown() {
 	vkDeviceWaitIdle(skr_device.device);
+	vkDestroyCommandPool(skr_device.device, vk_cmd_pool_transient, 0);
 	vkDestroyCommandPool(skr_device.device, vk_cmd_pool, 0);
 	vkDestroySurfaceKHR(vk_inst, skr_device.surface, 0);
 	vkDestroyDevice(skr_device.device, 0);
@@ -496,8 +516,6 @@ void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target,
 
 	VkClearValue clear_values = {};
 	memcpy(&clear_values.color, clear_color, sizeof(float) * 4);
-	clear_values.depthStencil.depth   = 1;
-	clear_values.depthStencil.stencil = 0;
 
 	VkRenderPassBeginInfo renderPassInfo = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
 	renderPassInfo.renderPass  = vk_renderpass_cache[render_target->rt_renderpass].renderpass;
@@ -521,8 +539,108 @@ void skr_draw (int32_t index_start, int32_t index_count, int32_t instance_count)
 // Buffer                                //
 ///////////////////////////////////////////
 
+int32_t vk_find_mem_type(uint32_t type_filter, VkMemoryPropertyFlags properties) {
+	VkPhysicalDeviceMemoryProperties props;
+	vkGetPhysicalDeviceMemoryProperties(skr_device.phys_device, &props);
+	for (uint32_t i = 0; i < props.memoryTypeCount; i++) {
+		if ((type_filter & (1 << i)) && (props.memoryTypes[i].propertyFlags & properties) == properties) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *out_buffer, VkDeviceMemory *out_memory) {
+	VkBufferCreateInfo buff_info = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+	buff_info.size        = size;
+	buff_info.usage       = usage;
+	buff_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateBuffer(skr_device.device, &buff_info, nullptr, out_buffer) != VK_SUCCESS) {
+		printf("failed to create buffer!");
+	}
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(skr_device.device, *out_buffer, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+	allocInfo.allocationSize  = memRequirements.size;
+	allocInfo.memoryTypeIndex = vk_find_mem_type(memRequirements.memoryTypeBits, properties);
+
+	if (vkAllocateMemory(skr_device.device, &allocInfo, nullptr, out_memory) != VK_SUCCESS) {
+		printf("failed to allocate buffer memory!");
+	}
+
+	vkBindBufferMemory(skr_device.device, *out_buffer, *out_memory, 0);
+}
+
+void vk_copy_buffer(VkBuffer src, VkBuffer dest, VkDeviceSize size) {
+	VkCommandBufferAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+	allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool        = vk_cmd_pool_transient;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer commandBuffer;
+	vkAllocateCommandBuffers(skr_device.device, &allocInfo, &commandBuffer);
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+	VkBufferCopy copyRegion = {};
+	copyRegion.size = size;
+	vkCmdCopyBuffer(commandBuffer, src, dest, 1, &copyRegion);
+
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	vkQueueSubmit  (skr_device.queue_gfx, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(skr_device.queue_gfx);
+	vkFreeCommandBuffers(skr_device.device, vk_cmd_pool_transient, 1, &commandBuffer);
+}
+
 skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
+	result.type = type;
+	result.use  = use;
+
+	VkBufferUsageFlags usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	switch (type) {
+	case skr_buffer_type_vertex:   usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;  break;
+	case skr_buffer_type_index:    usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;   break;
+	case skr_buffer_type_constant: usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; break;
+	}
+
+	VkBuffer       stage_buffer;
+	VkDeviceMemory stage_memory;
+	vk_create_buffer(size_bytes, 
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&stage_buffer, &stage_memory);
+
+	void* gpu_data;
+	vkMapMemory(skr_device.device, stage_memory, 0, size_bytes, 0, &gpu_data);
+	memcpy(gpu_data, data, (size_t)size_bytes);
+	vkUnmapMemory(skr_device.device, stage_memory);
+
+	vk_create_buffer(size_bytes, 
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+		usage,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&result.buffer, &result.memory);
+
+	vk_copy_buffer(stage_buffer, result.buffer, size_bytes);
+
+	vkDestroyBuffer(skr_device.device, stage_buffer, nullptr);
+	vkFreeMemory   (skr_device.device, stage_memory, nullptr);
+
 	return result;
 }
 
@@ -534,11 +652,25 @@ void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_byt
 ///////////////////////////////////////////
 
 void skr_buffer_set(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
+	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
+
+	
+	switch (buffer->type) {
+	case skr_buffer_type_vertex: {
+		VkBuffer     buffers[] = {buffer->buffer};
+		VkDeviceSize offsets[] = {offset};
+		vkCmdBindVertexBuffers(skr_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets);
+	} break;
+	case skr_buffer_type_index : vkCmdBindIndexBuffer  (skr_active_rendertarget->rt_commandbuffer, buffer->buffer, offset, VK_INDEX_TYPE_UINT32); break;
+	//case skr_buffer_type_vertex: vkCmdBindVertexBuffers(skr_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets); break;
+	};
 }
 
 ///////////////////////////////////////////
 
 void skr_buffer_destroy(skr_buffer_t *buffer) {
+	vkDestroyBuffer(skr_device.device, buffer->buffer, nullptr);
+	*buffer = {};
 }
 
 ///////////////////////////////////////////
@@ -586,6 +718,8 @@ skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const
 
 	vk_pipeline_info_t info = {};
 
+	info.vertex_info = skr_vertex_layout;
+
 	info.shader_stages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	info.shader_stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
 	info.shader_stages[0].module = vertex->module;
@@ -594,12 +728,6 @@ skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const
 	info.shader_stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
 	info.shader_stages[1].module = pixel->module;
 	info.shader_stages[1].pName  = "ps";
-
-	info.vertex_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	info.vertex_info.vertexBindingDescriptionCount   = 0;
-	info.vertex_info.pVertexBindingDescriptions      = nullptr; // Optional
-	info.vertex_info.vertexAttributeDescriptionCount = 0;
-	info.vertex_info.pVertexAttributeDescriptions    = nullptr; // Optional
 
 	info.input_asm.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	info.input_asm.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -650,7 +778,7 @@ skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const
 	info.dynamic_states[0] = VK_DYNAMIC_STATE_VIEWPORT;
 
 	info.dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	info.dynamic_state.dynamicStateCount = 1;
+	info.dynamic_state.dynamicStateCount = 0;// 1;
 	info.dynamic_state.pDynamicStates    = info.dynamic_states;
 
 	VkPipelineLayoutCreateInfo pipe_layout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
@@ -704,7 +832,8 @@ skr_shader_program_t skr_shader_program_create(const skr_shader_t *vertex, const
 	return result;
 }
 void skr_shader_program_set(const skr_shader_program_t *program) {
-	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipeline_cache[program->pipeline].pipelines[skr_active_rendertarget->rt_renderpass]);
+	vk_active_pipeline = &vk_pipeline_cache[program->pipeline].pipelines[skr_active_rendertarget->rt_renderpass];
+	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
 }
 void skr_shader_program_destroy(skr_shader_program_t *program) {
 	if (program->pipeline)        vk_pipeline_release(program->pipeline);

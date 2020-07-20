@@ -338,7 +338,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 
 	ID3D11Texture2D *back_buffer;
 	result.d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, format);
+	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, format, width, height);
 	result.depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
 	skr_tex_set_data(&result.depth, nullptr, 1, width, height);
 	back_buffer->Release();
@@ -367,7 +367,7 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 
 	ID3D11Texture2D *back_buffer;
 	swapchain->d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	swapchain->target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt);
+	swapchain->target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height);
 	swapchain->depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
 	skr_tex_set_data(&swapchain->depth, nullptr, 1, width, height);
 	back_buffer->Release();
@@ -375,8 +375,15 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 
 /////////////////////////////////////////// 
 
-void skr_swapchain_present(const skr_swapchain_t *swapchain) {
+void skr_swapchain_present(skr_swapchain_t *swapchain) {
 	swapchain->d3d_swapchain->Present(1, 0);
+}
+
+/////////////////////////////////////////// 
+
+void skr_swapchain_get_next(skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth) {
+	*out_target = swapchain->target.format != 0 ? &swapchain->target : nullptr;
+	*out_depth  = swapchain->depth .format != 0 ? &swapchain->depth  : nullptr;
 }
 
 /////////////////////////////////////////// 
@@ -402,7 +409,7 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format) {
+skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height) {
 	skr_tex_t result = {};
 	result.type    = type;
 	result.use     = skr_use_static;

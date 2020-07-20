@@ -239,6 +239,7 @@ const char *skr_semantic_to_d3d   (skr_el_semantic_ semantic);
 uint32_t    skr_buffer_type_to_gl (skr_buffer_type_ type);
 uint32_t    skr_tex_fmt_to_gl_type    (skr_tex_fmt_ format);
 uint32_t    skr_tex_fmt_to_gl_layout  (skr_tex_fmt_ format);
+skr_tex_fmt_ skr_gl_to_skr_fmt(uint32_t format);
 
 ///////////////////////////////////////////
 
@@ -533,7 +534,7 @@ skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shad
 
 	// create and compile the vertex shader
 	result.shader = glCreateShader(gl_type);
-	glShaderSource (result.shader, 1, &file_data, NULL);
+	glShaderSource (result.shader, 1, (char**)&file_data, NULL);
 	glCompileShader(result.shader);
 
 	// check for errors?
@@ -616,11 +617,18 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 
 /////////////////////////////////////////// 
 
-void skr_swapchain_present(const skr_swapchain_t *swapchain) {
+void skr_swapchain_present(skr_swapchain_t *swapchain) {
 #ifdef __EMSCRIPTEN__
 #else
 	SwapBuffers(gl_hdc);
 #endif
+}
+
+/////////////////////////////////////////// 
+
+void skr_swapchain_get_next(skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth) {
+	*out_target = nullptr;
+	*out_depth = nullptr;
 }
 
 /////////////////////////////////////////// 

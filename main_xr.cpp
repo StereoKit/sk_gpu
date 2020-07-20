@@ -153,7 +153,7 @@ vector<swapchain_t>             xr_swapchains;
 
 PFN_xrGetGraphicsRequirementsKHR ext_xrGetGraphicsRequirementsKHR;
 
-bool openxr_init          (const char *app_name, void *hwnd, int32_t screen_width, int32_t screen_height, int64_t swapchain_format);
+bool openxr_init          (const char *app_name, void *hwnd, int32_t screen_width, int32_t screen_height);
 void openxr_make_actions  ();
 void openxr_shutdown      ();
 void openxr_poll_events   (bool &exit);
@@ -257,12 +257,15 @@ bool app_init() {
 	skr_tex_settings(&app_tex, skr_tex_address_repeat, skr_tex_sample_linear, 0);
 	skr_tex_set_data(&app_tex, color_arr, 1, w, h);
 
-#ifdef SKR_OPENGL
-	app_ps = skr_shader_stage_create(shader_glsl_ps, skr_shader_pixel);
-	app_vs = skr_shader_stage_create(shader_glsl_vs, skr_shader_vertex);
-#else
-	app_ps = skr_shader_stage_create(shader_hlsl, skr_shader_pixel);
-	app_vs = skr_shader_stage_create(shader_hlsl, skr_shader_vertex);
+#if defined(SKR_OPENGL)
+	app_ps = skr_shader_stage_create((uint8_t*)shader_glsl_ps, strlen(shader_glsl_ps), skr_shader_pixel);
+	app_vs = skr_shader_stage_create((uint8_t*)shader_glsl_vs, strlen(shader_glsl_vs), skr_shader_vertex);
+#elif defined(SKR_DIRECT3D11)
+	app_ps = skr_shader_stage_create((uint8_t*)shader_hlsl, strlen(shader_hlsl), skr_shader_pixel);
+	app_vs = skr_shader_stage_create((uint8_t*)shader_hlsl, strlen(shader_hlsl), skr_shader_vertex);
+#elif defined(SKR_VULKAN)
+	app_ps = skr_shader_stage_create(shader_spirv_ps, _countof(shader_spirv_ps), skr_shader_pixel);
+	app_vs = skr_shader_stage_create(shader_spirv_vs, _countof(shader_spirv_vs), skr_shader_vertex);
 #endif
 	app_shader = skr_shader_create(&app_vs, &app_ps);
 
@@ -406,7 +409,7 @@ bool openxr_init(const char *app_name, void *hwnd, int32_t screen_width, int32_t
 #ifdef SKR_DIRECT3D11
 	luid = (void *)&requirement.adapterLuid;
 #endif
-	if (!skr_init(app_name, luid))
+	if (!skr_init(app_name, nullptr, luid))
 		return false;
 
 	// A session represents this application's desire to display things! This is where we hook up our graphics API.
@@ -488,7 +491,7 @@ bool openxr_init(const char *app_name, void *hwnd, int32_t screen_width, int32_t
 #elif defined(SKR_OPENGL)
 			void *tex = &swapchain.surface_images[i].image;
 #endif
-			result.render_tex = skr_tex_from_native(tex, skr_tex_type_rendertarget, xr_swapchain_fmt);
+			result.render_tex = skr_tex_from_native(tex, skr_tex_type_rendertarget, xr_swapchain_fmt, swapchain.width, swapchain.height);
 			result.depth_tex  = skr_tex_create(skr_tex_type_depth, skr_use_static, skr_tex_fmt_depth32, skr_mip_none);
 			skr_tex_set_data(&result.depth_tex, nullptr, 1, swapchain_info.width, swapchain_info.height);
 			swapchain.surface_data[i] = result;

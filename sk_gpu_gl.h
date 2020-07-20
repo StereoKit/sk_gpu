@@ -38,6 +38,7 @@ typedef struct skr_tex_t {
 	skr_tex_fmt_  format;
 	skr_mip_      mips;
 	uint32_t      texture;
+	uint32_t      framebuffer;
 } skr_tex_t;
 
 typedef struct skr_platform_data_t {

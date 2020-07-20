@@ -76,6 +76,8 @@ HGLRC gl_hrc;
 #define GL_MIRRORED_REPEAT 0x8370
 #define GL_TEXTURE_MAX_ANISOTROPY 0x84FE
 #define GL_TEXTURE0 0x84C0
+#define GL_FRAMEBUFFER 0x8D40
+#define GL_COLOR_ATTACHMENT0 0x8CE0
 
 #define GL_RED 0x1903
 #define GL_RGBA 0x1908
@@ -179,8 +181,11 @@ typedef void (WINAPI *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
     GLE(void,     BindBuffer,              uint32_t target, uint32_t buffer) \
     GLE(void,     DeleteBuffers,           int32_t n, const uint32_t *buffers) \
 	GLE(void,     GenTextures,             int32_t n, uint32_t *textures) \
+	GLE(void,     GenFramebuffers,         int32_t n, uint32_t *ids) \
 	GLE(void,     DeleteTextures,          int32_t n, const uint32_t *textures) \
 	GLE(void,     BindTexture,             uint32_t target, uint32_t texture) \
+	GLE(void,     BindFramebuffer,         uint32_t target, uint32_t framebuffer) \
+	GLE(void,     FramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
     GLE(void,     TexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
 	GLE(void,     GetInternalformativ,     uint32_t target, uint32_t internalformat, uint32_t pname, int32_t bufSize, int32_t *params)\
 	GLE(void,     GetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
@@ -330,6 +335,20 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	// Real OpenGL initialization            //
 	///////////////////////////////////////////
 
+	if (app_hwnd == nullptr) {
+		WNDCLASSA win_class = { 0 };
+		win_class.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+		win_class.lpfnWndProc   = DefWindowProcA;
+		win_class.hInstance     = GetModuleHandle(0);
+		win_class.lpszClassName = "SKGPUWindow";
+		if (!RegisterClassA(&win_class))
+			return false;
+
+		app_hwnd = CreateWindowExA(0, win_class.lpszClassName, "sk_gpu Window", 0, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, win_class.hInstance, 0);
+		if (!app_hwnd)
+			return false;
+	}
+
 	gl_hwnd = (HWND)app_hwnd;
 	gl_hdc  = GetDC(gl_hwnd);
 
@@ -422,6 +441,9 @@ void skr_draw_begin() {
 ///////////////////////////////////////////
 
 void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
+	glBindFramebuffer(GL_FRAMEBUFFER, render_target->framebuffer);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target->texture, 0);
+
 	glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
@@ -650,19 +672,25 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format) {
+skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height) {
 	skr_tex_t result = {};
 	result.type    = type;
 	result.use     = skr_use_static;
 	result.mips    = skr_mip_none;
 	result.texture = *(uint32_t *)native_tex;
+	result.format  = format;
+	result.width   = width;
+	result.height  = height;
 
 	int32_t t_fmt;
-	glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_INTERNAL_FORMAT, &t_fmt);
-	glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_WIDTH,  &result.width);
-	glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_HEIGHT, &result.height);
-	result.format = override_format ? override_format : skr_gl_to_skr_fmt( t_fmt );
+	//glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_INTERNAL_FORMAT, &t_fmt);
+	//glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_WIDTH,  &result.width);
+	//glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_HEIGHT, &result.height);
 
+	if (type == skr_tex_type_rendertarget) {
+		glGenFramebuffers(1, &result.framebuffer);
+	}
+	
 	return result;
 }
 
@@ -720,7 +748,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 	uint32_t format = (uint32_t)skr_tex_fmt_to_native(tex->format);
 	uint32_t type   = skr_tex_fmt_to_gl_type    (tex->format);
 	uint32_t layout = skr_tex_fmt_to_gl_layout  (tex->format);
-	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames==nullptr?nullptr:data_frames[0]);
 	if (tex->mips == skr_mip_generate)
 		glGenerateMipmap(GL_TEXTURE_2D);
 }

@@ -1,3 +1,4 @@
+/*
 #ifndef __EMSCRIPTEN__
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
@@ -258,3 +259,4 @@ void app_mesh_destroy(app_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
+*/

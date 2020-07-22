@@ -5,7 +5,7 @@
 
 // Also see here for OpenXR GL reference:
 // https://github.com/jherico/OpenXR-Samples/blob/master/src/examples/sdl2_gl_single_file_example.cpp
-/*
+
 // OpenXR platform defines
 #define XR_USE_PLATFORM_WIN32
 
@@ -870,7 +870,7 @@ void app_swapchain_destroy(swapchain_t &swapchain) {
 
 ///////////////////////////////////////////
 
-hmm_mat4 xr_projection(XrFovf fov, float clip_near, float clip_far) {
+hmm_mat4 xr_projection_dx(XrFovf fov, float clip_near, float clip_far) {
 	// Mix of XMMatrixPerspectiveFovRH from DirectXMath and XrMatrix4x4f_CreateProjectionFov from xr_linear.h
 	const float tanLeft        = tanf(fov.angleLeft);
 	const float tanRight       = tanf(fov.angleRight);
@@ -893,4 +893,80 @@ hmm_mat4 xr_projection(XrFovf fov, float clip_near, float clip_far) {
 	hmm_mat4 result;
 	memcpy(&result, arr, sizeof(hmm_mat4));
 	return result;
-}*/
+}
+
+hmm_mat4 xr_projection(XrFovf fov, float nearZ, float farZ)
+{
+	const float tanLeft        = tanf(fov.angleLeft);
+	const float tanRight       = tanf(fov.angleRight);
+	const float tanDown        = tanf(fov.angleDown);
+	const float tanUp          = tanf(fov.angleUp);
+
+	const float tanAngleWidth = tanRight - tanLeft;
+
+	// Set to tanAngleDown - tanAngleUp for a clip space with positive Y
+	// down (Vulkan). Set to tanAngleUp - tanAngleDown for a clip space with
+	// positive Y up (OpenGL / D3D / Metal).
+#if defined(SKR_VULKAN)
+	const float tanAngleHeight = (tanDown - tanUp);
+#else
+	const float tanAngleHeight = (tanUp - tanDown);
+#endif
+
+	// Set to nearZ for a [-1,1] Z clip space (OpenGL / OpenGL ES).
+	// Set to zero for a [0,1] Z clip space (Vulkan / D3D / Metal).
+#if defined(SKR_OPENGL) || defined(SKR_OPENGLES)
+	const float offsetZ = nearZ;
+#else
+	const float offsetZ = 0;
+#endif
+
+	float result[16] = { 0 };
+	if (farZ <= nearZ) {
+		// place the far plane at infinity
+		result[0] = 2 / tanAngleWidth;
+		result[4] = 0;
+		result[8] = (tanRight + tanLeft) / tanAngleWidth;
+		result[12] = 0;
+
+		result[1] = 0;
+		result[5] = 2 / tanAngleHeight;
+		result[9] = (tanUp + tanDown) / tanAngleHeight;
+		result[13] = 0;
+
+		result[2] = 0;
+		result[6] = 0;
+		result[10] = -1;
+		result[14] = -(nearZ + offsetZ);
+
+		result[3] = 0;
+		result[7] = 0;
+		result[11] = -1;
+		result[15] = 0;
+	} else {
+		// normal projection
+		result[0] = 2 / tanAngleWidth;
+		result[4] = 0;
+		result[8] = (tanRight + tanLeft) / tanAngleWidth;
+		result[12] = 0;
+
+		result[1] = 0;
+		result[5] = 2 / tanAngleHeight;
+		result[9] = (tanUp + tanDown) / tanAngleHeight;
+		result[13] = 0;
+
+		result[2] = 0;
+		result[6] = 0;
+		result[10] = -(farZ + offsetZ) / (farZ - nearZ);
+		result[14] = -(farZ * (nearZ + offsetZ)) / (farZ - nearZ);
+
+		result[3] = 0;
+		result[7] = 0;
+		result[11] = -1;
+		result[15] = 0;
+	}
+
+	hmm_mat4 resultMat;
+	memcpy(&resultMat, result, sizeof(hmm_mat4));
+	return resultMat;
+}

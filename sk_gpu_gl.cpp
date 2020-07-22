@@ -206,6 +206,7 @@ typedef void (WINAPI *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
 	GLE(void,     DebugMessageCallback,    GLDEBUGPROC callback, const void *userParam) \
 	GLE(void,     BindBufferBase,          uint32_t target, uint32_t index, uint32_t buffer) \
 	GLE(void,     BufferSubData,           uint32_t target, int64_t offset, int32_t size, const void *data) \
+	GLE(void,     Viewport,                int32_t x, int32_t y, int32_t width, int32_t height) \
 	GLE(void,     CullFace,                uint32_t mode) \
 	GLE(const char *, GetString,           uint32_t name)
 
@@ -441,8 +442,11 @@ void skr_draw_begin() {
 ///////////////////////////////////////////
 
 void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
-	glBindFramebuffer(GL_FRAMEBUFFER, render_target->framebuffer);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target->texture, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, render_target == nullptr? 0 : render_target->framebuffer);
+	if (render_target) {
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target->texture, 0);
+		glViewport(0, 0, render_target->width, render_target->height);
+	}
 
 	glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

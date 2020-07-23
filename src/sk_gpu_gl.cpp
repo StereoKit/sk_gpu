@@ -10,7 +10,16 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <GLES3/gl32.h>
-#else
+#elif __ANDROID__
+#include <EGL/egl.h>
+//#include <GLES/gl.h>
+//#include <GLES3/gl32.h>
+//#include <GLES3/gl3ext.h>
+
+EGLDisplay egl_display;
+EGLSurface egl_surface;
+EGLContext egl_context;
+#elif _WIN32
 #pragma comment(lib, "opengl32.lib")
 
 #define EMSCRIPTEN_KEEPALIVE
@@ -21,6 +30,7 @@
 HWND  gl_hwnd;
 HDC   gl_hdc;
 HGLRC gl_hrc;
+#endif
 
 ///////////////////////////////////////////
 // GL loader                             //
@@ -157,7 +167,17 @@ HGLRC gl_hrc;
 #define GL_DEBUG_SEVERITY_MEDIUM 0x9147
 #define GL_DEBUG_SEVERITY_LOW 0x9148
 
-typedef void (WINAPI *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char* message, const void* userParam);
+//#endif
+
+#if defined(_WIN32) || defined(__ANDROID__)
+
+#ifdef _WIN32
+#define GLDECL __stdcall
+#else
+#define GLDECL
+#endif
+
+typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char* message, const void* userParam);
 
 #define GL_API \
     GLE(void,     LinkProgram,             uint32_t program) \
@@ -213,10 +233,11 @@ typedef void (WINAPI *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
 	GLE(void,     CullFace,                uint32_t mode) \
 	GLE(const char *, GetString,           uint32_t name)
 
-#define GLDECL WINAPI
 #define GLE(ret, name, ...) typedef ret GLDECL name##proc(__VA_ARGS__); static name##proc * gl##name;
 GL_API
 #undef GLE
+
+#ifdef _WIN32
 
 // from https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions
 // Some GL functions can only be loaded with wglGetProcAddress, and others
@@ -234,7 +255,18 @@ static void gl_load_extensions( ) {
 	GL_API
 #undef GLE
 }
+
+#else
+
+static void gl_load_extensions( ) {
+#define GLE(ret, name, ...) gl##name = (name##proc *) eglGetProcAddress("gl" #name); if (gl##name == nullptr) printf("Couldn't load gl function gl" #name "\n");
+	GL_API
+#undef GLE
+}
+
 #endif
+
+#endif // _WIN32 or __ANDROID__
 
 ///////////////////////////////////////////
 
@@ -243,11 +275,11 @@ int      gl_height      = 0;
 
 ///////////////////////////////////////////
 
-size_t      skr_el_to_size        (skr_fmt_ desc);
-const char *skr_semantic_to_d3d   (skr_el_semantic_ semantic);
-uint32_t    skr_buffer_type_to_gl (skr_buffer_type_ type);
-uint32_t    skr_tex_fmt_to_gl_type    (skr_tex_fmt_ format);
-uint32_t    skr_tex_fmt_to_gl_layout  (skr_tex_fmt_ format);
+size_t       skr_el_to_size        (skr_fmt_ desc);
+const char  *skr_semantic_to_d3d   (skr_el_semantic_ semantic);
+uint32_t     skr_buffer_type_to_gl (skr_buffer_type_ type);
+uint32_t     skr_tex_fmt_to_gl_type    (skr_tex_fmt_ format);
+uint32_t     skr_tex_fmt_to_gl_layout  (skr_tex_fmt_ format);
 skr_tex_fmt_ skr_gl_to_skr_fmt(uint32_t format);
 
 ///////////////////////////////////////////
@@ -265,18 +297,8 @@ void console_log(const char *str) {
 ///////////////////////////////////////////
 
 // Some nice reference: https://gist.github.com/nickrolfe/1127313ed1dbf80254b614a721b3ee9c
-int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
-#ifdef __EMSCRIPTEN__
-	EmscriptenWebGLContextAttributes attrs;
-	emscripten_webgl_init_context_attributes(&attrs);
-	attrs.alpha = true;
-	attrs.depth = true;
-	attrs.enableExtensionsByDefault = true;
-	attrs.majorVersion = 2;
-	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context("canvas", &attrs);
-	emscripten_webgl_make_context_current(ctx);
-#else
-	
+int32_t gl_init_win32(void *app_hwnd) {
+#ifdef _WIN32
 	///////////////////////////////////////////
 	// Dummy initialization for pixel format //
 	///////////////////////////////////////////
@@ -415,9 +437,78 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 		} else {
 			printf("err: %s\n", message);
 		}
-	}, nullptr);
+		}, nullptr);
 #endif
+	return 1;
+}
 
+///////////////////////////////////////////
+
+int32_t gl_init_emscripten() {
+#ifdef __EMSCRIPTEN__
+	EmscriptenWebGLContextAttributes attrs;
+	emscripten_webgl_init_context_attributes(&attrs);
+	attrs.alpha = true;
+	attrs.depth = true;
+	attrs.enableExtensionsByDefault = true;
+	attrs.majorVersion = 2;
+	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context("canvas", &attrs);
+	emscripten_webgl_make_context_current(ctx);
+#endif
+	return 1;
+}
+
+///////////////////////////////////////////
+
+int32_t gl_init_android(void *native_window) {
+#ifdef __ANDROID__
+	const EGLint attribs[] = {
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+		EGL_BLUE_SIZE, 8,
+		EGL_GREEN_SIZE, 8,
+		EGL_RED_SIZE, 8,
+		EGL_NONE
+	};
+	EGLint w, h, format;
+	EGLint numConfigs;
+	EGLConfig config;
+
+	egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+
+	eglInitialize     (egl_display, 0, 0);
+	eglChooseConfig   (egl_display, attribs, &config, 1, &numConfigs);
+	eglGetConfigAttrib(egl_display, config, EGL_NATIVE_VISUAL_ID, &format);
+
+	//ANativeWindow_setBuffersGeometry(engine->app->window, 0, 0, format);
+
+	egl_surface = eglCreateWindowSurface(egl_display, config, (EGLNativeWindowType)native_window, nullptr);
+	egl_context = eglCreateContext      (egl_display, config, nullptr, nullptr);
+
+	if (eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_FALSE) {
+		console_log("Unable to eglMakeCurrent");
+		return -1;
+	}
+
+	eglQuerySurface(egl_display, egl_surface, EGL_WIDTH,  &gl_width);
+	eglQuerySurface(egl_display, egl_surface, EGL_HEIGHT, &gl_height);
+#endif
+	return 1;
+}
+
+///////////////////////////////////////////
+
+
+int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
+#if defined(_WIN32)
+	int32_t result = gl_init_win32(app_hwnd);
+#elif defined(__ANDROID__)
+	int32_t result = gl_init_android(app_hwnd);
+#elif defined(__EMSCRIPTEN__)
+	int32_t result = gl_init_emscripten();
+#endif
+	if (!result)
+		return result;
+	
 	// Some default behavior
 	glEnable(GL_DEPTH_TEST);  
 	glEnable(GL_CULL_FACE);
@@ -429,11 +520,20 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 ///////////////////////////////////////////
 
 void skr_shutdown() {
-#ifdef __EMSCRIPTEN__
-#else
+#ifdef _WIN32
 	wglMakeCurrent(NULL, NULL);
 	ReleaseDC(gl_hwnd, gl_hdc);
 	wglDeleteContext(gl_hrc);
+#elif __ANDROID__
+	if (egl_display != EGL_NO_DISPLAY) {
+		eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+		if (egl_context != EGL_NO_CONTEXT) eglDestroyContext(egl_display, egl_context);
+		if (egl_surface != EGL_NO_SURFACE) eglDestroySurface(egl_display, egl_surface);
+		eglTerminate(egl_display);
+	}
+	egl_display = EGL_NO_DISPLAY;
+	egl_context = EGL_NO_CONTEXT;
+	egl_surface = EGL_NO_SURFACE;
 #endif
 }
 
@@ -459,8 +559,10 @@ void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target,
 
 skr_platform_data_t skr_get_platform_data() {
 	skr_platform_data_t result = {};
+#ifdef _WIN32
 	result.gl_hdc = gl_hdc;
 	result.gl_hrc = gl_hrc;
+#endif
 
 	return result;
 }
@@ -647,9 +749,10 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 /////////////////////////////////////////// 
 
 void skr_swapchain_present(skr_swapchain_t *swapchain) {
-#ifdef __EMSCRIPTEN__
-#else
+#ifdef _WIN32
 	SwapBuffers(gl_hdc);
+#elif __ANDROID__
+	eglSwapBuffers(egl_display, egl_surface);
 #endif
 }
 
@@ -688,11 +791,6 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 	result.format  = format;
 	result.width   = width;
 	result.height  = height;
-
-	int32_t t_fmt;
-	//glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_INTERNAL_FORMAT, &t_fmt);
-	//glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_WIDTH,  &result.width);
-	//glGetTexLevelParameteriv(result.texture, 0, GL_TEXTURE_HEIGHT, &result.height);
 
 	if (type == skr_tex_type_rendertarget) {
 		glGenFramebuffers(1, &result.framebuffer);
@@ -740,8 +838,8 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, mode);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-#ifndef __EMSCRIPTEN__
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1);
+#ifdef _WIN32
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
 }
 

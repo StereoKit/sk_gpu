@@ -677,7 +677,7 @@ void skr_buffer_set(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, 
 		VkDeviceSize offsets[] = {offset};
 		vkCmdBindVertexBuffers(skr_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets);
 	} break;
-	case skr_buffer_type_index : vkCmdBindIndexBuffer  (skr_active_rendertarget->rt_commandbuffer, buffer->buffer, offset, VK_INDEX_TYPE_UINT32); break;
+	case skr_buffer_type_index : vkCmdBindIndexBuffer(skr_active_rendertarget->rt_commandbuffer, buffer->buffer, offset, VK_INDEX_TYPE_UINT32); break;
 	//case skr_buffer_type_vertex: vkCmdBindVertexBuffers(skr_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets); break;
 	};
 }
@@ -797,9 +797,43 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 	info.dynamic_state.dynamicStateCount = 0;// 1;
 	info.dynamic_state.pDynamicStates    = info.dynamic_states;
 
+	VkDescriptorSetLayoutBinding layout_binding = {};
+	layout_binding.binding            = 0;
+	layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	layout_binding.descriptorCount    = 1;
+	layout_binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+	layout_binding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+	layout_info.bindingCount = 1;
+	layout_info.pBindings    = &layout_binding;
+
+	VkDescriptorSetLayout desc_layout;
+	vkCreateDescriptorSetLayout(skr_device.device, &layout_info, nullptr, &desc_layout);
+
+	// Descriptor sets???
+	VkDescriptorPoolSize poolSize = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
+	poolSize.descriptorCount = 1;
+	VkDescriptorPoolCreateInfo poolInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+	poolInfo.poolSizeCount   = 1;
+	poolInfo.pPoolSizes      = &poolSize;
+	poolInfo.maxSets         = 1;
+	VkDescriptorPool descriptorPool;
+	if (vkCreateDescriptorPool(skr_device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+		printf("failed to create descriptor pool!");
+	}
+	VkDescriptorSetAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+	allocInfo.descriptorPool     = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts        = &desc_layout;
+	VkDescriptorSet desc_set;
+	if (vkAllocateDescriptorSets(skr_device.device, &allocInfo, &desc_set) != VK_SUCCESS) {
+		printf("failed to allocate descriptor sets!");
+	}
+
 	VkPipelineLayoutCreateInfo pipe_layout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-	pipe_layout.setLayoutCount         = 0; // Optional
-	pipe_layout.pSetLayouts            = nullptr; // Optional
+	pipe_layout.setLayoutCount         = 1;
+	pipe_layout.pSetLayouts            = &desc_layout;
 	pipe_layout.pushConstantRangeCount = 0; // Optional
 	pipe_layout.pPushConstantRanges    = nullptr; // Optional
 
@@ -1114,18 +1148,51 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 }
 skr_tex_t            skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps) {
 	skr_tex_t result = {};
+	result.type = type;
+	result.use = use;
+	result.format = format;
+	result.mips = mip_maps;
 	result.rt_renderpass = -1;
 	return result;
 }
-void                 skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {}
-void                 skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {}
-void                 skr_tex_set_active(const skr_tex_t *tex, int32_t slot) {}
+void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {}
+void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+	VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+	imageInfo.imageType     = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width  = width;
+	imageInfo.extent.height = height;
+	imageInfo.extent.depth  = 1;
+	imageInfo.mipLevels     = 1;
+	imageInfo.arrayLayers   = data_frame_count;
+	imageInfo.format        = VK_FORMAT_R8G8B8A8_SRGB;
+	imageInfo.tiling        = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage         = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.flags         = 0; // Optional
+	vkCreateImage(skr_device.device, &imageInfo, nullptr, &tex->texture);
+
+	VkMemoryRequirements memRequirements;
+	vkGetImageMemoryRequirements(skr_device.device, tex->texture, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = vk_find_mem_type(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	vkAllocateMemory(skr_device.device, &allocInfo, nullptr, &tex->texture_mem);
+	vkBindImageMemory(skr_device.device, tex->texture, tex->texture_mem, 0);
+}
+void skr_tex_set_active(const skr_tex_t *tex, int32_t slot) {}
+
+///////////////////////////////////////////
+
 void skr_tex_destroy(skr_tex_t *tex) {
 	if (tex->rt_framebuffer) vkDestroyFramebuffer(skr_device.device, tex->rt_framebuffer, nullptr);
 	if (tex->rt_renderpass ) vk_renderpass_release(tex->rt_renderpass);
 	
 	if (tex->view)        vkDestroyImageView  (skr_device.device, tex->view,        nullptr);
 	if (tex->texture)     vkDestroyImage      (skr_device.device, tex->texture,     nullptr);
+	if (tex->texture_mem) vkFreeMemory        (skr_device.device, tex->texture_mem, nullptr);
 	*tex = {};
 }
 

@@ -34,6 +34,7 @@ typedef struct skr_tex_t {
 	skr_mip_        mips;
 
 	VkImage         texture;
+	VkDeviceMemory  texture_mem;
 	VkImageView     view;
 
 	VkFramebuffer   rt_framebuffer;

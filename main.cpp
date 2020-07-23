@@ -10,7 +10,7 @@ HWND app_hwnd;
 #define _countof(a) (sizeof(a)/sizeof(*(a)))
 #endif
 
-#include "sk_gpu.h"
+#include "src/sk_gpu_dev.h"
 #include "shaders.h"
 
 #include <stdlib.h>

@@ -58,7 +58,7 @@
 
 HWND app_hwnd;
 
-#include "sk_gpu.h"
+#include "src/sk_gpu_dev.h"
 #include "shaders.h"
 
 #include <openxr/openxr.h>

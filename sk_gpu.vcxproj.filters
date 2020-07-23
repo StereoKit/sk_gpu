@@ -3,23 +3,49 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="main_xr.cpp" />
-    <ClCompile Include="sk_gpu_dx11.cpp" />
-    <ClCompile Include="sk_gpu_dx12.cpp" />
-    <ClCompile Include="sk_gpu_gl.cpp" />
-    <ClCompile Include="sk_gpu_vk.cpp" />
+    <ClCompile Include="src\sk_gpu_dx11.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sk_gpu_dx12.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sk_gpu_gl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sk_gpu_vk.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="HandmadeMath.h" />
     <ClInclude Include="shaders.h" />
-    <ClInclude Include="sk_gpu.h" />
-    <ClInclude Include="sk_gpu_dx11.h" />
-    <ClInclude Include="sk_gpu_dx12.h" />
-    <ClInclude Include="sk_gpu_gl.h" />
-    <ClInclude Include="sk_gpu_vk.h" />
+    <ClInclude Include="src\d3dx12.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sk_gpu_dev.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sk_gpu_dx11.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sk_gpu_dx12.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sk_gpu_gl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sk_gpu_vk.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="$(OpenXRLoaderBinaryRoot)\bin\openxr_loader.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{69f1b716-342a-48ef-a7fb-991f867b21f5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

@@ -1,6 +1,7 @@
 #ifdef SKR_VULKAN
 #include "sk_gpu_dev.h"
-
+///////////////////////////////////////////
+// Vulkan Implementation                 //
 ///////////////////////////////////////////
 
 #pragma comment(lib,"vulkan-1.lib")

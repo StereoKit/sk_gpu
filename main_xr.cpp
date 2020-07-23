@@ -1,7 +1,12 @@
-//#define SKR_VULKAN
-//#define SKR_DIRECT3D12
-//#define SKR_DIRECT3D11
+/*
+
+// When using single file header like normal, do this
 //#define SKR_OPENGL
+//#define SKR_IMPL
+//#include "sk_gpu.h"
+
+// For easier development
+#include "src/sk_gpu_dev.h"
 
 // Also see here for OpenXR GL reference:
 // https://github.com/jherico/OpenXR-Samples/blob/master/src/examples/sdl2_gl_single_file_example.cpp
@@ -58,7 +63,6 @@
 
 HWND app_hwnd;
 
-#include "src/sk_gpu_dev.h"
 #include "shaders.h"
 
 #include <openxr/openxr.h>
@@ -970,3 +974,4 @@ hmm_mat4 xr_projection(XrFovf fov, float nearZ, float farZ)
 	memcpy(&resultMat, result, sizeof(hmm_mat4));
 	return resultMat;
 }
+*/

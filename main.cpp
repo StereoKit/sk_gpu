@@ -1,4 +1,4 @@
-/*
+
 #ifndef __EMSCRIPTEN__
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
@@ -10,7 +10,14 @@ HWND app_hwnd;
 #define _countof(a) (sizeof(a)/sizeof(*(a)))
 #endif
 
+// When using single file header like normal, do this
+//#define SKR_OPENGL
+//#define SKR_IMPL
+//#include "sk_gpu.h"
+
+// For easier development
 #include "src/sk_gpu_dev.h"
+
 #include "shaders.h"
 
 #include <stdlib.h>
@@ -259,4 +266,3 @@ void app_mesh_destroy(app_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
-*/

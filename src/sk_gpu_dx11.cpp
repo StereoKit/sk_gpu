@@ -1,5 +1,8 @@
 #ifdef SKR_DIRECT3D11
 #include "sk_gpu_dev.h"
+///////////////////////////////////////////
+// Direct3D11 Implementation             //
+///////////////////////////////////////////
 
 #pragma comment(lib,"D3D11.lib")
 #pragma comment(lib,"Dxgi.lib")

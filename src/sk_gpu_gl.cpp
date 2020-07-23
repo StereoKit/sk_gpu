@@ -1,5 +1,8 @@
 #ifdef SKR_OPENGL
 #include "sk_gpu_dev.h"
+///////////////////////////////////////////
+// OpenGL Implementation                 //
+///////////////////////////////////////////
 
 #include <malloc.h>
 

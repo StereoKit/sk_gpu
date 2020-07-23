@@ -4,6 +4,9 @@
 
 #ifdef SKR_DIRECT3D12
 #include "sk_gpu_dev.h"
+///////////////////////////////////////////
+// Direct3D12 Implementation             //
+///////////////////////////////////////////
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")

@@ -12,8 +12,9 @@
 #include <GLES3/gl32.h>
 #elif __ANDROID__
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 //#include <GLES/gl.h>
-//#include <GLES3/gl32.h>
+//#include <GLES3/gl3.h>
 //#include <GLES3/gl3ext.h>
 
 EGLDisplay egl_display;
@@ -464,25 +465,32 @@ int32_t gl_init_android(void *native_window) {
 #ifdef __ANDROID__
 	const EGLint attribs[] = {
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-		EGL_BLUE_SIZE, 8,
+		EGL_CONFORMANT,   EGL_OPENGL_ES3_BIT_KHR,
+		EGL_BLUE_SIZE,  8,
 		EGL_GREEN_SIZE, 8,
-		EGL_RED_SIZE, 8,
+		EGL_RED_SIZE,   8,
+		EGL_ALPHA_SIZE, 8,
+		EGL_DEPTH_SIZE, 16,
 		EGL_NONE
 	};
+	EGLint context_attribs[] = { 
+		EGL_CONTEXT_CLIENT_VERSION, 3, 
+		EGL_NONE, EGL_NONE };
 	EGLint w, h, format;
 	EGLint numConfigs;
 	EGLConfig config;
 
 	egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 
-	eglInitialize     (egl_display, 0, 0);
+	int32_t major, minor;
+	eglInitialize     (egl_display, &major, &minor);
 	eglChooseConfig   (egl_display, attribs, &config, 1, &numConfigs);
 	eglGetConfigAttrib(egl_display, config, EGL_NATIVE_VISUAL_ID, &format);
-
+	
 	//ANativeWindow_setBuffersGeometry(engine->app->window, 0, 0, format);
 
 	egl_surface = eglCreateWindowSurface(egl_display, config, (EGLNativeWindowType)native_window, nullptr);
-	egl_context = eglCreateContext      (egl_display, config, nullptr, nullptr);
+	egl_context = eglCreateContext      (egl_display, config, nullptr, context_attribs);
 
 	if (eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_FALSE) {
 		console_log("Unable to eglMakeCurrent");

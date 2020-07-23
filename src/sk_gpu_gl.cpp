@@ -1,5 +1,5 @@
 #ifdef SKR_OPENGL
-#include "sk_gpu.h"
+#include "sk_gpu_dev.h"
 
 #include <malloc.h>
 

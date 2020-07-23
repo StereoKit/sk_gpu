@@ -3,7 +3,7 @@
 // https://www.3dgep.com/learning-directx-12-1/#Direct3D
 
 #ifdef SKR_DIRECT3D12
-#include "sk_gpu.h"
+#include "sk_gpu_dev.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")

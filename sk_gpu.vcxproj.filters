@@ -17,7 +17,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="d3dx12.h" />
     <ClInclude Include="HandmadeMath.h" />
     <ClInclude Include="shaders.h" />
     <ClInclude Include="src\d3dx12.h">

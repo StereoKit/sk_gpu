@@ -120,7 +120,6 @@ bool app_init() {
 	app_swapchain = skr_swapchain_create(skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, app_width, app_height);
 #endif
 
-	
 
 	// Make a cube
 	skr_vert_t verts[] = {

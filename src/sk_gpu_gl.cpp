@@ -422,27 +422,6 @@ int32_t gl_init_win32(void *app_hwnd) {
 		skr_log("Couldn't activate GL context!");
 		return false;
 	}
-
-	// Load OpenGL function pointers
-	gl_load_extensions();
-
-	char version_text[128];
-	sprintf_s(version_text, "sk_gpu: Using OpenGL %s", glGetString(GL_VERSION));
-	skr_log(version_text);
-
-#if _DEBUG
-	// Set up debug info for development
-	glEnable(GL_DEBUG_OUTPUT);
-	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
-		if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
-			//skr_log(message);
-		} else {
-			skr_log(message);
-		}
-		}, nullptr);
-#endif
-
 #endif
 	return 1;
 }
@@ -491,8 +470,6 @@ int32_t gl_init_android(void *native_window) {
 	eglChooseConfig   (egl_display, attribs, &config, 1, &numConfigs);
 	eglGetConfigAttrib(egl_display, config, EGL_NATIVE_VISUAL_ID, &format);
 	
-	//ANativeWindow_setBuffersGeometry(engine->app->window, 0, 0, format);
-
 	egl_surface = eglCreateWindowSurface(egl_display, config, (EGLNativeWindowType)native_window, nullptr);
 	egl_context = eglCreateContext      (egl_display, config, nullptr, context_attribs);
 
@@ -520,6 +497,25 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 #endif
 	if (!result)
 		return result;
+
+	// Load OpenGL function pointers
+	gl_load_extensions();
+
+	char version_text[128];
+	sprintf(version_text, "sk_gpu: Using OpenGL %s", glGetString(GL_VERSION));
+	skr_log(version_text);
+
+#if _DEBUG
+	// Set up debug info for development
+	glEnable(GL_DEBUG_OUTPUT);
+	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
+		if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
+			//skr_log(message);
+		} else {
+			skr_log(message);
+		} }, nullptr);
+#endif
 	
 	// Some default behavior
 	glEnable(GL_DEPTH_TEST);  

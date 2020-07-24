@@ -12,6 +12,8 @@
     <ClInclude Include="..\..\src\sk_gpu_vk.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\HandmadeMath.h" />
+    <ClInclude Include="..\..\shaders.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c" />

@@ -38,7 +38,6 @@ void                     *d3d_hwnd        = nullptr;
 size_t       skr_el_to_size(skr_fmt_ desc);
 DXGI_FORMAT  skr_el_to_d3d (skr_fmt_ desc);
 const char  *skr_semantic_to_d3d(skr_el_semantic_ semantic);
-skr_tex_fmt_ skr_d3d_to_tex_fmt(DXGI_FORMAT format);
 uint32_t     skr_tex_fmt_size  (skr_tex_fmt_ format);
 bool         skr_tex_make_view (skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, bool use_in_shader);
 
@@ -869,7 +868,7 @@ int64_t skr_tex_fmt_to_native(skr_tex_fmt_ format){
 
 /////////////////////////////////////////// 
 
-skr_tex_fmt_ skr_d3d_to_tex_fmt(DXGI_FORMAT format) {
+skr_tex_fmt_ skr_tex_fmt_from_native(int64_t format) {
 	switch (format) {
 	case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return skr_tex_fmt_rgba32;
 	case DXGI_FORMAT_R8G8B8A8_UNORM:      return skr_tex_fmt_rgba32_linear;

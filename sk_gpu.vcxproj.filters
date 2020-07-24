@@ -37,6 +37,7 @@
     <ClInclude Include="src\sk_gpu_vk.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="xr_app.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

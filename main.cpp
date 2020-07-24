@@ -1,3 +1,4 @@
+/*
 
 #ifndef __EMSCRIPTEN__
 #define VC_EXTRALEAN
@@ -266,3 +267,4 @@ void app_mesh_destroy(app_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
+*/

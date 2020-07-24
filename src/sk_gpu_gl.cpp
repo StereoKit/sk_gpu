@@ -293,7 +293,6 @@ const char  *skr_semantic_to_d3d   (skr_el_semantic_ semantic);
 uint32_t     skr_buffer_type_to_gl (skr_buffer_type_ type);
 uint32_t     skr_tex_fmt_to_gl_type    (skr_tex_fmt_ format);
 uint32_t     skr_tex_fmt_to_gl_layout  (skr_tex_fmt_ format);
-skr_tex_fmt_ skr_gl_to_skr_fmt(uint32_t format);
 
 ///////////////////////////////////////////
 
@@ -795,7 +794,7 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 	result.type    = type;
 	result.use     = skr_use_static;
 	result.mips    = skr_mip_none;
-	result.texture = *(uint32_t *)native_tex;
+	result.texture = (uint32_t)native_tex;
 	result.format  = format;
 	result.width   = width;
 	result.height  = height;
@@ -961,7 +960,7 @@ int64_t skr_tex_fmt_to_native(skr_tex_fmt_ format) {
 
 /////////////////////////////////////////// 
 
-skr_tex_fmt_ skr_gl_to_skr_fmt(uint32_t format) {
+skr_tex_fmt_ skr_tex_fmt_from_native(int64_t format) {
 	switch (format) {
 	case GL_SRGB8_ALPHA8:       return skr_tex_fmt_rgba32;
 	case GL_RGBA8:              return skr_tex_fmt_rgba32_linear;

@@ -5,6 +5,19 @@
 ///////////////////////////////////////////
 
 #include <malloc.h>
+#include <stdio.h>
+
+///////////////////////////////////////////
+
+void (*_skr_log)(const char *text);
+void skr_log_callback(void (*callback)(const char *text)) {
+	_skr_log = callback;
+}
+void skr_log(const char *text) {
+	if (_skr_log) _skr_log(text);
+}
+
+///////////////////////////////////////////
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -26,7 +39,6 @@ EGLContext egl_context;
 #define EMSCRIPTEN_KEEPALIVE
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <stdio.h>
 
 HWND  gl_hwnd;
 HDC   gl_hdc;
@@ -252,7 +264,7 @@ void *gl_get_func(const char *name, HMODULE module) {
 }
 static void gl_load_extensions( ) {
 	HMODULE dll = LoadLibraryA("opengl32.dll");
-#define GLE(ret, name, ...) gl##name = (name##proc *) gl_get_func("gl" #name, dll); if (gl##name == nullptr) printf("Couldn't load gl function gl" #name " %d\n", GetLastError());
+#define GLE(ret, name, ...) gl##name = (name##proc *) gl_get_func("gl" #name, dll); if (gl##name == nullptr) skr_log("Couldn't load gl function gl" #name);
 	GL_API
 #undef GLE
 }
@@ -260,7 +272,7 @@ static void gl_load_extensions( ) {
 #else
 
 static void gl_load_extensions( ) {
-#define GLE(ret, name, ...) gl##name = (name##proc *) eglGetProcAddress("gl" #name); if (gl##name == nullptr) printf("Couldn't load gl function gl" #name "\n");
+#define GLE(ret, name, ...) gl##name = (name##proc *) eglGetProcAddress("gl" #name); if (gl##name == nullptr) skr_log("Couldn't load gl function gl" #name);
 	GL_API
 #undef GLE
 }
@@ -282,18 +294,6 @@ uint32_t     skr_buffer_type_to_gl (skr_buffer_type_ type);
 uint32_t     skr_tex_fmt_to_gl_type    (skr_tex_fmt_ format);
 uint32_t     skr_tex_fmt_to_gl_layout  (skr_tex_fmt_ format);
 skr_tex_fmt_ skr_gl_to_skr_fmt(uint32_t format);
-
-///////////////////////////////////////////
-
-#if __EMSCRIPTEN__
-EM_JS(void, console_log, (const char *arg), {
-	console.log(""+Module.UTF8ToString(arg));
-	});
-#else
-void console_log(const char *str) {
-	printf(str);
-}
-#endif
 
 ///////////////////////////////////////////
 
@@ -329,20 +329,20 @@ int32_t gl_init_win32(void *app_hwnd) {
 
 	int pixel_format = ChoosePixelFormat(dummy_dc, &format_desc);
 	if (!pixel_format) {
-		printf("Failed to find a suitable pixel format.\n");
+		skr_log("Failed to find a suitable pixel format.");
 		return false;
 	}
 	if (!SetPixelFormat(dummy_dc, pixel_format, &format_desc)) {
-		printf("Failed to set the pixel format.\n");
+		skr_log("Failed to set the pixel format.");
 		return false;
 	}
 	HGLRC dummy_context = wglCreateContext(dummy_dc);
 	if (!dummy_context) {
-		printf("Failed to create a dummy OpenGL rendering context.\n");
+		skr_log("Failed to create a dummy OpenGL rendering context.");
 		return false;
 	}
 	if (!wglMakeCurrent(dummy_dc, dummy_context)) {
-		printf("Failed to activate dummy OpenGL rendering context.\n");
+		skr_log("Failed to activate dummy OpenGL rendering context.");
 		return false;
 	}
 
@@ -396,14 +396,14 @@ int32_t gl_init_win32(void *app_hwnd) {
 	pixel_format = 0;
 	UINT num_formats = 0;
 	if (!wglChoosePixelFormatARB(gl_hdc, format_attribs, nullptr, 1, &pixel_format, &num_formats)) {
-		printf("Couldn't find pixel format!");
+		skr_log("Couldn't find pixel format!");
 		return false;
 	}
 
 	memset(&format_desc, 0, sizeof(format_desc));
 	DescribePixelFormat(gl_hdc, pixel_format, sizeof(format_desc), &format_desc);
 	if (!SetPixelFormat(gl_hdc, pixel_format, &format_desc)) {
-		printf("Couldn't set pixel format!");
+		skr_log("Couldn't set pixel format!");
 		return false;
 	}
 
@@ -415,30 +415,34 @@ int32_t gl_init_win32(void *app_hwnd) {
 		0 };
 	gl_hrc = wglCreateContextAttribsARB( gl_hdc, 0, attributes );
 	if (!gl_hrc) {
-		printf("Couldn't create GL context!");
+		skr_log("Couldn't create GL context!");
 		return false;
 	}
 	if (!wglMakeCurrent(gl_hdc, gl_hrc)) {
-		printf("Couldn't activate GL context!");
+		skr_log("Couldn't activate GL context!");
 		return false;
 	}
 
 	// Load OpenGL function pointers
 	gl_load_extensions();
 
-	const char *version = glGetString(GL_VERSION);
-	printf("sk_gpu: Using OpenGL %s\n", version);
+	char version_text[128];
+	sprintf_s(version_text, "sk_gpu: Using OpenGL %s", glGetString(GL_VERSION));
+	skr_log(version_text);
 
+#if _DEBUG
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
 		if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
-			printf("info: %s\n", message);
+			//skr_log(message);
 		} else {
-			printf("err: %s\n", message);
+			skr_log(message);
 		}
 		}, nullptr);
+#endif
+
 #endif
 	return 1;
 }
@@ -493,7 +497,7 @@ int32_t gl_init_android(void *native_window) {
 	egl_context = eglCreateContext      (egl_display, config, nullptr, context_attribs);
 
 	if (eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_FALSE) {
-		console_log("Unable to eglMakeCurrent");
+		skr_log("Unable to eglMakeCurrent");
 		return -1;
 	}
 
@@ -686,8 +690,8 @@ skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shad
 		log = (char*)malloc(length);
 		glGetShaderInfoLog(result.shader, length, &err, log);
 
-		console_log("Unable to compile shader:\n");
-		console_log(log);
+		skr_log("Unable to compile shader:\n");
+		skr_log(log);
 		free(log);
 	}
 
@@ -721,8 +725,8 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 		log = (char*)malloc(length);
 		glGetShaderInfoLog(result.program, length, &err, log);
 
-		console_log("Unable to compile shader program:\n");
-		console_log(log);
+		skr_log("Unable to compile shader program:");
+		skr_log(log);
 		free(log);
 	}
 

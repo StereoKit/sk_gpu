@@ -366,8 +366,6 @@ void app_mesh_destroy(app_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
-
-///////////////////////////////////////////
 // OpenXR code                           //
 ///////////////////////////////////////////
 
@@ -413,6 +411,7 @@ bool openxr_init(const char *app_name, void *hwnd, int32_t screen_width, int32_t
 #ifdef SKR_DIRECT3D11
 	luid = (void *)&requirement.adapterLuid;
 #endif
+	skr_log_callback([](const char *text) { printf("%s\n", text); });
 	if (!skr_init(app_name, nullptr, luid))
 		return false;
 

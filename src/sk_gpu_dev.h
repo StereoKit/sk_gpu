@@ -116,6 +116,7 @@ skr_platform_data_t  skr_get_platform_data     ();
 void                 skr_set_render_target     (float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target);
 void                 skr_draw                  (int32_t index_start, int32_t index_count, int32_t instance_count);
 int64_t              skr_tex_fmt_to_native     (skr_tex_fmt_ format);
+void                 skr_log_callback          (void (*callback)(const char *text));
 
 skr_buffer_t         skr_buffer_create         (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
 void                 skr_buffer_update         (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);

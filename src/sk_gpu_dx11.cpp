@@ -16,6 +16,16 @@
 
 ///////////////////////////////////////////
 
+void (*_skr_log)(const char *text);
+void skr_log_callback(void (*callback)(const char *text)) {
+	_skr_log = callback;
+}
+void skr_log(const char *text) {
+	if (_skr_log) _skr_log(text);
+}
+
+///////////////////////////////////////////
+
 ID3D11Device             *d3d_device      = nullptr;
 ID3D11DeviceContext      *d3d_context     = nullptr;
 ID3D11InfoQueue          *d3d_info        = nullptr;
@@ -71,7 +81,7 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 	if (FAILED(D3D11CreateDevice(final_adapter, final_adapter == nullptr ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_UNKNOWN, 0, creation_flags, feature_levels, _countof(feature_levels), D3D11_SDK_VERSION, &d3d_device, nullptr, &d3d_context))) {
 		return -1;
 	}
-	printf("sk_gpu: Using Direct3D 11\n");
+	skr_log("sk_gpu: Using Direct3D 11");
 
 	if (final_adapter != nullptr)
 		final_adapter->Release();
@@ -254,8 +264,10 @@ skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shad
 #endif
 
 	ID3DBlob *compiled, *errors;
-	if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_shader_pixel ? "ps" : "vs", type == skr_shader_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors)))
-		printf("Error: D3DCompile failed %s", (char*)errors->GetBufferPointer());
+	if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_shader_pixel ? "ps" : "vs", type == skr_shader_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
+		skr_log("Error - D3DCompile failed:");
+		skr_log((char *)errors->GetBufferPointer());
+	}
 	if (errors) errors->Release();
 
 	switch(type) {
@@ -440,7 +452,7 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 	result.mips   = mip_maps;
 
 	if (use == skr_use_dynamic && mip_maps == skr_mip_generate)
-		printf("Dynamic textures don't support mip-maps!");
+		skr_log("Dynamic textures don't support mip-maps!");
 
 	return result;
 }
@@ -479,7 +491,7 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	// D3D will already return the same sampler when provided the same settings, so we
 	// can just lean on that to prevent sampler duplicates :)
 	if (FAILED(d3d_device->CreateSamplerState(&desc_sampler, &tex->sampler)))
-		printf("skr_tex_settings: failed to create sampler state!");
+		skr_log("skr_tex_settings: failed to create sampler state!");
 }
 
 ///////////////////////////////////////////
@@ -539,7 +551,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 		}
 
 		if (use_in_shader && FAILED(d3d_device->CreateShaderResourceView(tex->texture, &res_desc, &tex->resource))) {
-			printf("Create Shader Resource View error!");
+			skr_log("Create Shader Resource View error!");
 			return false;
 		}
 	} else {
@@ -552,7 +564,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 			stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 		}
 		if (FAILED(d3d_device->CreateDepthStencilView(tex->texture, &stencil_desc, &tex->depth_view))) {
-			printf("Create Depth Stencil View error!");
+			skr_log("Create Depth Stencil View error!");
 			return false;
 		}
 	}
@@ -568,7 +580,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 		}
 
 		if (FAILED(d3d_device->CreateRenderTargetView(tex->texture, &target_desc, &tex->target_view))) {
-			printf("Create Render Target View error!");
+			skr_log("Create Render Target View error!");
 			return false;
 		}
 	}
@@ -580,11 +592,11 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	// Some warning messages
 	if (tex->use != skr_use_dynamic && tex->texture) {
-		printf("Only dynamic textures can be updated!");
+		skr_log("Only dynamic textures can be updated!");
 		return;
 	}
 	if (tex->use == skr_use_dynamic && (tex->mips == skr_mip_generate || data_frame_count > 1)) {
-		printf("Dynamic textures don't support mip-maps or texture arrays!");
+		skr_log("Dynamic textures don't support mip-maps or texture arrays!");
 		return;
 	}
 
@@ -623,7 +635,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 		}
 
 		if (FAILED(d3d_device->CreateTexture2D(&desc, tex_mem, &tex->texture))) {
-			printf("Create texture error!");
+			skr_log("Create texture error!");
 		}
 
 		if (tex_mem != nullptr) {
@@ -640,7 +652,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
 		if (FAILED(d3d_context->Map(tex->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem))) {
-			printf("Failed mapping a texture");
+			skr_log("Failed mapping a texture");
 			return;
 		}
 

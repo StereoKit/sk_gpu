@@ -15,6 +15,7 @@
     <ClCompile Include="src\sk_gpu_vk.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="app.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HandmadeMath.h" />
@@ -38,6 +39,7 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="xr_app.h" />
+    <ClInclude Include="app.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

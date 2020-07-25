@@ -156,6 +156,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="app.cpp" />
     <ClCompile Include="main_xr.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="src\sk_gpu_dx11.cpp">
@@ -185,6 +186,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HandmadeMath.h" />
+    <ClInclude Include="app.h" />
     <ClInclude Include="shaders.h" />
     <ClInclude Include="src\d3dx12.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>

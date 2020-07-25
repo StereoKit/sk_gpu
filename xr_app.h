@@ -78,22 +78,24 @@ struct xr_callbacks_t {
 
 ///////////////////////////////////////////
 
-bool openxr_init (const char *app_name, xr_callbacks_t *callbacks, void *hwnd);
-bool openxr_step ();
+bool openxr_init      (const char *app_name, xr_callbacks_t *callbacks);
+bool openxr_step      ();
+void openxr_projection(XrFovf fov, float nearZ, float farZ, float *out_matrix);
 
 ///////////////////////////////////////////
 
 #ifdef XR_APP_IMPL
 
-#include <vector>
+#include <malloc.h>
+#include <math.h>
 
 ///////////////////////////////////////////
 
 struct swapchain_t {
-	XrSwapchain handle;
-	int32_t     width;
-	int32_t     height;
-	std::vector<XrSwapchainImage> surface_images;
+	int32_t           width;
+	int32_t           height;
+	XrSwapchain       handle;
+	XrSwapchainImage *surface_images;
 };
 
 struct input_state_t {
@@ -123,9 +125,11 @@ input_state_t          xr_input         = { };
 XrEnvironmentBlendMode xr_blend;
 xr_callbacks_t         xr_callbacks = {};
 
-std::vector<XrView>                  xr_views;
-std::vector<XrViewConfigurationView> xr_config_views;
-std::vector<swapchain_t>             xr_swapchains;
+XrView                           *xr_views;
+XrViewConfigurationView          *xr_config_views;
+XrCompositionLayerProjectionView *xr_proj_views;
+swapchain_t                      *xr_swapchains;
+uint32_t                          xr_view_count = 0;
 
 PFN_xrGetGraphicsRequirementsKHR ext_xrGetGraphicsRequirementsKHR;
 
@@ -137,19 +141,19 @@ void openxr_poll_events     (bool &exit);
 void openxr_poll_actions    ();
 void openxr_poll_predicted  (XrTime predicted_time);
 void openxr_render_frame    ();
-bool openxr_render_layer    (XrTime predictedTime, std::vector<XrCompositionLayerProjectionView> &projectionViews, XrCompositionLayerProjection &layer);
+bool openxr_render_layer    (XrTime predictedTime, XrCompositionLayerProjection &layer);
 void openxr_preferred_format(const int64_t *pixel_fmt_options, int32_t pixel_fmt_count, const int64_t *depth_fmt_options, int32_t depth_fmt_count, int64_t &out_color, int64_t &out_depth);
 
 ///////////////////////////////////////////
 // OpenXR code                           //
 ///////////////////////////////////////////
 
-bool openxr_init(const char *app_name, xr_callbacks_t *callbacks, void *hwnd) {
+bool openxr_init(const char *app_name, xr_callbacks_t *callbacks) {
 	xr_callbacks = *callbacks;
 
 	const char          *extensions[] = { XR_GFX_EXTENSION };
 	XrInstanceCreateInfo createInfo   = { XR_TYPE_INSTANCE_CREATE_INFO };
-	createInfo.enabledExtensionCount      = _countof(extensions);
+	createInfo.enabledExtensionCount      = sizeof(extensions)/sizeof(const char*);
 	createInfo.enabledExtensionNames      = extensions;
 	createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
 	strcpy_s(createInfo.applicationInfo.applicationName, 128, app_name);
@@ -211,14 +215,24 @@ bool openxr_init(const char *app_name, xr_callbacks_t *callbacks, void *hwnd) {
 
 	// Now we need to find all the viewpoints we need to take care of! For a stereo headset, this should be 2.
 	// Similarly, for an AR phone, we'll need 1, and a VR cave could have 6, or even 12!
-	uint32_t view_count = 0;
 	uint32_t surface_count = 0;
-	xrEnumerateViewConfigurationViews(xr_instance, xr_system_id, app_config_view, 0, &view_count, nullptr);
-	xr_config_views.resize(view_count, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
-	xr_views       .resize(view_count, { XR_TYPE_VIEW });
-	xrEnumerateViewConfigurationViews(xr_instance, xr_system_id, app_config_view, view_count, &view_count, xr_config_views.data());
+	xrEnumerateViewConfigurationViews(xr_instance, xr_system_id, app_config_view, 0, &xr_view_count, nullptr);
+	xr_config_views = (XrViewConfigurationView         *)malloc(sizeof(XrViewConfigurationView         ) * xr_view_count);
+	xr_views        = (XrView                          *)malloc(sizeof(XrView                          ) * xr_view_count);
+	xr_proj_views   = (XrCompositionLayerProjectionView*)malloc(sizeof(XrCompositionLayerProjectionView) * xr_view_count);
+	xr_swapchains   = (swapchain_t                     *)malloc(sizeof(swapchain_t                     ) * xr_view_count);
+	memset(xr_config_views, 0, sizeof(XrViewConfigurationView         ) * xr_view_count);
+	memset(xr_views,        0, sizeof(XrView                          ) * xr_view_count);
+	memset(xr_proj_views,   0, sizeof(XrCompositionLayerProjectionView) * xr_view_count);
+	memset(xr_swapchains,   0, sizeof(swapchain_t                     ) * xr_view_count);
+	for (uint32_t i = 0; i < xr_view_count; i++) {
+		xr_config_views[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+		xr_views       [i].type = XR_TYPE_VIEW;
+		xr_proj_views  [i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+	}
+	xrEnumerateViewConfigurationViews(xr_instance, xr_system_id, app_config_view, xr_view_count, &xr_view_count, xr_config_views);
 	void **textures = nullptr;
-	for (uint32_t i = 0; i < view_count; i++) {
+	for (uint32_t i = 0; i < xr_view_count; i++) {
 		// Create a swapchain for this viewpoint! A swapchain is a set of texture buffers used for displaying to screen,
 		// typically this is a backbuffer and a front buffer, one for rendering data to, and one for displaying on-screen.
 		// A note about swapchain image format here! OpenXR doesn't create a concrete image format for the texture, like 
@@ -243,16 +257,18 @@ bool openxr_init(const char *app_name, xr_callbacks_t *callbacks, void *hwnd) {
 		
 		xrEnumerateSwapchainImages(handle, 0, &surface_count, nullptr);
 		if (textures == nullptr)
-			textures = (void**)malloc(sizeof(void *) * surface_count * view_count);
+			textures = (void**)malloc(sizeof(void *) * surface_count * xr_view_count);
 
 		// We'll want to track our own information about the swapchain, so we can draw stuff onto it! We'll also create
 		// a depth buffer for each generated texture here as well with make_surfacedata.
 		swapchain_t swapchain = {};
-		swapchain.width  = swapchain_info.width;
-		swapchain.height = swapchain_info.height;
-		swapchain.handle = handle;
-		swapchain.surface_images.resize(surface_count, XrSwapchainImage{ XR_TYPE_SWAPCHAIN_IMAGE } );
-		xrEnumerateSwapchainImages(swapchain.handle, surface_count, &surface_count, (XrSwapchainImageBaseHeader*)swapchain.surface_images.data());
+		swapchain.width          = swapchain_info.width;
+		swapchain.height         = swapchain_info.height;
+		swapchain.handle         = handle;
+		swapchain.surface_images = (XrSwapchainImage *)malloc(sizeof(XrSwapchainImage) * surface_count);
+		memset(swapchain.surface_images, 0, sizeof(XrSwapchainImage) * surface_count);
+		for (uint32_t i = 0; i < surface_count; i++) swapchain.surface_images[i].type = XR_TYPE_SWAPCHAIN_IMAGE;
+		xrEnumerateSwapchainImages(swapchain.handle, surface_count, &surface_count, (XrSwapchainImageBaseHeader*)swapchain.surface_images);
 		
 		for (uint32_t s = 0; s < surface_count; s++) {
 #if defined(XR_USE_GRAPHICS_API_D3D11)
@@ -262,9 +278,9 @@ bool openxr_init(const char *app_name, xr_callbacks_t *callbacks, void *hwnd) {
 #endif
 			textures[i*surface_count + s] = tex;
 		}
-		xr_swapchains.push_back(swapchain);
+		xr_swapchains[i] = swapchain;
 	}
-	callbacks->init_swapchain(callbacks->user_data, view_count, surface_count, textures, xr_swapchains[0].width, xr_swapchains[0].height, pixel_fmt);
+	callbacks->init_swapchain(callbacks->user_data, xr_view_count, surface_count, textures, xr_swapchains[0].width, xr_swapchains[0].height, pixel_fmt);
 	free(textures);
 
 	return true;
@@ -314,7 +330,7 @@ void openxr_make_actions() {
 	// Create an action to track the position and orientation of the hands! This is
 	// the controller location, or the center of the palms for actual hands.
 	XrActionCreateInfo action_info = { XR_TYPE_ACTION_CREATE_INFO };
-	action_info.countSubactionPaths = _countof(xr_input.handSubactionPath);
+	action_info.countSubactionPaths = sizeof(xr_input.handSubactionPath) / sizeof(XrPath);
 	action_info.subactionPaths      = xr_input.handSubactionPath;
 	action_info.actionType          = XR_ACTION_TYPE_POSE_INPUT;
 	strcpy_s(action_info.actionName,          "hand_pose");
@@ -348,7 +364,7 @@ void openxr_make_actions() {
 	XrInteractionProfileSuggestedBinding suggested_binds = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
 	suggested_binds.interactionProfile     = profile_path;
 	suggested_binds.suggestedBindings      = &bindings[0];
-	suggested_binds.countSuggestedBindings = _countof(bindings);
+	suggested_binds.countSuggestedBindings = sizeof(bindings) / sizeof(XrActionSuggestedBinding);
 	xrSuggestInteractionProfileBindings(xr_instance, &suggested_binds);
 
 	// Create frames of reference for the pose actions
@@ -372,10 +388,15 @@ void openxr_make_actions() {
 void openxr_shutdown() {
 	// We used a graphics API to initialize the swapchain data, so we'll
 	// give it a chance to release anythig here!
-	for (int32_t i = 0; i < xr_swapchains.size(); i++) {
+	for (int32_t i = 0; i < xr_view_count; i++) {
 		xrDestroySwapchain(xr_swapchains[i].handle);
+		free(xr_swapchains[i].surface_images);
 	}
-	xr_swapchains.clear();
+	free(xr_swapchains);
+	free(xr_views);
+	free(xr_proj_views);
+	free(xr_config_views);
+	xr_view_count = 0;
 	xr_callbacks.destroy_swapchain(xr_callbacks.user_data);
 
 	// Release all the other OpenXR resources that we've created!
@@ -512,9 +533,8 @@ void openxr_render_frame() {
 	// If the session is active, lets render our layer in the compositor!
 	XrCompositionLayerBaseHeader            *layer      = nullptr;
 	XrCompositionLayerProjection             layer_proj = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
-	std::vector<XrCompositionLayerProjectionView> views;
 	bool session_active = xr_session_state == XR_SESSION_STATE_VISIBLE || xr_session_state == XR_SESSION_STATE_FOCUSED;
-	if (session_active && openxr_render_layer(frame_state.predictedDisplayTime, views, layer_proj)) {
+	if (session_active && openxr_render_layer(frame_state.predictedDisplayTime, layer_proj)) {
 		layer = (XrCompositionLayerBaseHeader*)&layer_proj;
 	}
 
@@ -529,7 +549,7 @@ void openxr_render_frame() {
 
 ///////////////////////////////////////////
 
-bool openxr_render_layer(XrTime predictedTime, std::vector<XrCompositionLayerProjectionView> &views, XrCompositionLayerProjection &layer) {
+bool openxr_render_layer(XrTime predictedTime, XrCompositionLayerProjection &layer) {
 
 	// Find the state and location of each viewpoint at the predicted time
 	uint32_t         view_count  = 0;
@@ -538,8 +558,7 @@ bool openxr_render_layer(XrTime predictedTime, std::vector<XrCompositionLayerPro
 	locate_info.viewConfigurationType = app_config_view;
 	locate_info.displayTime           = predictedTime;
 	locate_info.space                 = xr_app_space;
-	xrLocateViews(xr_session, &locate_info, &view_state, (uint32_t)xr_views.size(), &view_count, xr_views.data());
-	views.resize(view_count);
+	xrLocateViews(xr_session, &locate_info, &view_state, xr_view_count, &view_count, xr_views);
 
 	// And now we'll iterate through each viewpoint, and render it!
 	for (uint32_t i = 0; i < view_count; i++) {
@@ -557,15 +576,15 @@ bool openxr_render_layer(XrTime predictedTime, std::vector<XrCompositionLayerPro
 		xrWaitSwapchainImage(xr_swapchains[i].handle, &wait_info);
 
 		// Set up our rendering information for the viewpoint we're using right now!
-		views[i] = { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW };
-		views[i].pose = xr_views[i].pose;
-		views[i].fov  = xr_views[i].fov;
-		views[i].subImage.swapchain        = xr_swapchains[i].handle;
-		views[i].subImage.imageRect.offset = { 0, 0 };
-		views[i].subImage.imageRect.extent = { xr_swapchains[i].width, xr_swapchains[i].height };
+		xr_proj_views[i] = { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW };
+		xr_proj_views[i].pose = xr_views[i].pose;
+		xr_proj_views[i].fov  = xr_views[i].fov;
+		xr_proj_views[i].subImage.swapchain        = xr_swapchains[i].handle;
+		xr_proj_views[i].subImage.imageRect.offset = { 0, 0 };
+		xr_proj_views[i].subImage.imageRect.extent = { xr_swapchains[i].width, xr_swapchains[i].height };
 
 		// Call the rendering callback with our view and swapchain info
-		xr_callbacks.draw(xr_callbacks.user_data, &views[i], i, img_id);
+		xr_callbacks.draw(xr_callbacks.user_data, &xr_proj_views[i], i, img_id);
 
 		// And tell OpenXR we're done with rendering to this one!
 		XrSwapchainImageReleaseInfo release_info = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
@@ -573,8 +592,8 @@ bool openxr_render_layer(XrTime predictedTime, std::vector<XrCompositionLayerPro
 	}
 
 	layer.space     = xr_app_space;
-	layer.viewCount = (uint32_t)views.size();
-	layer.views     = views.data();
+	layer.viewCount = view_count;
+	layer.views     = xr_proj_views;
 	return true;
 }
 
@@ -591,4 +610,76 @@ bool openxr_step() {
 	return !quit;
 }
 
+///////////////////////////////////////////
+
+void openxr_projection(XrFovf fov, float nearZ, float farZ, float *out_matrix)
+{
+	const float tanLeft       = tanf(fov.angleLeft);
+	const float tanRight      = tanf(fov.angleRight);
+	const float tanDown       = tanf(fov.angleDown);
+	const float tanUp         = tanf(fov.angleUp);
+	const float tanAngleWidth = tanRight - tanLeft;
+
+	// Set to tanAngleDown - tanAngleUp for a clip space with positive Y
+	// down (Vulkan). Set to tanAngleUp - tanAngleDown for a clip space with
+	// positive Y up (OpenGL / D3D / Metal).
+#if defined(SKR_VULKAN)
+	const float tanAngleHeight = (tanDown - tanUp);
+#else
+	const float tanAngleHeight = (tanUp - tanDown);
+#endif
+
+	// Set to nearZ for a [-1,1] Z clip space (OpenGL / OpenGL ES).
+	// Set to zero for a [0,1] Z clip space (Vulkan / D3D / Metal).
+#if defined(SKR_OPENGL) || defined(SKR_OPENGLES)
+	const float offsetZ = nearZ;
+#else
+	const float offsetZ = 0;
+#endif
+
+	memset(out_matrix, 0, sizeof(float) * 16);
+	if (farZ <= nearZ) {
+		// place the far plane at infinity
+		out_matrix[0] = 2 / tanAngleWidth;
+		out_matrix[4] = 0;
+		out_matrix[8] = (tanRight + tanLeft) / tanAngleWidth;
+		out_matrix[12] = 0;
+
+		out_matrix[1] = 0;
+		out_matrix[5] = 2 / tanAngleHeight;
+		out_matrix[9] = (tanUp + tanDown) / tanAngleHeight;
+		out_matrix[13] = 0;
+
+		out_matrix[2] = 0;
+		out_matrix[6] = 0;
+		out_matrix[10] = -1;
+		out_matrix[14] = -(nearZ + offsetZ);
+
+		out_matrix[3] = 0;
+		out_matrix[7] = 0;
+		out_matrix[11] = -1;
+		out_matrix[15] = 0;
+	} else {
+		// normal projection
+		out_matrix[0] = 2 / tanAngleWidth;
+		out_matrix[4] = 0;
+		out_matrix[8] = (tanRight + tanLeft) / tanAngleWidth;
+		out_matrix[12] = 0;
+
+		out_matrix[1] = 0;
+		out_matrix[5] = 2 / tanAngleHeight;
+		out_matrix[9] = (tanUp + tanDown) / tanAngleHeight;
+		out_matrix[13] = 0;
+
+		out_matrix[2] = 0;
+		out_matrix[6] = 0;
+		out_matrix[10] = -(farZ + offsetZ) / (farZ - nearZ);
+		out_matrix[14] = -(farZ * (nearZ + offsetZ)) / (farZ - nearZ);
+
+		out_matrix[3] = 0;
+		out_matrix[7] = 0;
+		out_matrix[11] = -1;
+		out_matrix[15] = 0;
+	}
+}
 #endif

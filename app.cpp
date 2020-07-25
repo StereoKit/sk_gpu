@@ -55,7 +55,7 @@ bool app_init() {
 		0,2,1, 0,3,2, 5,6,4, 4,6,7,
 		1,2,6, 1,6,5, 4,7,3, 4,3,0,
 		1,5,4, 1,4,0, 3,7,2, 7,6,2, };
-	app_mesh1 = app_mesh_create(verts, _countof(verts), inds, _countof(inds));
+	app_mesh1 = app_mesh_create(verts, sizeof(verts)/sizeof(skr_vert_t), inds, sizeof(inds)/sizeof(uint32_t));
 
 	// Make a pyramid
 	skr_vert_t verts2[] = {
@@ -66,7 +66,7 @@ bool app_init() {
 		skr_vert_t{ {-1,-1, 1}, { 1,-1, 1}, {0.75f,0}, {255,0,255,255}},};
 	uint32_t inds2[] = {
 		2,1,0, 3,2,0, 4,3,0, 1,4,0, 1,2,3, 1,3,4 };
-	app_mesh2 = app_mesh_create(verts2, _countof(verts2), inds2, _countof(inds2));
+	app_mesh2 = app_mesh_create(verts2, sizeof(verts2)/sizeof(skr_vert_t), inds2, sizeof(inds2)/sizeof(uint32_t));
 
 	// Make a checkered texture
 	const int w = 128, h = 64;

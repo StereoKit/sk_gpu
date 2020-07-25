@@ -500,7 +500,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	// Load OpenGL function pointers
 	gl_load_extensions();
 
-	char version_text[128];
+	char version_text[256];
 	sprintf(version_text, "sk_gpu: Using OpenGL %s", glGetString(GL_VERSION));
 	skr_log(version_text);
 
@@ -794,7 +794,7 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 	result.type    = type;
 	result.use     = skr_use_static;
 	result.mips    = skr_mip_none;
-	result.texture = (uint32_t)native_tex;
+	result.texture = (uint32_t)(uint64_t)native_tex;
 	result.format  = format;
 	result.width   = width;
 	result.height  = height;

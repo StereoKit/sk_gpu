@@ -211,6 +211,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\app.h" />
     <ClInclude Include="..\..\HandmadeMath.h" />
     <ClInclude Include="..\..\shaders.h" />
     <ClInclude Include="..\..\src\sk_gpu_dev.h" />
@@ -220,6 +221,7 @@
     <ClInclude Include="android_native_app_glue.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\app.cpp" />
     <ClCompile Include="..\..\src\sk_gpu_gl.cpp" />
     <ClCompile Include="..\..\src\sk_gpu_vk.cpp" />
     <ClCompile Include="android_native_app_glue.c" />

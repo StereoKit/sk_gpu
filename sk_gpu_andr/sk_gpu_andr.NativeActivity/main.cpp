@@ -95,14 +95,14 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 
 	skr_platform_data_t platform = skr_get_platform_data();
 #if defined(SKR_OPENGL) && defined(_WIN32)
-	out_graphics->hDC   = (HDC  )platform.gl_hdc;
-	out_graphics->hGLRC = (HGLRC)platform.gl_hrc;
+	out_graphics->hDC     = (HDC  )platform.gl_hdc;
+	out_graphics->hGLRC   = (HGLRC)platform.gl_hrc;
 #elif defined(SKR_OPENGL) && defined(__ANDROID__)
 	out_graphics->display = (EGLDisplay)platform.egl_display;
 	out_graphics->config  = (EGLConfig )platform.egl_config;
 	out_graphics->context = (EGLContext)platform.egl_context;
 #elif defined(SKR_DIRECT3D11)
-	out_graphics->device = (ID3D11Device*)platform.d3d11_device;
+	out_graphics->device  = (ID3D11Device*)platform.d3d11_device;
 #endif
 
 	return true;
@@ -166,7 +166,7 @@ static int engine_init_display(struct engine* engine) {
 	engine->xr_functions.user_data = engine;
 
 	if (engine->initialized)
-		return 0;
+		return 1;
 
 	engine->xr_functions.android_activity = engine->app->activity->clazz;
 	engine->xr_functions.android_vm       = engine->app->activity->vm;
@@ -197,7 +197,7 @@ static int engine_init_display(struct engine* engine) {
 
 	engine->initialized = true;
 
-	return app_init() ? 0 : -1;
+	return app_init() ? 1 : -1;
 }
 
 static void engine_draw_frame(struct engine* engine) {
@@ -210,7 +210,15 @@ static void engine_draw_frame(struct engine* engine) {
 #endif
 
 static void engine_term_display(struct engine* engine) {
-	//skr_shutdown();
+	if (!engine->initialized)
+		return;
+
+	LOGI("Shutting down...");
+	app_shutdown();
+	openxr_shutdown();
+	skr_shutdown();
+	LOGI("Done! Bye :)");
+	engine->initialized = false;
 }
 
 static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) {
@@ -229,17 +237,15 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 	case APP_CMD_INIT_WINDOW:
 		// The window is being shown, get it ready.
 		if (engine->app->window != NULL) {
-			engine_init_display(engine);
-			engine_draw_frame(engine);
+			if (engine_init_display(engine))
+				engine_draw_frame(engine);
+			else
+				app->destroyRequested = 1;
 		}
 		break;
-	case APP_CMD_TERM_WINDOW: engine_term_display(engine); break;
+	case APP_CMD_TERM_WINDOW:  engine_term_display(engine); break;
 	case APP_CMD_GAINED_FOCUS: break;
-	case APP_CMD_LOST_FOCUS:
-		// Also stop animating.
-		engine->animating = 0;
-		engine_draw_frame(engine);
-		break;
+	case APP_CMD_LOST_FOCUS:   break;
 	}
 }
 
@@ -258,7 +264,8 @@ void android_main(struct android_app* state) {
 	}
 
 	engine.animating = 1;
-	while (1) {
+	bool run = true;
+	while (run) {
 		// Read all pending events.
 		int events;
 		struct android_poll_source* source;
@@ -268,8 +275,7 @@ void android_main(struct android_app* state) {
 			if (source != NULL) source->process(state, source);
 			
 			if (state->destroyRequested != 0) {
-				engine_term_display(&engine);
-				return;
+				run = false;
 			}
 		}
 
@@ -277,6 +283,8 @@ void android_main(struct android_app* state) {
 			engine_draw_frame(&engine);
 		}
 	}
+
+	engine_term_display(&engine);
 }
 
 ///////////////////////////////////////////

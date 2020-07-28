@@ -61,6 +61,7 @@
 
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
+#include <openxr/openxr_reflection.h>
 
 #ifdef __ANDROID__
 #include <openxr/openxr_oculus.h>
@@ -107,6 +108,18 @@ void openxr_log_callback(void (*callback)(const char *text));
 #else
 #define strcpy_p(dest, size, src) strncpy(dest, src, size)
 #endif
+
+///////////////////////////////////////////
+
+const char *openxr_string(XrResult result) {
+	switch (result) {
+#define ENTRY(NAME, VALUE) \
+	case VALUE: return #NAME;
+		XR_LIST_ENUM_XrResult(ENTRY)
+#undef ENTRY
+	default: return "<UNKNOWN>";
+	}
+}
 
 ///////////////////////////////////////////
 
@@ -198,32 +211,31 @@ bool openxr_init(const char *app_name, xr_settings_t *settings) {
 	}
 #endif
 
+	// Create an OpenXR instance
 	const char *extensions[] = {
 		XR_GFX_EXTENSION,
 #ifdef __ANDROID__
 		XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME,
-		//XR_KHR_LOADER_INIT_ANDROID_EXTENSION_NAME,
 #endif
 	};
 	XrInstanceCreateInfo create_info = { XR_TYPE_INSTANCE_CREATE_INFO };
 	create_info.enabledExtensionCount      = sizeof(extensions)/sizeof(const char*);
 	create_info.enabledExtensionNames      = extensions;
 	create_info.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
-	strcpy_p(create_info.applicationInfo.applicationName, 128, app_name);
-	
+	strcpy_p(create_info.applicationInfo.applicationName, sizeof(create_info.applicationInfo.applicationName), app_name);
 #ifdef __ANDROID__
 	XrInstanceCreateInfoAndroidKHR create_android = { XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR };
 	create_android.applicationVM       = xr_settings.android_vm;
 	create_android.applicationActivity = xr_settings.android_activity;
 	create_info.next = (void*)&create_android;
 #endif
-
-	xrCreateInstance(&create_info, &xr_instance);
+	XrResult result = xrCreateInstance(&create_info, &xr_instance);
 
 	// Check if OpenXR is on this system, if this is null here, the user needs to install an
 	// OpenXR runtime and ensure it's active!
 	if (xr_instance == XR_NULL_HANDLE) {
 		oxr_log("openxr: failed to create instance");
+		oxr_log(openxr_string(result));
 		return false;
 	}
 
@@ -239,8 +251,10 @@ bool openxr_init(const char *app_name, xr_settings_t *settings) {
 	// Request a form factor from the device (HMD, Handheld, etc.)
 	XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
 	systemInfo.formFactor = app_config_form;
-	if (XR_FAILED(xrGetSystem(xr_instance, &systemInfo, &xr_system_id))) {
+	result = xrGetSystem(xr_instance, &systemInfo, &xr_system_id);
+	if (XR_FAILED(result)) {
 		oxr_log("openxr: failed get a system");
+		oxr_log(openxr_string(result));
 		return false;
 	}
 
@@ -249,6 +263,7 @@ bool openxr_init(const char *app_name, xr_settings_t *settings) {
 	uint32_t blend_count = 0;
 	xrEnumerateEnvironmentBlendModes(xr_instance, xr_system_id, app_config_view, 1, &blend_count, &xr_blend);
 
+	
 	// OpenXR wants to ensure apps are using the correct graphics card, so this MUST be called 
 	// before xrCreateSession. This is crucial on devices that have multiple graphics cards, 
 	// like laptops with integrated graphics chips in addition to dedicated graphics cards.
@@ -264,11 +279,12 @@ bool openxr_init(const char *app_name, xr_settings_t *settings) {
 	XrSessionCreateInfo sessionInfo = { XR_TYPE_SESSION_CREATE_INFO };
 	sessionInfo.next     = &binding;
 	sessionInfo.systemId = xr_system_id;
-	xrCreateSession(xr_instance, &sessionInfo, &xr_session);
+	result = xrCreateSession(xr_instance, &sessionInfo, &xr_session);
 
 	// Unable to start a session, may not have an MR device attached or ready
 	if (xr_session == XR_NULL_HANDLE) {
 		oxr_log("openxr: failed to create session");
+		oxr_log(openxr_string(result));
 		return false;
 	}
 

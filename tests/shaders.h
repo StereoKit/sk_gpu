@@ -38,7 +38,7 @@ float4 ps(psIn input) : SV_TARGET {
 
 ///////////////////////////////////////////
 
-const char *shader_glsl_vs = R"_(#version 300 es
+const char *shader_glsl_vs = R"_(#version 450
 
 layout(binding = 0, std140) uniform type_TransformBuffer
 {
@@ -63,7 +63,7 @@ void main()
 
 ///////////////////////////////////////////
 
-const char *shader_glsl_ps = R"_(#version 300 es
+const char *shader_glsl_ps = R"_(#version 450
 precision mediump float;
 precision highp int;
 

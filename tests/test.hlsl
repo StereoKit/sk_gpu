@@ -14,8 +14,8 @@ struct psIn {
 	float3 color : COLOR0;
 };
 
-Texture2D    tex         : register(t0);
-SamplerState tex_sampler : register(s0);
+//Texture2D    tex         : register(t0);
+//SamplerState tex_sampler : register(s0);
 
 psIn vs(vsIn input) {
 	psIn output;
@@ -27,5 +27,5 @@ psIn vs(vsIn input) {
 	return output;
 }
 float4 ps(psIn input) : SV_TARGET {
-	return float4(input.color, 1) * tex.Sample(tex_sampler, input.uv);
+	return float4(input.color, 1);// * tex.Sample(tex_sampler, input.uv);
 }

@@ -1,6 +1,6 @@
 #include "app.h"
 
-#include "src/sk_gpu_dev.h"
+#include "../src/sk_gpu_dev.h"
 #include "HandmadeMath.h"
 #include "shaders.h"
 

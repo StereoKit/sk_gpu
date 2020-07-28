@@ -5,7 +5,7 @@
 //#include "sk_gpu.h"
 
 // For easier development
-#include "src/sk_gpu_dev.h"
+#include "../src/sk_gpu_dev.h"
 
 // Also see here for OpenXR GL reference:
 // https://github.com/jherico/OpenXR-Samples/blob/master/src/examples/sdl2_gl_single_file_example.cpp

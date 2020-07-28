@@ -13,10 +13,10 @@ HWND app_hwnd;
 // When using single file header like normal, do this
 //#define SKR_OPENGL
 //#define SKR_IMPL
-//#include "sk_gpu.h"
+//#include "../sk_gpu.h"
 
 // For easier development
-#include "src/sk_gpu_dev.h"
+#include "../src/sk_gpu_dev.h"
 
 #include <stdlib.h>
 #include <stdio.h>

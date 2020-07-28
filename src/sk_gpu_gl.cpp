@@ -514,9 +514,8 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	// Load OpenGL function pointers
 	gl_load_extensions();
 
-	char version_text[256];
-	sprintf(version_text, "sk_gpu: Using OpenGL %s", glGetString(GL_VERSION));
-	skr_log(version_text);
+	skr_log("sk_gpu: Using OpenGL");
+	skr_log(glGetString(GL_VERSION));
 
 #if _DEBUG
 	// Set up debug info for development

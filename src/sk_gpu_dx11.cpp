@@ -435,7 +435,7 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 	result.texture->GetDesc(&color_desc);
 	result.width  = color_desc.Width;
 	result.height = color_desc.Height;
-	result.format = override_format != 0 ? override_format : skr_d3d_to_tex_fmt(color_desc.Format);
+	result.format = override_format != 0 ? override_format : skr_tex_fmt_from_native(color_desc.Format);
 	skr_tex_make_view(&result, color_desc.MipLevels, color_desc.ArraySize, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
 
 	return result;

@@ -42,8 +42,14 @@ typedef struct skr_tex_t {
 } skr_tex_t;
 
 typedef struct skr_platform_data_t {
+#if __ANDROID__
+	void *egl_display;
+	void *egl_config;
+	void *egl_context;
+#elif _WIN32
 	void *gl_hdc;
 	void *gl_hrc;
+#endif
 } skr_platform_data_t;
 
 typedef struct skr_swapchain_t {

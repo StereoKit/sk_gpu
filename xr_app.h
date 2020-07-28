@@ -44,15 +44,16 @@
 #define XR_TYPE_GRAPHICS_BINDING XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR
 
 #elif defined(XR_USE_GRAPHICS_API_OPENGL_ES)
+#include <EGL/egl.h>
 #define XR_GFX_EXTENSION XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME
 #define XrSwapchainImage XrSwapchainImageOpenGLESKHR
-#define XR_TYPE_SWAPCHAIN_IMAGE XR_TYPE_SWAPCHAIN_IMAGE_OPENGLES_KHR
+#define XR_TYPE_SWAPCHAIN_IMAGE XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR
 #define XrGraphicsRequirements XrGraphicsRequirementsOpenGLESKHR
-#define XR_TYPE_GRAPHICS_REQUIREMENTS XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGLES_KHR
+#define XR_TYPE_GRAPHICS_REQUIREMENTS XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR
 #define PFN_xrGetGraphicsRequirementsKHR PFN_xrGetOpenGLESGraphicsRequirementsKHR
 #define NAME_xrGetGraphicsRequirementsKHR "xrGetOpenGLESGraphicsRequirementsKHR"
-#define XrGraphicsBinding XrGraphicsBindingOpenGLESKHR
-#define XR_TYPE_GRAPHICS_BINDING XR_TYPE_GRAPHICS_BINDING_OPENGLES_KHR
+#define XrGraphicsBinding XrGraphicsBindingOpenGLESAndroidKHR
+#define XR_TYPE_GRAPHICS_BINDING XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR
 
 #endif
 
@@ -61,10 +62,15 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
+#ifdef __ANDROID__
+#include <openxr/openxr_oculus.h>
+#endif
+
 ///////////////////////////////////////////
 
-struct xr_callbacks_t {
+struct xr_settings_t {
 	void *user_data;
+
 	bool (*init_gfx)         (void *user_data, const XrGraphicsRequirements *requirements, XrGraphicsBinding *out_graphics);
 	bool (*init_swapchain)   (void *user_data, int32_t view_count, int32_t surface_count, void **textures_view_surface, int32_t width, int32_t height, int64_t fmt);
 	void (*draw)             (void *user_data, const XrCompositionLayerProjectionView *view, int32_t swapchain_view_id, int32_t swapchain_surface_id);
@@ -74,13 +80,19 @@ struct xr_callbacks_t {
 	int32_t  pixel_format_count;
 	int64_t *depth_formats;
 	int32_t  depth_format_count;
+
+#ifdef __ANDROID__
+	void *android_vm;
+	void *android_activity;
+#endif
 };
 
 ///////////////////////////////////////////
 
-bool openxr_init      (const char *app_name, xr_callbacks_t *callbacks);
-bool openxr_step      ();
-void openxr_projection(XrFovf fov, float nearZ, float farZ, float *out_matrix);
+bool openxr_init        (const char *app_name, xr_settings_t *settings);
+bool openxr_step        ();
+void openxr_projection  (XrFovf fov, float nearZ, float farZ, float *out_matrix);
+void openxr_log_callback(void (*callback)(const char *text));
 
 ///////////////////////////////////////////
 
@@ -88,6 +100,23 @@ void openxr_projection(XrFovf fov, float nearZ, float farZ, float *out_matrix);
 
 #include <malloc.h>
 #include <math.h>
+#include <string.h>
+
+#if _WIN32
+#define strcpy_p(dest, size, src) strcpy_s(dest, size, src)
+#else
+#define strcpy_p(dest, size, src) strncpy(dest, src, size)
+#endif
+
+///////////////////////////////////////////
+
+void (*_oxr_log)(const char *text);
+void openxr_log_callback(void (*callback)(const char *text)) {
+	_oxr_log = callback;
+}
+void oxr_log(const char *text) {
+	if (_oxr_log) _oxr_log(text);
+}
 
 ///////////////////////////////////////////
 
@@ -123,7 +152,7 @@ XrSpace                xr_app_space     = {};
 XrSystemId             xr_system_id     = XR_NULL_SYSTEM_ID;
 input_state_t          xr_input         = { };
 XrEnvironmentBlendMode xr_blend;
-xr_callbacks_t         xr_callbacks = {};
+xr_settings_t          xr_settings = {};
 
 XrView                           *xr_views;
 XrViewConfigurationView          *xr_config_views;
@@ -132,6 +161,9 @@ swapchain_t                      *xr_swapchains;
 uint32_t                          xr_view_count = 0;
 
 PFN_xrGetGraphicsRequirementsKHR ext_xrGetGraphicsRequirementsKHR;
+#ifdef __ANDROID__
+PFN_xrInitializeLoaderKHR        ext_xrInitializeLoaderKHR;
+#endif
 
 ///////////////////////////////////////////
 
@@ -148,21 +180,52 @@ void openxr_preferred_format(const int64_t *pixel_fmt_options, int32_t pixel_fmt
 // OpenXR code                           //
 ///////////////////////////////////////////
 
-bool openxr_init(const char *app_name, xr_callbacks_t *callbacks) {
-	xr_callbacks = *callbacks;
+bool openxr_init(const char *app_name, xr_settings_t *settings) {
+	xr_settings = *settings;
 
-	const char          *extensions[] = { XR_GFX_EXTENSION };
-	XrInstanceCreateInfo createInfo   = { XR_TYPE_INSTANCE_CREATE_INFO };
-	createInfo.enabledExtensionCount      = sizeof(extensions)/sizeof(const char*);
-	createInfo.enabledExtensionNames      = extensions;
-	createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
-	strcpy_s(createInfo.applicationInfo.applicationName, 128, app_name);
-	xrCreateInstance(&createInfo, &xr_instance);
+#ifdef __ANDROID__
+	xrGetInstanceProcAddr(
+		XR_NULL_HANDLE,
+		"xrInitializeLoaderKHR",
+		(PFN_xrVoidFunction *)(&ext_xrInitializeLoaderKHR));
+
+	XrLoaderInitInfoAndroidKHR init_android = { XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR };
+	init_android.applicationVM      = xr_settings.android_vm;
+	init_android.applicationContext = xr_settings.android_activity;
+	if (XR_FAILED(ext_xrInitializeLoaderKHR((XrLoaderInitInfoBaseHeaderKHR *)&init_android))) {
+		oxr_log("openxr: failed to initialize loader");
+		return false;
+	}
+#endif
+
+	const char *extensions[] = {
+		XR_GFX_EXTENSION,
+#ifdef __ANDROID__
+		XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME,
+		//XR_KHR_LOADER_INIT_ANDROID_EXTENSION_NAME,
+#endif
+	};
+	XrInstanceCreateInfo create_info = { XR_TYPE_INSTANCE_CREATE_INFO };
+	create_info.enabledExtensionCount      = sizeof(extensions)/sizeof(const char*);
+	create_info.enabledExtensionNames      = extensions;
+	create_info.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
+	strcpy_p(create_info.applicationInfo.applicationName, 128, app_name);
+	
+#ifdef __ANDROID__
+	XrInstanceCreateInfoAndroidKHR create_android = { XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR };
+	create_android.applicationVM       = xr_settings.android_vm;
+	create_android.applicationActivity = xr_settings.android_activity;
+	create_info.next = (void*)&create_android;
+#endif
+
+	xrCreateInstance(&create_info, &xr_instance);
 
 	// Check if OpenXR is on this system, if this is null here, the user needs to install an
 	// OpenXR runtime and ensure it's active!
-	if (xr_instance == nullptr)
+	if (xr_instance == XR_NULL_HANDLE) {
+		oxr_log("openxr: failed to create instance");
 		return false;
+	}
 
 	// Load extension methods that we'll need for this application! There's a
 	// couple ways to do this, and this is a fairly manual one. Chek out this
@@ -176,7 +239,10 @@ bool openxr_init(const char *app_name, xr_callbacks_t *callbacks) {
 	// Request a form factor from the device (HMD, Handheld, etc.)
 	XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
 	systemInfo.formFactor = app_config_form;
-	xrGetSystem(xr_instance, &systemInfo, &xr_system_id);
+	if (XR_FAILED(xrGetSystem(xr_instance, &systemInfo, &xr_system_id))) {
+		oxr_log("openxr: failed get a system");
+		return false;
+	}
 
 	// Check what blend mode is valid for this device (opaque vs transparent displays)
 	// We'll just take the first one available!
@@ -190,8 +256,10 @@ bool openxr_init(const char *app_name, xr_callbacks_t *callbacks) {
 	ext_xrGetGraphicsRequirementsKHR(xr_instance, xr_system_id, &requirement);
 
 	XrGraphicsBinding binding = { XR_TYPE_GRAPHICS_BINDING };
-	if (!callbacks->init_gfx(callbacks->user_data, &requirement, &binding))
+	if (!settings->init_gfx(settings->user_data, &requirement, &binding)) {
+		oxr_log("openxr: failed to initialize graphics api");
 		return false;
+	}
 
 	XrSessionCreateInfo sessionInfo = { XR_TYPE_SESSION_CREATE_INFO };
 	sessionInfo.next     = &binding;
@@ -199,11 +267,13 @@ bool openxr_init(const char *app_name, xr_callbacks_t *callbacks) {
 	xrCreateSession(xr_instance, &sessionInfo, &xr_session);
 
 	// Unable to start a session, may not have an MR device attached or ready
-	if (xr_session == nullptr)
+	if (xr_session == XR_NULL_HANDLE) {
+		oxr_log("openxr: failed to create session");
 		return false;
+	}
 
 	int64_t pixel_fmt, depth_fmt;
-	openxr_preferred_format(xr_callbacks.pixel_formats, xr_callbacks.pixel_format_count, xr_callbacks.depth_formats, xr_callbacks.depth_format_count, pixel_fmt, depth_fmt);
+	openxr_preferred_format(xr_settings.pixel_formats, xr_settings.pixel_format_count, xr_settings.depth_formats, xr_settings.depth_format_count, pixel_fmt, depth_fmt);
 
 	// OpenXR uses a couple different types of reference frames for positioning content, we need to choose one for
 	// displaying our content! STAGE would be relative to the center of your guardian system's bounds, and LOCAL
@@ -274,13 +344,13 @@ bool openxr_init(const char *app_name, xr_callbacks_t *callbacks) {
 #if defined(XR_USE_GRAPHICS_API_D3D11)
 			void *tex = swapchain.surface_images[s].texture;
 #elif defined(XR_USE_GRAPHICS_API_OPENGL_ES) || defined(XR_USE_GRAPHICS_API_OPENGL)
-			void *tex = (void*)swapchain.surface_images[s].image;
+			void *tex = (void*)(uint64_t)swapchain.surface_images[s].image;
 #endif
 			textures[i*surface_count + s] = tex;
 		}
 		xr_swapchains[i] = swapchain;
 	}
-	callbacks->init_swapchain(callbacks->user_data, xr_view_count, surface_count, textures, xr_swapchains[0].width, xr_swapchains[0].height, pixel_fmt);
+	settings->init_swapchain(settings->user_data, xr_view_count, surface_count, textures, xr_swapchains[0].width, xr_swapchains[0].height, pixel_fmt);
 	free(textures);
 
 	return true;
@@ -321,8 +391,8 @@ void openxr_preferred_format(const int64_t *pixel_fmt_options, int32_t pixel_fmt
 
 void openxr_make_actions() {
 	XrActionSetCreateInfo actionset_info = { XR_TYPE_ACTION_SET_CREATE_INFO };
-	strcpy_s(actionset_info.actionSetName,          "gameplay");
-	strcpy_s(actionset_info.localizedActionSetName, "Gameplay");
+	strcpy_p(actionset_info.actionSetName,          sizeof(actionset_info.actionSetName),          "gameplay");
+	strcpy_p(actionset_info.localizedActionSetName, sizeof(actionset_info.localizedActionSetName), "Gameplay");
 	xrCreateActionSet(xr_instance, &actionset_info, &xr_input.actionSet);
 	xrStringToPath(xr_instance, "/user/hand/left",  &xr_input.handSubactionPath[0]);
 	xrStringToPath(xr_instance, "/user/hand/right", &xr_input.handSubactionPath[1]);
@@ -333,15 +403,15 @@ void openxr_make_actions() {
 	action_info.countSubactionPaths = sizeof(xr_input.handSubactionPath) / sizeof(XrPath);
 	action_info.subactionPaths      = xr_input.handSubactionPath;
 	action_info.actionType          = XR_ACTION_TYPE_POSE_INPUT;
-	strcpy_s(action_info.actionName,          "hand_pose");
-	strcpy_s(action_info.localizedActionName, "Hand Pose");
+	strcpy_p(action_info.actionName,          sizeof(action_info.actionName),          "hand_pose");
+	strcpy_p(action_info.localizedActionName, sizeof(action_info.localizedActionName), "Hand Pose");
 	xrCreateAction(xr_input.actionSet, &action_info, &xr_input.poseAction);
 
 	// Create an action for listening to the select action! This is primary trigger
 	// on controllers, and an airtap on HoloLens
 	action_info.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
-	strcpy_s(action_info.actionName,          "select");
-	strcpy_s(action_info.localizedActionName, "Select");
+	strcpy_p(action_info.actionName,          sizeof(action_info.actionName),          "select");
+	strcpy_p(action_info.localizedActionName, sizeof(action_info.localizedActionName), "Select");
 	xrCreateAction(xr_input.actionSet, &action_info, &xr_input.selectAction);
 
 	// Bind the actions we just created to specific locations on the Khronos simple_controller
@@ -397,7 +467,7 @@ void openxr_shutdown() {
 	free(xr_proj_views);
 	free(xr_config_views);
 	xr_view_count = 0;
-	xr_callbacks.destroy_swapchain(xr_callbacks.user_data);
+	xr_settings.destroy_swapchain(xr_settings.user_data);
 
 	// Release all the other OpenXR resources that we've created!
 	// What gets allocated, must get deallocated!
@@ -438,9 +508,11 @@ void openxr_poll_events(bool &exit) {
 			} break;
 			case XR_SESSION_STATE_EXITING:      exit = true;              break;
 			case XR_SESSION_STATE_LOSS_PENDING: exit = true;              break;
+			default: break;
 			}
 		} break;
 		case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: exit = true; return;
+		default: break;
 		}
 		event_buffer = { XR_TYPE_EVENT_DATA_BUFFER };
 	}
@@ -584,7 +656,7 @@ bool openxr_render_layer(XrTime predictedTime, XrCompositionLayerProjection &lay
 		xr_proj_views[i].subImage.imageRect.extent = { xr_swapchains[i].width, xr_swapchains[i].height };
 
 		// Call the rendering callback with our view and swapchain info
-		xr_callbacks.draw(xr_callbacks.user_data, &xr_proj_views[i], i, img_id);
+		xr_settings.draw(xr_settings.user_data, &xr_proj_views[i], i, img_id);
 
 		// And tell OpenXR we're done with rendering to this one!
 		XrSwapchainImageReleaseInfo release_info = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };

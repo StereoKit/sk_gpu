@@ -15,6 +15,7 @@
     <ClInclude Include="..\..\HandmadeMath.h" />
     <ClInclude Include="..\..\shaders.h" />
     <ClInclude Include="..\..\app.h" />
+    <ClInclude Include="..\..\xr_app.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c" />
@@ -31,5 +32,8 @@
     <Filter Include="src">
       <UniqueIdentifier>{c2dfe5e0-a7f9-4064-af09-ed93bd55ac42}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\..\..\..\Users\progr\Downloads\ovr_openxr_mobile_sdk_1.0.9\OpenXR\Libs\Android\arm64-v8a\Debug\libopenxr_loader.so" />
   </ItemGroup>
 </Project>

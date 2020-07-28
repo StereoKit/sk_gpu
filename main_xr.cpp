@@ -1,4 +1,4 @@
-/*
+
 // When using single file header like normal, do this
 //#define SKR_OPENGL
 //#define SKR_IMPL
@@ -43,7 +43,7 @@ struct app_swapchain_t {
 
 app_swapchain_t app_swapchain = {};
 const char     *app_name      = "sk_gpu.h";
-xr_callbacks_t  xr_functions  = {};
+xr_settings_t  xr_functions  = {};
 
 ///////////////////////////////////////////
 
@@ -116,12 +116,16 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	if (!skr_init(app_name, nullptr, luid))
 		return false;
 
-#if defined(SKR_OPENGL)
 	skr_platform_data_t platform = skr_get_platform_data();
+#if defined(SKR_OPENGL) && defined(_WIN32)
 	out_graphics->hDC   = (HDC  )platform.gl_hdc;
 	out_graphics->hGLRC = (HGLRC)platform.gl_hrc;
+#elif defined(SKR_OPENGL) && defined(__ANDROID__)
+	out_graphics->egl_display = platform.egl_display;
+	out_graphics->egl_surface = platform.egl_surface;
+	out_graphics->egl_context = platform.egl_context;
 #elif defined(SKR_DIRECT3D11)
-	out_graphics->device = (ID3D11Device*)skr_get_platform_data().d3d11_device;
+	out_graphics->device = (ID3D11Device*)platform.d3d11_device;
 #endif
 
 	return true;
@@ -178,4 +182,3 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 
 ///////////////////////////////////////////
 
-*/

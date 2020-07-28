@@ -33,6 +33,7 @@ void skr_log(const char *text) {
 EGLDisplay egl_display;
 EGLSurface egl_surface;
 EGLContext egl_context;
+EGLConfig  egl_config;
 #elif _WIN32
 #pragma comment(lib, "opengl32.lib")
 
@@ -444,6 +445,7 @@ int32_t gl_init_emscripten() {
 ///////////////////////////////////////////
 
 int32_t gl_init_android(void *native_window) {
+	skr_log("sk_gpu: attempting to init gles");
 #ifdef __ANDROID__
 	const EGLint attribs[] = {
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
@@ -458,19 +460,30 @@ int32_t gl_init_android(void *native_window) {
 	EGLint context_attribs[] = { 
 		EGL_CONTEXT_CLIENT_VERSION, 3, 
 		EGL_NONE, EGL_NONE };
-	EGLint w, h, format;
+	EGLint format;
 	EGLint numConfigs;
-	EGLConfig config;
 
 	egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetDisplay");
 
+	skr_log("sk_gpu: got display");
+	
 	int32_t major, minor;
 	eglInitialize     (egl_display, &major, &minor);
-	eglChooseConfig   (egl_display, attribs, &config, 1, &numConfigs);
-	eglGetConfigAttrib(egl_display, config, EGL_NATIVE_VISUAL_ID, &format);
+	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglInitialize");
+	eglChooseConfig   (egl_display, attribs, &egl_config, 1, &numConfigs);
+	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglChooseConfig");
+	eglGetConfigAttrib(egl_display, egl_config, EGL_NATIVE_VISUAL_ID, &format);
+	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetConfigAttrib");
 	
-	egl_surface = eglCreateWindowSurface(egl_display, config, (EGLNativeWindowType)native_window, nullptr);
-	egl_context = eglCreateContext      (egl_display, config, nullptr, context_attribs);
+	skr_log("sk_gpu: egl initialized");
+
+	egl_surface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)native_window, nullptr);
+	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateWindowSurface");
+	egl_context = eglCreateContext      (egl_display, egl_config, nullptr, context_attribs);
+	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateContext");
+
+	skr_log("sk_gpu: gles context made");
 
 	if (eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_FALSE) {
 		skr_log("Unable to eglMakeCurrent");
@@ -480,6 +493,7 @@ int32_t gl_init_android(void *native_window) {
 	eglQuerySurface(egl_display, egl_surface, EGL_WIDTH,  &gl_width);
 	eglQuerySurface(egl_display, egl_surface, EGL_HEIGHT, &gl_height);
 #endif
+	skr_log("sk_gpu: gles init successful");
 	return 1;
 }
 
@@ -569,8 +583,11 @@ skr_platform_data_t skr_get_platform_data() {
 #ifdef _WIN32
 	result.gl_hdc = gl_hdc;
 	result.gl_hrc = gl_hrc;
+#elif __ANDROID__
+	result.egl_display = egl_display;
+	result.egl_config  = egl_config;
+	result.egl_context = egl_context;
 #endif
-
 	return result;
 }
 

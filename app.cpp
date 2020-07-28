@@ -107,7 +107,7 @@ bool app_init() {
 void app_render(hmm_mat4 view, hmm_mat4 proj) {
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 
-	hmm_mat4 world = HMM_Translate({ -1.5f,0,0 });
+	hmm_mat4 world = HMM_Translate(hmm_vec3{ -1.5f,0,0 });
 	world = HMM_Transpose(world);
 	memcpy(app_shader_data.world,     &world,     sizeof(float) * 16);
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
@@ -119,7 +119,7 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 	skr_tex_set_active(&app_tex, 0);
 	skr_draw(0, app_mesh1.ind_count, 1);
 
-	world = HMM_Translate({ 1.5f,0,0 }) * HMM_Rotate(0, { 1,0,0 });
+	world = HMM_Translate(hmm_vec3{ 1.5f,0,0 }) * HMM_Rotate(0, hmm_vec3{ 1,0,0 });
 	world = HMM_Transpose(world);
 	memcpy(app_shader_data.world, &world, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_buffer, &app_shader_data, sizeof(app_shader_data));

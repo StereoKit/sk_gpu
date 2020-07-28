@@ -1,3 +1,4 @@
+/*
 #ifndef __EMSCRIPTEN__
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
@@ -31,10 +32,10 @@ HWND app_hwnd;
 ///////////////////////////////////////////
 
 skr_swapchain_t app_swapchain = {};
-int             app_width  = 1280;
-int             app_height = 720;
-bool            app_run    = true;
-const char     *app_name   = "sk_gpu.h";
+int             app_width     = 1280;
+int             app_height    = 720;
+bool            app_run       = true;
+const char     *app_name      = "sk_gpu.h";
 
 ///////////////////////////////////////////
 
@@ -132,3 +133,4 @@ bool main_step() {
 }
 
 ///////////////////////////////////////////
+*/

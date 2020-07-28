@@ -114,14 +114,38 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <LibraryPath>$(ProjectDir)Libs\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Libs\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -217,6 +241,7 @@
     <ClInclude Include="..\..\src\sk_gpu_dev.h" />
     <ClInclude Include="..\..\src\sk_gpu_gl.h" />
     <ClInclude Include="..\..\src\sk_gpu_vk.h" />
+    <ClInclude Include="..\..\xr_app.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="android_native_app_glue.h" />
   </ItemGroup>
@@ -226,6 +251,18 @@
     <ClCompile Include="..\..\src\sk_gpu_vk.cpp" />
     <ClCompile Include="android_native_app_glue.c" />
     <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\..\..\..\Users\progr\Downloads\ovr_openxr_mobile_sdk_1.0.9\OpenXR\Libs\Android\arm64-v8a\Debug\libopenxr_loader.so">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x86'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </Library>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

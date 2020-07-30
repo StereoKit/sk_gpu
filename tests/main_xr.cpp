@@ -110,7 +110,7 @@ bool main_step() {
 bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, XrGraphicsBinding *out_graphics) {
 	void *luid = nullptr;
 #ifdef SKR_DIRECT3D11
-	luid = (void *)&requirement.adapterLuid;
+	luid = (void *)&requirements->adapterLuid;
 #endif
 	skr_log_callback([](const char *text) { printf("%s\n", text); });
 	if (!skr_init(app_name, nullptr, luid))

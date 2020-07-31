@@ -3,10 +3,17 @@
 ///////////////////////////////////////////
 
 const char *shader_hlsl = R"_(
-cbuffer TransformBuffer : register(b0) {
-	float4x4 world;
+cbuffer SystemBuffer : register(b0) {
 	float4x4 viewproj;
 };
+
+struct Inst {
+	float4x4 world;
+};
+cbuffer TransformBuffer : register(b1) {
+	Inst inst[100];
+};
+
 struct vsIn {
 	float4 pos  : SV_POSITION;
 	float3 norm : NORMAL;
@@ -22,11 +29,11 @@ struct psIn {
 Texture2D    tex         : register(t0);
 SamplerState tex_sampler : register(s0);
 
-psIn vs(vsIn input) {
+psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn output;
-	output.pos = mul(float4(input.pos.xyz, 1), world);
+	output.pos = mul(float4(input.pos.xyz, 1), inst[id].world);
 	output.pos = mul(output.pos, viewproj);
-	float3 normal = normalize(mul(float4(input.norm, 0), world).xyz);
+	float3 normal = normalize(mul(float4(input.norm, 0), inst[id].world).xyz);
 	output.color = saturate(dot(normal, float3(0,1,0))).xxx * input.color.rgb;
 	output.uv = input.uv;
 	return output;
@@ -39,25 +46,42 @@ float4 ps(psIn input) : SV_TARGET {
 ///////////////////////////////////////////
 
 const char *shader_glsl_vs = R"_(#version 450
+#ifdef GL_ARB_shader_draw_parameters
+#extension GL_ARB_shader_draw_parameters : enable
+#endif
 
-layout(binding = 0, std140) uniform type_TransformBuffer
+struct Inst
 {
-    layout(row_major) mat4 world;
+    mat4 world;
+};
+
+layout(binding = 0, std140) uniform type_SystemBuffer
+{
     layout(row_major) mat4 viewproj;
+} SystemBuffer;
+
+layout(binding = 1, std140) uniform type_TransformBuffer
+{
+    layout(row_major) Inst inst[100];
 } TransformBuffer;
 
 layout(location = 0) in vec4 in_var_SV_POSITION;
 layout(location = 1) in vec3 in_var_NORMAL;
 layout(location = 2) in vec2 in_var_TEXCOORD0;
 layout(location = 3) in vec4 in_var_COLOR0;
+#ifdef GL_ARB_shader_draw_parameters
+#define SPIRV_Cross_BaseInstance gl_BaseInstanceARB
+#else
+uniform int SPIRV_Cross_BaseInstance;
+#endif
 layout(location = 0) out vec2 out_var_TEXCOORD0;
 layout(location = 1) out vec3 out_var_COLOR0;
 
 void main()
 {
-    gl_Position = TransformBuffer.viewproj * (TransformBuffer.world * vec4(in_var_SV_POSITION.xyz, 1.0));
+    gl_Position = SystemBuffer.viewproj * (TransformBuffer.inst[uint((gl_InstanceID + SPIRV_Cross_BaseInstance))].world * vec4(in_var_SV_POSITION.xyz, 1.0));
     out_var_TEXCOORD0 = in_var_TEXCOORD0;
-    out_var_COLOR0 = vec3(clamp(normalize((TransformBuffer.world * vec4(in_var_NORMAL, 0.0)).xyz).y, 0.0, 1.0)) * in_var_COLOR0.xyz;
+    out_var_COLOR0 = vec3(clamp(normalize((TransformBuffer.inst[uint((gl_InstanceID + SPIRV_Cross_BaseInstance))].world * vec4(in_var_NORMAL, 0.0)).xyz).y, 0.0, 1.0)) * in_var_COLOR0.xyz;
 }
 )_";
 

@@ -17,19 +17,24 @@ struct app_mesh_t {
 };
 
 struct app_shader_data_t {
-	float world[16];
 	float view_proj[16];
+};
+
+struct app_shader_inst_t {
+	float world[16];
 };
 
 ///////////////////////////////////////////
 
 app_shader_data_t    app_shader_data = {};
+app_shader_inst_t    app_shader_inst[100] = {};
 app_mesh_t           app_mesh1  = {};
 app_mesh_t           app_mesh2  = {};
 skr_shader_stage_t   app_ps     = {};
 skr_shader_stage_t   app_vs     = {};
 skr_shader_t         app_shader = {};
-skr_buffer_t         app_shader_buffer = {};
+skr_buffer_t         app_shader_data_buffer = {};
+skr_buffer_t         app_shader_inst_buffer = {};
 skr_tex_t            app_tex    = {};
 
 ///////////////////////////////////////////
@@ -98,7 +103,8 @@ bool app_init() {
 #endif
 	app_shader = skr_shader_create(&app_vs, &app_ps);
 
-	app_shader_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t), skr_buffer_type_constant, skr_use_dynamic);
+	app_shader_data_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t),       skr_buffer_type_constant, skr_use_dynamic);
+	app_shader_inst_buffer = skr_buffer_create(&app_shader_inst, sizeof(app_shader_inst_t) * 100, skr_buffer_type_constant, skr_use_dynamic);
 	return true;
 }
 
@@ -107,31 +113,43 @@ bool app_init() {
 void app_render(hmm_mat4 view, hmm_mat4 proj) {
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 
-	hmm_mat4 world = HMM_Translate(hmm_vec3{ -1.5f,0,0 });
-	world = HMM_Transpose(world);
-	memcpy(app_shader_data.world,     &world,     sizeof(float) * 16);
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
-	skr_buffer_update(&app_shader_buffer, &app_shader_data, sizeof(app_shader_data));
+	skr_buffer_update(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
+	skr_buffer_set(&app_shader_data_buffer, 0, sizeof(app_shader_data_t), 0);
 
-	skr_buffer_set(&app_shader_buffer, 0, sizeof(app_shader_data_t), 0);
+	// Set transforms for 100 instances
+	for (size_t i = 0; i < 100; i++) {
+		int y = i / 10 - 4, x = i % 10 -4;
+		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,0,(float)y -0.5f })*HMM_Scale(hmm_vec3{.4f,.4f,.4f}));
+		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
+	}
+	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
+	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
+
 	skr_mesh_set(&app_mesh1.mesh);
 	skr_shader_set(&app_shader);
 	skr_tex_set_active(&app_tex, 0);
-	skr_draw(0, app_mesh1.ind_count, 1);
+	skr_draw(0, app_mesh1.ind_count, 100);
 
-	world = HMM_Translate(hmm_vec3{ 1.5f,0,0 }) * HMM_Rotate(0, hmm_vec3{ 1,0,0 });
-	world = HMM_Transpose(world);
-	memcpy(app_shader_data.world, &world, sizeof(float) * 16);
-	skr_buffer_update(&app_shader_buffer, &app_shader_data, sizeof(app_shader_data));
+	// Set transforms for another 100 instances
+	for (size_t i = 0; i < 100; i++) {
+		int y = i / 10 - 4, x = i % 10 -4;
+		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,1,(float)y-0.5f }) * HMM_Scale(hmm_vec3{.4f,.4f,.4f}));
+		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
+	}
+	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
+	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
+
 	skr_mesh_set(&app_mesh2.mesh);
 	skr_shader_set(&app_shader);
-	skr_draw(0, app_mesh2.ind_count, 1);
+	skr_draw(0, app_mesh2.ind_count, 100);
 }
 
 ///////////////////////////////////////////
 
 void app_shutdown() {
-	skr_buffer_destroy(&app_shader_buffer);
+	skr_buffer_destroy(&app_shader_data_buffer);
+	skr_buffer_destroy(&app_shader_inst_buffer);
 	skr_shader_destroy(&app_shader);
 	skr_shader_stage_destroy(&app_ps);
 	skr_shader_stage_destroy(&app_vs);

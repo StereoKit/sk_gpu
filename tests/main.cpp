@@ -1,4 +1,4 @@
-/*
+
 #ifndef __EMSCRIPTEN__
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
@@ -113,9 +113,9 @@ bool main_step() {
 
 	skr_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	const skr_tex_t *target, *depth;
+	skr_tex_t *target, *depth;
 	skr_swapchain_get_next(&app_swapchain, &target, &depth);
-	skr_set_render_target(clear_color, target, depth);
+	skr_set_render_target(clear_color, true, target, depth);
 
 	static int32_t frame = 0;
 	frame++;
@@ -133,4 +133,3 @@ bool main_step() {
 }
 
 ///////////////////////////////////////////
-*/

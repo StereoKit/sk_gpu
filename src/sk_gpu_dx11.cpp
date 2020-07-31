@@ -33,6 +33,9 @@ ID3D11InputLayout        *d3d_vert_layout = nullptr;
 ID3D11RasterizerState    *d3d_rasterstate = nullptr;
 void                     *d3d_hwnd        = nullptr;
 
+skr_tex_t *d3d_active_rendertarget       = nullptr;
+skr_tex_t *d3d_active_rendertarget_depth = nullptr;
+
 ///////////////////////////////////////////
 
 size_t       skr_el_to_size(skr_fmt_ desc);
@@ -143,7 +146,10 @@ skr_platform_data_t skr_get_platform_data() {
 
 ///////////////////////////////////////////
 
-void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
+void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_target, skr_tex_t *depth_target) {
+	d3d_active_rendertarget       = render_target;
+	d3d_active_rendertarget_depth = depth_target;
+
 	if (render_target == nullptr) {
 		d3d_context->OMSetRenderTargets(0, nullptr, nullptr);
 		return;
@@ -154,10 +160,19 @@ void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target,
 	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(0.f, 0.f, (float)render_target->width, (float)render_target->height);
 	d3d_context->RSSetViewports(1, &viewport);
 
-	float clear[] = { 0, 0, 0, 1 };
-	d3d_context->ClearRenderTargetView(render_target->target_view, clear_color);
-	d3d_context->ClearDepthStencilView(depth_target ->depth_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-	d3d_context->OMSetRenderTargets(1, &render_target->target_view, depth_target->depth_view);
+	if (clear) {
+		d3d_context->ClearRenderTargetView(render_target->target_view, clear_color);
+		if (depth_target != nullptr)
+			d3d_context->ClearDepthStencilView(depth_target->depth_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	}
+	d3d_context->OMSetRenderTargets(1, &render_target->target_view, depth_target == nullptr ? nullptr : depth_target->depth_view);
+}
+
+///////////////////////////////////////////
+
+void skr_get_render_target(skr_tex_t **out_render_target, skr_tex_t **out_depth_target) {
+	*out_render_target = d3d_active_rendertarget;
+	*out_depth_target  = d3d_active_rendertarget_depth;
 }
 
 ///////////////////////////////////////////
@@ -395,7 +410,7 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-void skr_swapchain_get_next(skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth) {
+void skr_swapchain_get_next(skr_swapchain_t *swapchain, skr_tex_t **out_target, skr_tex_t **out_depth) {
 	*out_target = swapchain->target.format != 0 ? &swapchain->target : nullptr;
 	*out_depth  = swapchain->depth .format != 0 ? &swapchain->depth  : nullptr;
 }

@@ -36,6 +36,8 @@ skr_shader_t         app_shader = {};
 skr_buffer_t         app_shader_data_buffer = {};
 skr_buffer_t         app_shader_inst_buffer = {};
 skr_tex_t            app_tex    = {};
+skr_tex_t            app_target = {};
+skr_tex_t            app_target_depth = {};
 
 ///////////////////////////////////////////
 
@@ -64,7 +66,7 @@ bool app_init() {
 
 	// Make a pyramid
 	skr_vert_t verts2[] = {
-		skr_vert_t{ { 0, 1, 0}, { 0, 1, 0}, {0.00f,1}, {255,0,0,255}},
+		skr_vert_t{ { 0, 1, 0}, { 0, 1, 0}, {0.00f,1}, {255,255,255,255}},
 		skr_vert_t{ {-1,-1,-1}, {-1,-1,-1}, {0.00f,0}, {0,255,0,255}},
 		skr_vert_t{ { 1,-1,-1}, { 1,-1,-1}, {0.25f,0}, {0,0,255,255}},
 		skr_vert_t{ { 1,-1, 1}, {-1,-1, 1}, {0.50f,0}, {255,255,0,255}},
@@ -91,6 +93,11 @@ bool app_init() {
 	skr_tex_settings(&app_tex, skr_tex_address_repeat, skr_tex_sample_linear, 0);
 	skr_tex_set_data(&app_tex, color_arr, 1, w, h);
 
+	app_target       = skr_tex_create(skr_tex_type_rendertarget, skr_use_static, skr_tex_fmt_rgba32,  skr_mip_none);
+	app_target_depth = skr_tex_create(skr_tex_type_depth,        skr_use_static, skr_tex_fmt_depth16, skr_mip_none);
+	skr_tex_set_data(&app_target,       nullptr, 1, 512, 512);
+	skr_tex_set_data(&app_target_depth, nullptr, 1, 512, 512);
+
 #if defined(SKR_OPENGL)
 	app_ps = skr_shader_stage_create((uint8_t*)shader_glsl_ps, strlen(shader_glsl_ps), skr_shader_pixel);
 	app_vs = skr_shader_stage_create((uint8_t*)shader_glsl_vs, strlen(shader_glsl_vs), skr_shader_vertex);
@@ -110,13 +117,39 @@ bool app_init() {
 
 ///////////////////////////////////////////
 
-void app_render(hmm_mat4 view, hmm_mat4 proj) {
-	hmm_mat4 view_proj = HMM_Transpose( proj * view );
+void app_test_rendertarget() {
+	skr_tex_t *old_target, *old_depth;
+	skr_get_render_target(&old_target, &old_depth);
 
+	float color[4] = { 1,1,1,1 };
+	skr_set_render_target(color, true, &app_target, &app_target_depth);
+
+	hmm_mat4 view = HMM_LookAt(
+		HMM_Vec3(1,1,1),
+		HMM_Vec3(0,0,0),
+		HMM_Vec3(0,1,0));
+	hmm_mat4 proj = HMM_Perspective(45, 1, 0.01f, 100);
+	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
-	skr_buffer_set(&app_shader_data_buffer, 0, sizeof(app_shader_data_t), 0);
+	skr_buffer_set   (&app_shader_data_buffer, 0, sizeof(app_shader_data_t), 0);
 
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ 0,0,0 })*HMM_Scale(hmm_vec3{.4f,.4f,.4f}));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t));
+	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
+
+	skr_mesh_set(&app_mesh1.mesh);
+	skr_shader_set(&app_shader);
+	skr_tex_set_active(&app_tex, 0);
+	skr_draw(0, app_mesh1.ind_count, 1);
+
+	skr_set_render_target(color, false, old_target, old_depth);
+}
+
+///////////////////////////////////////////
+
+void app_test_instancing() {
 	// Set transforms for 100 instances
 	for (size_t i = 0; i < 100; i++) {
 		int y = i / 10 - 4, x = i % 10 -4;
@@ -142,7 +175,22 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 
 	skr_mesh_set(&app_mesh2.mesh);
 	skr_shader_set(&app_shader);
+	skr_tex_set_active(&app_target, 0);
 	skr_draw(0, app_mesh2.ind_count, 100);
+}
+
+///////////////////////////////////////////
+
+void app_render(hmm_mat4 view, hmm_mat4 proj) {
+	
+	app_test_rendertarget();
+
+	hmm_mat4 view_proj = HMM_Transpose( proj * view );
+	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
+	skr_buffer_update(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
+	skr_buffer_set(&app_shader_data_buffer, 0, sizeof(app_shader_data_t), 0);
+
+	app_test_instancing();
 }
 
 ///////////////////////////////////////////
@@ -153,6 +201,8 @@ void app_shutdown() {
 	skr_shader_destroy(&app_shader);
 	skr_shader_stage_destroy(&app_ps);
 	skr_shader_stage_destroy(&app_vs);
+	skr_tex_destroy(&app_target_depth);
+	skr_tex_destroy(&app_target);
 	skr_tex_destroy(&app_tex);
 	app_mesh_destroy(&app_mesh1);
 	app_mesh_destroy(&app_mesh2);

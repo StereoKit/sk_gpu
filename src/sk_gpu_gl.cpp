@@ -582,7 +582,6 @@ void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_t
 
 	glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	if (render_target) {
-		//glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target->texture, 0);
 		glViewport(0, 0, render_target->width, render_target->height);
 	} else {
 		glViewport(0, 0, gl_width, gl_height);
@@ -592,7 +591,6 @@ void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_t
 		glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
-	glEnable(GL_DEPTH_TEST);
 }
 
 ///////////////////////////////////////////
@@ -860,6 +858,7 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 	result.mips   = mip_maps;
 
 	glGenTextures(1, &result.texture);
+	skr_tex_settings(&result, skr_tex_address_repeat, skr_tex_sample_linear, 1);
 
 	if (type == skr_tex_type_rendertarget) {
 		glGenFramebuffers(1, &result.framebuffer);

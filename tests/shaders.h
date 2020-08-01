@@ -45,7 +45,7 @@ float4 ps(psIn input) : SV_TARGET {
 
 ///////////////////////////////////////////
 
-const char *shader_glsl_vs = R"_(#version 450
+const char *shader_glsl_vs = R"_(#version 300 es
 #ifdef GL_ARB_shader_draw_parameters
 #extension GL_ARB_shader_draw_parameters : enable
 #endif
@@ -87,7 +87,7 @@ void main()
 
 ///////////////////////////////////////////
 
-const char *shader_glsl_ps = R"_(#version 450
+const char *shader_glsl_ps = R"_(#version 300 es
 precision mediump float;
 precision highp int;
 

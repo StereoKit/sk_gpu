@@ -704,15 +704,42 @@ skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shad
 	skr_shader_stage_t result = {}; 
 	result.type = type;
 
+	// Include terminating character
+	if (shader_size > 0 && file_data[shader_size-1] != '\0')
+		shader_size += 1;
+
 	uint32_t gl_type = 0;
 	switch (type) {
 	case skr_shader_pixel:  gl_type = GL_FRAGMENT_SHADER; break;
 	case skr_shader_vertex: gl_type = GL_VERTEX_SHADER;   break;
 	}
 
+	// Convert the prefix if it doesn't match the GL version we're using
+	const char   *prefix_gl      = "#version 450";
+	const int32_t prefix_gl_size = strlen(prefix_gl);
+	const char   *prefix_es      = "#version 300 es";
+	const int32_t prefix_es_size = strlen(prefix_es);
+	char         *final_data = (char*)file_data;
+	bool          needs_free = false;
+#if __ANDROID__
+	if (shader_size >= prefix_gl_size && memcmp(prefix_gl, file_data, prefix_gl_size) == 0) {
+		final_data = (char*)malloc(sizeof(char) * ((shader_size-prefix_gl_size)+prefix_es_size));
+		memcpy(final_data, prefix_es, prefix_es_size);
+		memcpy(&final_data[prefix_es_size], &file_data[prefix_gl_size], shader_size - prefix_gl_size);
+		needs_free = true;
+	}
+#else
+	if (shader_size >= prefix_es_size && memcmp(prefix_es, file_data, prefix_es_size) == 0) {
+		final_data = (char*)malloc(sizeof(char) * ((shader_size-prefix_es_size)+prefix_gl_size));
+		memcpy(final_data, prefix_gl, prefix_gl_size);
+		memcpy(&final_data[prefix_gl_size], &file_data[prefix_es_size], shader_size - prefix_es_size);
+		needs_free = true;
+	}
+#endif
+
 	// create and compile the vertex shader
 	result.shader = glCreateShader(gl_type);
-	glShaderSource (result.shader, 1, (char**)&file_data, NULL);
+	glShaderSource (result.shader, 1, &final_data, NULL);
 	glCompileShader(result.shader);
 
 	// check for errors?
@@ -729,6 +756,8 @@ skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shad
 		skr_log(log);
 		free(log);
 	}
+	if (needs_free)
+		free(final_data);
 
 	return result;
 }

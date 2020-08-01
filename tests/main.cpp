@@ -113,15 +113,15 @@ bool main_step() {
 
 	skr_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skr_tex_t *target, *depth;
-	skr_swapchain_get_next(&app_swapchain, &target, &depth);
-	skr_set_render_target(clear_color, true, target, depth);
+	skr_tex_t *target;
+	skr_swapchain_get_next(&app_swapchain, &target);
+	skr_set_render_target(clear_color, true, target);
 
 	static int32_t frame = 0;
 	frame++;
 
 	hmm_mat4 view = HMM_LookAt(
-		HMM_Vec3(sinf(frame / 30.0f) * 5, 3, cosf(frame / 30.0f) * 5),
+		HMM_Vec3(sinf(frame / 100.0f) * 5, 3, cosf(frame / 100.0f) * 5),
 		HMM_Vec3(0, 0, 0),
 		HMM_Vec3(0, 1, 0));
 	hmm_mat4 proj = HMM_Perspective(90, app_width / (float)app_height, 0.01f, 1000);

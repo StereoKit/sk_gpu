@@ -113,8 +113,8 @@ int32_t              skr_init                  (const char *app_name, void *hwnd
 void                 skr_shutdown              ();
 void                 skr_draw_begin            ();
 skr_platform_data_t  skr_get_platform_data     ();
-void                 skr_set_render_target     (float clear_color[4], bool clear, skr_tex_t *render_target, skr_tex_t *depth_target);
-void                 skr_get_render_target     (skr_tex_t **out_render_target, skr_tex_t **out_depth_target);
+void                 skr_set_render_target     (float clear_color[4], bool clear, skr_tex_t *render_target);
+void                 skr_get_render_target     (skr_tex_t **out_render_target);
 void                 skr_draw                  (int32_t index_start, int32_t index_count, int32_t instance_count);
 int64_t              skr_tex_fmt_to_native     (skr_tex_fmt_ format);
 skr_tex_fmt_         skr_tex_fmt_from_native   (int64_t format);
@@ -139,13 +139,14 @@ void                 skr_shader_destroy        (      skr_shader_t *shader);
 skr_swapchain_t      skr_swapchain_create      (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);
 void                 skr_swapchain_resize      (      skr_swapchain_t *swapchain, int32_t width, int32_t height);
 void                 skr_swapchain_present     (      skr_swapchain_t *swapchain);
-void                 skr_swapchain_get_next    (      skr_swapchain_t *swapchain, skr_tex_t **out_target, skr_tex_t **out_depth);
+void                 skr_swapchain_get_next    (      skr_swapchain_t *swapchain, skr_tex_t **out_target);
 const skr_tex_t     *skr_swapchain_get_target  (const skr_swapchain_t *swapchain);
 const skr_tex_t     *skr_swapchain_get_depth   (const skr_swapchain_t *swapchain);
 void                 skr_swapchain_destroy     (      skr_swapchain_t *swapchain);
 
 skr_tex_t            skr_tex_from_native       (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height);
 skr_tex_t            skr_tex_create            (skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps);
+void                 skr_tex_set_depth         (      skr_tex_t *tex, skr_tex_t *depth);
 void                 skr_tex_settings          (      skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy);
 void                 skr_tex_set_data          (      skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
 void                 skr_tex_set_active        (const skr_tex_t *tex, int32_t slot);

@@ -105,6 +105,8 @@ HGLRC gl_hrc;
 #define GL_TEXTURE0 0x84C0
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_COLOR_ATTACHMENT0 0x8CE0
+#define GL_DEPTH_ATTACHMENT 0x8D00
+#define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
 
 #define GL_RED 0x1903
 #define GL_RGBA 0x1908
@@ -219,6 +221,8 @@ typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
     GLE(void,     DeleteBuffers,           int32_t n, const uint32_t *buffers) \
 	GLE(void,     GenTextures,             int32_t n, uint32_t *textures) \
 	GLE(void,     GenFramebuffers,         int32_t n, uint32_t *ids) \
+	GLE(void,     DeleteFramebuffers,      int32_t n, uint32_t *ids) \
+	GLE(void,     FramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 	GLE(void,     DeleteTextures,          int32_t n, const uint32_t *textures) \
 	GLE(void,     BindTexture,             uint32_t target, uint32_t texture) \
 	GLE(void,     BindFramebuffer,         uint32_t target, uint32_t framebuffer) \
@@ -284,8 +288,11 @@ static void gl_load_extensions( ) {
 
 ///////////////////////////////////////////
 
-int      gl_width       = 0;
-int      gl_height      = 0;
+int32_t    gl_width  = 0;
+int32_t    gl_height = 0;
+skr_tex_t *gl_active_rendertarget       = nullptr;
+skr_tex_t *gl_active_rendertarget_depth = nullptr;
+uint32_t   gl_current_framebuffer       = 0;
 
 ///////////////////////////////////////////
 
@@ -378,6 +385,11 @@ int32_t gl_init_win32(void *app_hwnd) {
 
 	gl_hwnd = (HWND)app_hwnd;
 	gl_hdc  = GetDC(gl_hwnd);
+
+	RECT bounds;
+	GetWindowRect(gl_hwnd, &bounds);
+	gl_width  = bounds.right  - bounds.left;
+	gl_height = bounds.bottom - bounds.top;
 
 	// Find a pixel format
 	const int format_attribs[] = {
@@ -564,15 +576,29 @@ void skr_draw_begin() {
 
 ///////////////////////////////////////////
 
-void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
-	glBindFramebuffer(GL_FRAMEBUFFER, render_target == nullptr? 0 : render_target->framebuffer);
+void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_target) {
+	gl_active_rendertarget = render_target;
+	gl_current_framebuffer = render_target == nullptr ? 0 : render_target->framebuffer;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	if (render_target) {
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target->texture, 0);
+		//glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target->texture, 0);
 		glViewport(0, 0, render_target->width, render_target->height);
+	} else {
+		glViewport(0, 0, gl_width, gl_height);
 	}
 
-	glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	if (clear) {
+		glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	}
+	glEnable(GL_DEPTH_TEST);
+}
+
+///////////////////////////////////////////
+
+void skr_get_render_target(skr_tex_t **out_render_target) {
+	*out_render_target = gl_active_rendertarget;
 }
 
 ///////////////////////////////////////////
@@ -594,14 +620,13 @@ skr_platform_data_t skr_get_platform_data() {
 
 void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) {
 	glDrawElementsInstanced(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count);
-	//glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)));
 }
 
 ///////////////////////////////////////////
 
 skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
-	result.use = use;
+	result.use  = use;
 	result.type = skr_buffer_type_to_gl(type);
 
 	glGenBuffers(1, &result.buffer);
@@ -781,9 +806,8 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-void skr_swapchain_get_next(skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth) {
+void skr_swapchain_get_next(skr_swapchain_t *swapchain, skr_tex_t **out_target) {
 	*out_target = nullptr;
-	*out_depth = nullptr;
 }
 
 /////////////////////////////////////////// 
@@ -817,6 +841,10 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 
 	if (type == skr_tex_type_rendertarget) {
 		glGenFramebuffers(1, &result.framebuffer);
+
+		glBindFramebuffer     (GL_FRAMEBUFFER, result.framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, result.texture, 0); 
+		glBindFramebuffer     (GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
 	
 	return result;
@@ -832,8 +860,25 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 	result.mips   = mip_maps;
 
 	glGenTextures(1, &result.texture);
+
+	if (type == skr_tex_type_rendertarget) {
+		glGenFramebuffers(1, &result.framebuffer);
+	}
 	
 	return result;
+}
+
+/////////////////////////////////////////// 
+
+void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
+	bool stencil = depth->format == skr_tex_fmt_depthstencil;
+	if (tex->type == skr_tex_type_rendertarget) {
+		glBindFramebuffer     (GL_FRAMEBUFFER, tex->framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, stencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->texture, 0); 
+		glBindFramebuffer     (GL_FRAMEBUFFER, gl_current_framebuffer);
+	} else {
+		skr_log("Can't bind a depth texture to a non-rendertarget");
+	}
 }
 
 /////////////////////////////////////////// 
@@ -857,8 +902,8 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	default: filter = GL_LINEAR;
 	}
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, mode);	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, mode);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,     mode  );	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,     mode  );
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 #ifdef _WIN32
@@ -879,19 +924,26 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames==nullptr?nullptr:data_frames[0]);
 	if (tex->mips == skr_mip_generate)
 		glGenerateMipmap(GL_TEXTURE_2D);
+
+	if (tex->type == skr_tex_type_rendertarget) {
+		glBindFramebuffer     (GL_FRAMEBUFFER, tex->framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex->texture, 0); 
+		glBindFramebuffer     (GL_FRAMEBUFFER, gl_current_framebuffer);
+	}
 }
 
 /////////////////////////////////////////// 
 
 void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
 	glActiveTexture(GL_TEXTURE0 + slot);
-	glBindTexture(GL_TEXTURE_2D, texture->texture);
+	glBindTexture  (GL_TEXTURE_2D, texture->texture);
 }
 
 /////////////////////////////////////////// 
 
 void skr_tex_destroy(skr_tex_t *tex) {
-	glDeleteTextures(1, &tex->texture);
+	glDeleteTextures    (1, &tex->texture);
+	glDeleteFramebuffers(1, &tex->framebuffer);  
 	*tex = {};
 }
 

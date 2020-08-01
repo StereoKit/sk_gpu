@@ -53,9 +53,9 @@ typedef struct skr_platform_data_t {
 } skr_platform_data_t;
 
 typedef struct skr_swapchain_t {
-	int32_t width;
-	int32_t height;
+	int32_t   width;
+	int32_t   height;
 	skr_tex_t target;
 	skr_tex_t depth;
-	uint32_t gl_framebuffer;
+	uint32_t  gl_framebuffer;
 } skr_swapchain_t;

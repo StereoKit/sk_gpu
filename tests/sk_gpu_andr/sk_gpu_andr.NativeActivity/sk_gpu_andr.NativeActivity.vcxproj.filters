@@ -34,6 +34,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\..\..\..\Users\progr\Downloads\ovr_openxr_mobile_sdk_1.0.9\OpenXR\Libs\Android\arm64-v8a\Debug\libopenxr_loader.so" />
+    <Library Include="libs\arm64-v8a\Debug\libopenxr_loader.so" />
   </ItemGroup>
 </Project>

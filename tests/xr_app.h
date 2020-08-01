@@ -211,6 +211,14 @@ bool openxr_init(const char *app_name, xr_settings_t *settings) {
 	}
 #endif
 
+	uint32_t ext_count = 0;
+	xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr);
+	XrExtensionProperties *exts = (XrExtensionProperties *)malloc(sizeof(XrExtensionProperties) * ext_count);
+	for (uint32_t i = 0; i < ext_count; i++) exts[i] = { XR_TYPE_EXTENSION_PROPERTIES };
+	xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, exts);
+	for (uint32_t i = 0; i < ext_count; i++) oxr_log(exts[i].extensionName);
+	free(exts);
+
 	// Create an OpenXR instance
 	const char *extensions[] = {
 		XR_GFX_EXTENSION,

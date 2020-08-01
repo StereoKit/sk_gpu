@@ -530,6 +530,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	skr_log(glGetString(GL_VERSION));
 
 #if _DEBUG
+	skr_log("sk_gpu: Debug info enabled.");
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);

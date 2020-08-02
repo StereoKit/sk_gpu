@@ -33,11 +33,15 @@ app_mesh_t           app_mesh2  = {};
 skr_shader_stage_t   app_ps     = {};
 skr_shader_stage_t   app_vs     = {};
 skr_shader_t         app_shader = {};
+skr_shader_stage_t   app_cube_ps     = {};
+skr_shader_stage_t   app_cube_vs     = {};
+skr_shader_t         app_cube_shader = {};
 skr_buffer_t         app_shader_data_buffer = {};
 skr_buffer_t         app_shader_inst_buffer = {};
 skr_tex_t            app_tex    = {};
 skr_tex_t            app_target = {};
 skr_tex_t            app_target_depth = {};
+skr_tex_t            app_cubemap = {};
 
 ///////////////////////////////////////////
 
@@ -99,6 +103,29 @@ bool app_init() {
 	skr_tex_set_data (&app_target_depth, nullptr, 1, 512, 512);
 	skr_tex_set_depth(&app_target, &app_target_depth);
 
+	app_cubemap = skr_tex_create(skr_tex_type_cubemap, skr_use_static, skr_tex_fmt_rgba32, skr_mip_none);
+	uint8_t *cube_cols[6];
+	for (size_t f = 0; f < 6; f++) {
+		cube_cols[f] = (uint8_t*)malloc(sizeof(uint8_t) * 4 * 4);
+		size_t offset = f * 4 * 4;
+		for (size_t p = 0; p < 4; p++) {
+			cube_cols[f][p*4 + 0] = (f/2) % 3 == 0 ? (f%2==0?128:255) : 0;
+			cube_cols[f][p*4 + 1] = (f/2) % 3 == 1 ? (f%2==0?128:255) : 0;
+			cube_cols[f][p*4 + 2] = (f/2) % 3 == 2 ? (f%2==0?128:255) : 0;
+			cube_cols[f][p*4 + 3] = 255;
+		}
+	}
+	skr_tex_set_data(&app_cubemap, (void**)&cube_cols, 6, 2, 2);
+
+#if defined(SKR_OPENGL)
+	app_cube_ps = skr_shader_stage_create((uint8_t*)shader_cube_glsl_ps, strlen(shader_cube_glsl_ps), skr_shader_pixel);
+	app_cube_vs = skr_shader_stage_create((uint8_t*)shader_cube_glsl_vs, strlen(shader_cube_glsl_vs), skr_shader_vertex);
+#elif defined(SKR_DIRECT3D11)
+	app_cube_ps = skr_shader_stage_create((uint8_t*)shader_cube_hlsl, strlen(shader_cube_hlsl), skr_shader_pixel);
+	app_cube_vs = skr_shader_stage_create((uint8_t*)shader_cube_hlsl, strlen(shader_cube_hlsl), skr_shader_vertex);
+#endif
+	app_cube_shader = skr_shader_create(&app_cube_vs, &app_cube_ps);
+
 #if defined(SKR_OPENGL)
 	app_ps = skr_shader_stage_create((uint8_t*)shader_glsl_ps, strlen(shader_glsl_ps), skr_shader_pixel);
 	app_vs = skr_shader_stage_create((uint8_t*)shader_glsl_vs, strlen(shader_glsl_vs), skr_shader_vertex);
@@ -114,6 +141,21 @@ bool app_init() {
 	app_shader_data_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t),       skr_buffer_type_constant, skr_use_dynamic);
 	app_shader_inst_buffer = skr_buffer_create(&app_shader_inst, sizeof(app_shader_inst_t) * 100, skr_buffer_type_constant, skr_use_dynamic);
 	return true;
+}
+
+///////////////////////////////////////////
+
+void app_test_cubemap() {
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ 0,0,0 }) * HMM_Scale(hmm_vec3{ .4f,.4f,.4f }));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t));
+	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
+
+	skr_mesh_set      (&app_mesh1.mesh);
+	skr_shader_set    (&app_cube_shader);
+	skr_tex_set_active(&app_tex, 0);
+	skr_tex_set_active(&app_cubemap, 1);
+	skr_draw(0, app_mesh1.ind_count, 1);
 }
 
 ///////////////////////////////////////////
@@ -194,6 +236,7 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 	skr_buffer_set(&app_shader_data_buffer, 0, sizeof(app_shader_data_t), 0);
 
 	app_test_instancing();
+	app_test_cubemap();
 }
 
 ///////////////////////////////////////////

@@ -45,6 +45,53 @@ float4 ps(psIn input) : SV_TARGET {
 
 ///////////////////////////////////////////
 
+const char *shader_cube_hlsl = R"_(
+cbuffer SystemBuffer : register(b0) {
+	float4x4 viewproj;
+};
+
+struct Inst {
+	float4x4 world;
+};
+cbuffer TransformBuffer : register(b1) {
+	Inst inst[100];
+};
+
+struct vsIn {
+	float4 pos  : SV_POSITION;
+	float3 norm : NORMAL;
+	float2 uv   : TEXCOORD0;
+	float4 color: COLOR0;
+};
+struct psIn {
+	float4 pos   : SV_POSITION;
+	float3 norm  : NORMAL;
+	float2 uv    : TEXCOORD0;
+	float3 color : COLOR0;
+};
+
+Texture2D    tex         : register(t0);
+SamplerState tex_sampler : register(s0);
+
+TextureCube  cubemap      : register(t11);
+SamplerState cube_sampler : register(s11);
+
+psIn vs(vsIn input, uint id : SV_InstanceID) {
+	psIn output;
+	output.pos = mul(float4(input.pos.xyz, 1), inst[id].world);
+	output.pos = mul(output.pos, viewproj);
+	output.norm = normalize(mul(float4(input.norm, 0), inst[id].world).xyz);
+	output.color = input.color.rgb;
+	output.uv = input.uv;
+	return output;
+}
+float4 ps(psIn input) : SV_TARGET {
+	return float4(input.color, 1) * tex.Sample(tex_sampler, input.uv) * cubemap.SampleLevel(cube_sampler, input.norm, 0);
+}
+)_";
+
+///////////////////////////////////////////
+
 const char *shader_glsl_vs = R"_(#version 300 es
 #ifdef GL_ARB_shader_draw_parameters
 #extension GL_ARB_shader_draw_parameters : enable
@@ -100,6 +147,70 @@ layout(location = 0) out highp vec4 out_var_SV_TARGET;
 void main()
 {
     out_var_SV_TARGET = vec4(in_var_COLOR0, 1.0) * texture(SPIRV_Cross_Combinedtextex_sampler, in_var_TEXCOORD0);
+}
+)_";
+
+///////////////////////////////////////////
+
+const char *shader_cube_glsl_vs = R"_(#version 300 es
+#ifdef GL_ARB_shader_draw_parameters
+#extension GL_ARB_shader_draw_parameters : enable
+#endif
+
+struct Inst
+{
+	mat4 world;
+};
+
+layout(binding = 0, std140) uniform type_SystemBuffer
+{
+	layout(row_major) mat4 viewproj;
+} SystemBuffer;
+
+layout(binding = 1, std140) uniform type_TransformBuffer
+{
+	layout(row_major) Inst inst[100];
+} TransformBuffer;
+
+layout(location = 0) in vec4 in_var_SV_POSITION;
+layout(location = 1) in vec3 in_var_NORMAL;
+layout(location = 2) in vec2 in_var_TEXCOORD0;
+layout(location = 3) in vec4 in_var_COLOR0;
+#ifdef GL_ARB_shader_draw_parameters
+#define SPIRV_Cross_BaseInstance gl_BaseInstanceARB
+#else
+uniform int SPIRV_Cross_BaseInstance;
+#endif
+layout(location = 0) out vec3 out_var_NORMAL;
+layout(location = 1) out vec2 out_var_TEXCOORD0;
+layout(location = 2) out vec3 out_var_COLOR0;
+
+void main()
+{
+	gl_Position = SystemBuffer.viewproj * (TransformBuffer.inst[uint((gl_InstanceID + SPIRV_Cross_BaseInstance))].world * vec4(in_var_SV_POSITION.xyz, 1.0));
+	out_var_NORMAL = normalize((TransformBuffer.inst[uint((gl_InstanceID + SPIRV_Cross_BaseInstance))].world * vec4(in_var_NORMAL, 0.0)).xyz);
+	out_var_TEXCOORD0 = in_var_TEXCOORD0;
+	out_var_COLOR0 = in_var_COLOR0.xyz;
+}
+)_";
+
+///////////////////////////////////////////
+
+const char *shader_cube_glsl_ps = R"_(#version 300 es
+precision mediump float;
+precision highp int;
+
+uniform highp sampler2D SPIRV_Cross_Combinedtextex_sampler;
+uniform highp samplerCube SPIRV_Cross_Combinedcubemapcube_sampler;
+
+layout(location = 0) in highp vec3 in_var_NORMAL;
+layout(location = 1) in highp vec2 in_var_TEXCOORD0;
+layout(location = 2) in highp vec3 in_var_COLOR0;
+layout(location = 0) out highp vec4 out_var_SV_TARGET;
+
+void main()
+{
+	out_var_SV_TARGET = (vec4(in_var_COLOR0, 1.0) * texture(SPIRV_Cross_Combinedtextex_sampler, in_var_TEXCOORD0)) * textureLod(SPIRV_Cross_Combinedcubemapcube_sampler, in_var_NORMAL, 0.0);
 }
 )_";
 

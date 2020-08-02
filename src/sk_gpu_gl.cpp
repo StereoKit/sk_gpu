@@ -85,6 +85,16 @@ HGLRC gl_hrc;
 #define GL_BACK 0x0405
 #define GL_DEPTH_TEST 0x0B71
 #define GL_TEXTURE_2D 0x0DE1
+#define GL_TEXTURE_CUBE_MAP 0x8513
+#define GL_TEXTURE_CUBE_MAP_SEAMLESS 0x884F
+#define GL_TEXTURE_CUBE_MAP_ARRAY 0x9009
+#define GL_TEXTURE_BINDING_CUBE_MAP 0x8514
+#define GL_TEXTURE_CUBE_MAP_POSITIVE_X 0x8515
+#define GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0x8516
+#define GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0x8517
+#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0x8518
+#define GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0x8519
+#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0x851A
 #define GL_NEAREST 0x2600
 #define GL_LINEAR 0x2601
 #define GL_NEAREST_MIPMAP_NEAREST 0x2700
@@ -95,6 +105,7 @@ HGLRC gl_hrc;
 #define GL_TEXTURE_MIN_FILTER 0x2801
 #define GL_TEXTURE_WRAP_S 0x2802
 #define GL_TEXTURE_WRAP_T 0x2803
+#define GL_TEXTURE_WRAP_R 0x8072
 #define GL_TEXTURE_WIDTH 0x1000
 #define GL_TEXTURE_HEIGHT 0x1001
 #define GL_TEXTURE_INTERNAL_FORMAT 0x1003
@@ -536,15 +547,15 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
 		if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
-			//skr_log(message);
+			skr_log(message);
 		} else {
 			skr_log(message);
 		} }, nullptr);
 #endif
 	
 	// Some default behavior
-	glEnable(GL_DEPTH_TEST);  
-	glEnable(GL_CULL_FACE);
+	glEnable  (GL_DEPTH_TEST);  
+	glEnable  (GL_CULL_FACE);
 	glCullFace(GL_BACK);
 	
 	return 1;
@@ -913,7 +924,10 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 /////////////////////////////////////////// 
 
 void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {
-	glBindTexture(GL_TEXTURE_2D, tex->texture);
+	uint32_t target = tex->type == skr_tex_type_cubemap 
+		? GL_TEXTURE_CUBE_MAP 
+		: GL_TEXTURE_2D;
+	glBindTexture(target, tex->texture);
 
 	uint32_t mode;
 	switch (address) {
@@ -931,10 +945,12 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	default: filter = GL_LINEAR;
 	}
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,     mode  );	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,     mode  );
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+	glTexParameteri(target, GL_TEXTURE_WRAP_S,     mode  );	
+	glTexParameteri(target, GL_TEXTURE_WRAP_T,     mode  );
+	if (tex->type == skr_tex_type_cubemap)
+		glTexParameteri(target, GL_TEXTURE_WRAP_R, mode  );
+	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
+	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
 #ifdef _WIN32
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
@@ -943,16 +959,28 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 /////////////////////////////////////////// 
 
 void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+	uint32_t target = tex->type == skr_tex_type_cubemap 
+		? GL_TEXTURE_CUBE_MAP 
+		: GL_TEXTURE_2D;
 	tex->width  = width;
 	tex->height = height;
-	glBindTexture(GL_TEXTURE_2D, tex->texture);
+	glBindTexture(target, tex->texture);
 
 	uint32_t format = (uint32_t)skr_tex_fmt_to_native(tex->format);
-	uint32_t type   = skr_tex_fmt_to_gl_type    (tex->format);
-	uint32_t layout = skr_tex_fmt_to_gl_layout  (tex->format);
-	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames==nullptr?nullptr:data_frames[0]);
+	uint32_t type   = skr_tex_fmt_to_gl_type         (tex->format);
+	uint32_t layout = skr_tex_fmt_to_gl_layout       (tex->format);
+	if (tex->type == skr_tex_type_cubemap) {
+		if (data_frame_count != 6) {
+			skr_log("sk_gpu: cubemaps need 6 data frames");
+			return;
+		}
+		for (size_t f = 0; f < 6; f++)
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, format, width, height, 0, layout, type, data_frames[f]);
+	} else {
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
+	}
 	if (tex->mips == skr_mip_generate)
-		glGenerateMipmap(GL_TEXTURE_2D);
+		glGenerateMipmap(target);
 
 	if (tex->type == skr_tex_type_rendertarget) {
 		glBindFramebuffer     (GL_FRAMEBUFFER, tex->framebuffer);
@@ -964,8 +992,12 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 /////////////////////////////////////////// 
 
 void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
+	uint32_t target = texture->type == skr_tex_type_cubemap 
+		? GL_TEXTURE_CUBE_MAP 
+		: GL_TEXTURE_2D;
+
 	glActiveTexture(GL_TEXTURE0 + slot);
-	glBindTexture  (GL_TEXTURE_2D, texture->texture);
+	glBindTexture  (target, texture->texture);
 }
 
 /////////////////////////////////////////// 

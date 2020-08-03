@@ -14,7 +14,7 @@ for match in re.findall(regex_includes, dest_header):
     include_filename = match.split('"')[1]
 
     # some APIs aren't ready yet
-    if include_filename == "sk_gpu_dx12.h" or include_filename == "sk_gpu_vk.h":
+    if include_filename == "sk_gpu_dx12.h" or include_filename == "sk_gpu_vk.h" or include_filename == "sk_gpu_common.h":
         dest_header = dest_header.replace(match, "")
         continue
     

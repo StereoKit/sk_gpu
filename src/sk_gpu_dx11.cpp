@@ -16,16 +16,6 @@
 
 ///////////////////////////////////////////
 
-void (*_skr_log)(const char *text);
-void skr_log_callback(void (*callback)(const char *text)) {
-	_skr_log = callback;
-}
-void skr_log(const char *text) {
-	if (_skr_log) _skr_log(text);
-}
-
-///////////////////////////////////////////
-
 ID3D11Device             *d3d_device      = nullptr;
 ID3D11DeviceContext      *d3d_context     = nullptr;
 ID3D11InfoQueue          *d3d_info        = nullptr;

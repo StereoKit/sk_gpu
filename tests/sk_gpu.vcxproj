@@ -156,6 +156,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\sk_gpu_common.cpp" />
     <ClCompile Include="..\src\sk_gpu_dx11.cpp" />
     <ClCompile Include="..\src\sk_gpu_dx12.cpp" />
     <ClCompile Include="..\src\sk_gpu_gl.cpp" />
@@ -166,6 +167,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\d3dx12.h" />
+    <ClInclude Include="..\src\sk_gpu_common.h" />
     <ClInclude Include="..\src\sk_gpu_dev.h" />
     <ClInclude Include="..\src\sk_gpu_dx11.h" />
     <ClInclude Include="..\src\sk_gpu_dx12.h" />

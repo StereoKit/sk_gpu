@@ -919,11 +919,11 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	default: mode = GL_REPEAT;
 	}
 
-	uint32_t filter;
+	uint32_t filter, min_filter;
 	switch (sample) {
-	case skr_tex_sample_linear:     filter = GL_LINEAR;  break; // Technically trilinear
-	case skr_tex_sample_point:      filter = GL_NEAREST; break;
-	case skr_tex_sample_anisotropic:filter = GL_LINEAR;  break;
+	case skr_tex_sample_linear:     filter = GL_LINEAR;  min_filter = tex->mips == skr_mip_generate ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR; break; // Technically trilinear
+	case skr_tex_sample_point:      filter = GL_NEAREST; min_filter = GL_NEAREST;              break;
+	case skr_tex_sample_anisotropic:filter = GL_LINEAR;  min_filter = tex->mips == skr_mip_generate ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR; break;
 	default: filter = GL_LINEAR;
 	}
 
@@ -932,7 +932,7 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	if (tex->type == skr_tex_type_cubemap) {
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
 	}
-	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
+	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, min_filter);
 	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
 #ifdef _WIN32
 	glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);

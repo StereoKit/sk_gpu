@@ -825,6 +825,8 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 /////////////////////////////////////////// 
 
 void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t height) {
+	gl_width  = width;
+	gl_height = height;
 }
 
 /////////////////////////////////////////// 

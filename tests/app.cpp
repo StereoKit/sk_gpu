@@ -162,8 +162,7 @@ void app_test_cubemap() {
 ///////////////////////////////////////////
 
 void app_test_rendertarget() {
-	skr_tex_t *old_target;
-	skr_get_render_target(&old_target);
+	skr_tex_t *old_target = skr_get_render_target();
 
 	float color[4] = { 1,1,1,1 };
 	skr_set_render_target(color, true, &app_target);

@@ -601,8 +601,8 @@ void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_t
 
 ///////////////////////////////////////////
 
-void skr_get_render_target(skr_tex_t **out_render_target) {
-	*out_render_target = gl_active_rendertarget;
+skr_tex_t *skr_get_render_target() {
+	return gl_active_rendertarget;
 }
 
 ///////////////////////////////////////////
@@ -839,19 +839,7 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-void skr_swapchain_get_next(skr_swapchain_t *swapchain, skr_tex_t **out_target) {
-	*out_target = nullptr;
-}
-
-/////////////////////////////////////////// 
-
-const skr_tex_t *skr_swapchain_get_target(const skr_swapchain_t *swapchain) {
-	return nullptr;
-}
-
-/////////////////////////////////////////// 
-
-const skr_tex_t *skr_swapchain_get_depth(const skr_swapchain_t *swapchain) {
+skr_tex_t *skr_swapchain_get_next(skr_swapchain_t *swapchain) {
 	return nullptr;
 }
 

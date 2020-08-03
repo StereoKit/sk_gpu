@@ -23,8 +23,7 @@ ID3D11InputLayout        *d3d_vert_layout = nullptr;
 ID3D11RasterizerState    *d3d_rasterstate = nullptr;
 void                     *d3d_hwnd        = nullptr;
 
-skr_tex_t *d3d_active_rendertarget       = nullptr;
-skr_tex_t *d3d_active_rendertarget_depth = nullptr;
+skr_tex_t *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
 
@@ -136,15 +135,14 @@ skr_platform_data_t skr_get_platform_data() {
 
 ///////////////////////////////////////////
 
-void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_target, skr_tex_t *depth_target) {
-	d3d_active_rendertarget       = render_target;
-	d3d_active_rendertarget_depth = depth_target;
+void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_target) {
+	d3d_active_rendertarget = render_target;
 
 	if (render_target == nullptr) {
 		d3d_context->OMSetRenderTargets(0, nullptr, nullptr);
 		return;
 	}
-	if (render_target->type != skr_tex_type_rendertarget || (depth_target != nullptr && depth_target->type != skr_tex_type_depth))
+	if (render_target->type != skr_tex_type_rendertarget)
 		return;
 
 	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(0.f, 0.f, (float)render_target->width, (float)render_target->height);
@@ -152,17 +150,16 @@ void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_t
 
 	if (clear) {
 		d3d_context->ClearRenderTargetView(render_target->target_view, clear_color);
-		if (depth_target != nullptr)
-			d3d_context->ClearDepthStencilView(depth_target->depth_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+		if (render_target->depth_tex != nullptr)
+			d3d_context->ClearDepthStencilView(render_target->depth_tex->depth_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	}
-	d3d_context->OMSetRenderTargets(1, &render_target->target_view, depth_target == nullptr ? nullptr : depth_target->depth_view);
+	d3d_context->OMSetRenderTargets(1, &render_target->target_view, render_target->depth_tex == nullptr ? nullptr : render_target->depth_tex->depth_view);
 }
 
 ///////////////////////////////////////////
 
-void skr_get_render_target(skr_tex_t **out_render_target, skr_tex_t **out_depth_target) {
-	*out_render_target = d3d_active_rendertarget;
-	*out_depth_target  = d3d_active_rendertarget_depth;
+skr_tex_t *skr_get_render_target() {
+	return d3d_active_rendertarget;
 }
 
 ///////////////////////////////////////////
@@ -400,21 +397,8 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-void skr_swapchain_get_next(skr_swapchain_t *swapchain, skr_tex_t **out_target, skr_tex_t **out_depth) {
-	*out_target = swapchain->target.format != 0 ? &swapchain->target : nullptr;
-	*out_depth  = swapchain->depth .format != 0 ? &swapchain->depth  : nullptr;
-}
-
-/////////////////////////////////////////// 
-
-const skr_tex_t *skr_swapchain_get_target(const skr_swapchain_t *swapchain) {
+skr_tex_t *skr_swapchain_get_next(skr_swapchain_t *swapchain) {
 	return swapchain->target.format != 0 ? &swapchain->target : nullptr;
-}
-
-/////////////////////////////////////////// 
-
-const skr_tex_t *skr_swapchain_get_depth(const skr_swapchain_t *swapchain) {
-	return swapchain->depth.format != 0 ? &swapchain->depth : nullptr;
 }
 
 /////////////////////////////////////////// 
@@ -459,6 +443,16 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 		skr_log("Dynamic textures don't support mip-maps!");
 
 	return result;
+}
+
+/////////////////////////////////////////// 
+
+void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
+	if (depth->type == skr_tex_type_depth) {
+		tex->depth_tex = depth;
+	} else {
+		skr_log("Can't bind a depth texture to a non-rendertarget");
+	}
 }
 
 /////////////////////////////////////////// 
@@ -615,7 +609,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 		desc.Width            = width;
 		desc.Height           = height;
 		desc.MipLevels        = mip_levels;
-		desc.ArraySize        = 1;
+		desc.ArraySize        = data_frame_count;
 		desc.SampleDesc.Count = 1;
 		desc.Format           = (DXGI_FORMAT)skr_tex_fmt_to_native(tex->format);
 		desc.BindFlags        = tex->type == skr_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : D3D11_BIND_SHADER_RESOURCE;
@@ -683,7 +677,7 @@ void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
 		d3d_context->PSSetSamplers       (slot, 1, &texture->sampler);
 		d3d_context->PSSetShaderResources(slot, 1, &texture->resource);
 	} else {
-		d3d_context->PSSetShaderResources(slot, 1, nullptr);
+		d3d_context->PSSetShaderResources(slot, 0, nullptr);
 	}
 }
 

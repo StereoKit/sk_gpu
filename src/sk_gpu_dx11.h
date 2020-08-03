@@ -38,6 +38,7 @@ typedef struct skr_tex_t {
 	ID3D11ShaderResourceView *resource;
 	ID3D11RenderTargetView   *target_view;
 	ID3D11DepthStencilView   *depth_view;
+	skr_tex_t                *depth_tex;
 } skr_tex_t;
 
 typedef struct skr_swapchain_t {

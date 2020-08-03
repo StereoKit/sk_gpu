@@ -113,8 +113,7 @@ bool main_step() {
 
 	skr_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skr_tex_t *target;
-	skr_swapchain_get_next(&app_swapchain, &target);
+	skr_tex_t *target = skr_swapchain_get_next(&app_swapchain);
 	skr_set_render_target(clear_color, true, target);
 
 	static int32_t frame = 0;

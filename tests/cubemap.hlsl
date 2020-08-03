@@ -25,8 +25,8 @@ struct psIn {
 Texture2D    tex         : register(t0);
 SamplerState tex_sampler : register(s0);
 
-TextureCube  cubemap      : register(t11);
-SamplerState cube_sampler : register(s11);
+TextureCube  cubemap      : register(t9);
+SamplerState cube_sampler : register(s9);
 
 psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn output;

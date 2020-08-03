@@ -154,8 +154,9 @@ void app_test_cubemap() {
 	skr_mesh_set      (&app_mesh1.mesh);
 	skr_shader_set    (&app_cube_shader);
 	skr_tex_set_active(&app_tex, 0);
-	skr_tex_set_active(&app_cubemap, 1);
+	skr_tex_set_active(&app_cubemap, 9);
 	skr_draw(0, app_mesh1.ind_count, 1);
+	skr_tex_set_active(nullptr, 1);
 }
 
 ///////////////////////////////////////////
@@ -198,7 +199,7 @@ void app_test_instancing() {
 	// Set transforms for 100 instances
 	for (size_t i = 0; i < 100; i++) {
 		int y = i / 10 - 4, x = i % 10 -4;
-		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,0,(float)y -0.5f })*HMM_Scale(hmm_vec3{.1f,.1f,.1f}));
+		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,0,(float)y -0.5f })*HMM_Scale(hmm_vec3{.2f,.2f,.2f}));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
@@ -212,7 +213,7 @@ void app_test_instancing() {
 	// Set transforms for another 100 instances
 	for (size_t i = 0; i < 100; i++) {
 		int y = i / 10 - 4, x = i % 10 -4;
-		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,1,(float)y-0.5f }) * HMM_Scale(hmm_vec3{.1f,.1f,.1f}));
+		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,1,(float)y-0.5f }) * HMM_Scale(hmm_vec3{.2f,.2f,.2f}));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));

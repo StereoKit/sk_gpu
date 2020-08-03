@@ -73,8 +73,8 @@ struct psIn {
 Texture2D    tex         : register(t0);
 SamplerState tex_sampler : register(s0);
 
-TextureCube  cubemap      : register(t11);
-SamplerState cube_sampler : register(s11);
+TextureCube  cubemap      : register(t9);
+SamplerState cube_sampler : register(s9);
 
 psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn output;
@@ -200,8 +200,8 @@ const char *shader_cube_glsl_ps = R"_(#version 300 es
 precision mediump float;
 precision highp int;
 
-uniform highp sampler2D SPIRV_Cross_Combinedtextex_sampler;
-uniform highp samplerCube SPIRV_Cross_Combinedcubemapcube_sampler;
+layout(location = 0) uniform highp sampler2D SPIRV_Cross_Combinedtextex_sampler;
+layout(location = 9) uniform highp samplerCube SPIRV_Cross_Combinedcubemapcube_sampler;
 
 layout(location = 0) in highp vec3 in_var_NORMAL;
 layout(location = 1) in highp vec2 in_var_TEXCOORD0;

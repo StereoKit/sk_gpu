@@ -101,6 +101,10 @@ HGLRC gl_hrc;
 #define GL_LINEAR_MIPMAP_NEAREST 0x2701
 #define GL_NEAREST_MIPMAP_LINEAR 0x2702
 #define GL_LINEAR_MIPMAP_LINEAR 0x2703
+#define GL_TEXTURE_MIN_LOD 0x813A
+#define GL_TEXTURE_MAX_LOD 0x813B
+#define GL_TEXTURE_BASE_LEVEL 0x813C
+#define GL_TEXTURE_MAX_LEVEL 0x813D
 #define GL_TEXTURE_MAG_FILTER 0x2800
 #define GL_TEXTURE_MIN_FILTER 0x2801
 #define GL_TEXTURE_WRAP_S 0x2802
@@ -899,7 +903,7 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 	result.mips   = mip_maps;
 
 	glGenTextures(1, &result.texture);
-	skr_tex_settings(&result, skr_tex_address_repeat, skr_tex_sample_linear, 1);
+	skr_tex_settings(&result, type == skr_tex_type_cubemap ? skr_tex_address_clamp : skr_tex_address_repeat, skr_tex_sample_linear, 1);
 
 	if (type == skr_tex_type_rendertarget) {
 		glGenFramebuffers(1, &result.framebuffer);
@@ -947,12 +951,13 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 
 	glTexParameteri(target, GL_TEXTURE_WRAP_S,     mode  );	
 	glTexParameteri(target, GL_TEXTURE_WRAP_T,     mode  );
-	if (tex->type == skr_tex_type_cubemap)
-		glTexParameteri(target, GL_TEXTURE_WRAP_R, mode  );
+	if (tex->type == skr_tex_type_cubemap) {
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
+	}
 	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
 	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
 #ifdef _WIN32
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);
+	glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
 }
 
@@ -992,12 +997,14 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 /////////////////////////////////////////// 
 
 void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
-	uint32_t target = texture->type == skr_tex_type_cubemap 
-		? GL_TEXTURE_CUBE_MAP 
-		: GL_TEXTURE_2D;
+	uint32_t target = texture == nullptr || texture->type != skr_tex_type_cubemap 
+		? GL_TEXTURE_2D
+		: GL_TEXTURE_CUBE_MAP;
 
 	glActiveTexture(GL_TEXTURE0 + slot);
-	glBindTexture  (target, texture->texture);
+	glBindTexture  (target, texture == nullptr ? 0 : texture->texture);
+	if (texture)
+		glUniform1i(slot, slot);
 }
 
 /////////////////////////////////////////// 

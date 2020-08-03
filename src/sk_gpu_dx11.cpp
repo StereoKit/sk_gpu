@@ -697,8 +697,8 @@ template <typename T>
 void skr_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
 	int w = (int32_t)log2(width);
 	int h = (int32_t)log2(height);
-	*out_width  = w = (1 << w) >> 1;
-	*out_height = h = (1 << h) >> 1;
+	*out_width  = w = max(1, (1 << w) >> 1);
+	*out_height = h = max(1, (1 << h) >> 1);
 
 	*out_data = (T*)malloc(w * h * sizeof(T) * 4);
 	memset(*out_data, 0, w * h * sizeof(T) * 4);

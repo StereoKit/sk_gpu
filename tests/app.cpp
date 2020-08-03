@@ -93,7 +93,7 @@ bool app_init() {
 		}
 	}
 	void *color_arr[1] = { colors };
-	app_tex = skr_tex_create(skr_tex_type_image, skr_use_static, skr_tex_fmt_rgba32, skr_mip_none);
+	app_tex = skr_tex_create(skr_tex_type_image, skr_use_static, skr_tex_fmt_rgba32, skr_mip_generate);
 	skr_tex_settings(&app_tex, skr_tex_address_repeat, skr_tex_sample_linear, 0);
 	skr_tex_set_data(&app_tex, color_arr, 1, w, h);
 

@@ -16,22 +16,18 @@
 
 ///////////////////////////////////////////
 
-ID3D11Device             *d3d_device      = nullptr;
-ID3D11DeviceContext      *d3d_context     = nullptr;
-ID3D11InfoQueue          *d3d_info        = nullptr;
-ID3D11InputLayout        *d3d_vert_layout = nullptr;
-ID3D11RasterizerState    *d3d_rasterstate = nullptr;
-void                     *d3d_hwnd        = nullptr;
-
-skr_tex_t *d3d_active_rendertarget = nullptr;
+ID3D11Device          *d3d_device      = nullptr;
+ID3D11DeviceContext   *d3d_context     = nullptr;
+ID3D11InfoQueue       *d3d_info        = nullptr;
+ID3D11InputLayout     *d3d_vert_layout = nullptr;
+ID3D11RasterizerState *d3d_rasterstate = nullptr;
+void                  *d3d_hwnd        = nullptr;
+skr_tex_t             *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
 
-size_t       skr_el_to_size(skr_fmt_ desc);
-DXGI_FORMAT  skr_el_to_d3d (skr_fmt_ desc);
-const char  *skr_semantic_to_d3d(skr_el_semantic_ semantic);
-uint32_t     skr_tex_fmt_size  (skr_tex_fmt_ format);
-bool         skr_tex_make_view (skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, bool use_in_shader);
+uint32_t skr_tex_fmt_size (skr_tex_fmt_ format);
+bool     skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, bool use_in_shader);
 
 template <typename T>
 void skr_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -747,106 +743,6 @@ void skr_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 
 /////////////////////////////////////////// 
 
-size_t skr_el_to_size(skr_fmt_ desc) {
-	switch (desc) {
-	case skr_fmt_f32_1: return sizeof(float)*1;
-	case skr_fmt_f32_2: return sizeof(float)*2;
-	case skr_fmt_f32_3: return sizeof(float)*3;
-	case skr_fmt_f32_4: return sizeof(float)*4;
-
-	case skr_fmt_f16_1: return sizeof(uint16_t)*1;
-	case skr_fmt_f16_2: return sizeof(uint16_t)*2;
-	case skr_fmt_f16_4: return sizeof(uint16_t)*4;
-
-	case skr_fmt_i32_1: return sizeof(int32_t)*1;
-	case skr_fmt_i32_2: return sizeof(int32_t)*2;
-	case skr_fmt_i32_3: return sizeof(int32_t)*3;
-	case skr_fmt_i32_4: return sizeof(int32_t)*4;
-
-	case skr_fmt_i16_1: return sizeof(int16_t)*1;
-	case skr_fmt_i16_2: return sizeof(int16_t)*2;
-	case skr_fmt_i16_4: return sizeof(int16_t)*4;
-
-	case skr_fmt_i8_1: return sizeof(int8_t)*1;
-	case skr_fmt_i8_2: return sizeof(int8_t)*2;
-	case skr_fmt_i8_4: return sizeof(int8_t)*4;
-
-	case skr_fmt_ui32_1: return sizeof(uint32_t)*1;
-	case skr_fmt_ui32_2: return sizeof(uint32_t)*2;
-	case skr_fmt_ui32_3: return sizeof(uint32_t)*3;
-	case skr_fmt_ui32_4: return sizeof(uint32_t)*4;
-
-	case skr_fmt_ui16_1: return sizeof(uint16_t)*1;
-	case skr_fmt_ui16_2: return sizeof(uint16_t)*2;
-	case skr_fmt_ui16_4: return sizeof(uint16_t)*4;
-
-	case skr_fmt_ui8_1: return sizeof(uint8_t)*1;
-	case skr_fmt_ui8_2: return sizeof(uint8_t)*2;
-	case skr_fmt_ui8_4: return sizeof(uint8_t)*4;
-
-	case skr_fmt_ui16_n_1: return sizeof(uint16_t)*1;
-	case skr_fmt_ui16_n_2: return sizeof(uint16_t)*2;
-	case skr_fmt_ui16_n_4: return sizeof(uint16_t)*4;
-
-	case skr_fmt_ui8_n_1: return sizeof(uint8_t)*1;
-	case skr_fmt_ui8_n_2: return sizeof(uint8_t)*2;
-	case skr_fmt_ui8_n_4: return sizeof(uint8_t)*4;
-	default: return 0;
-	}
-}
-
-/////////////////////////////////////////// 
-
-DXGI_FORMAT skr_el_to_d3d(skr_fmt_ desc) {
-	switch (desc) {
-	case skr_fmt_f32_1: return DXGI_FORMAT_R32_FLOAT;
-	case skr_fmt_f32_2: return DXGI_FORMAT_R32G32_FLOAT;
-	case skr_fmt_f32_3: return DXGI_FORMAT_R32G32B32_FLOAT;
-	case skr_fmt_f32_4: return DXGI_FORMAT_R32G32B32A32_FLOAT;
-
-	case skr_fmt_f16_1: return DXGI_FORMAT_R16_FLOAT;
-	case skr_fmt_f16_2: return DXGI_FORMAT_R16G16_FLOAT;
-	case skr_fmt_f16_4: return DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-	case skr_fmt_i32_1: return DXGI_FORMAT_R32_SINT;
-	case skr_fmt_i32_2: return DXGI_FORMAT_R32G32_SINT;
-	case skr_fmt_i32_3: return DXGI_FORMAT_R32G32B32_SINT;
-	case skr_fmt_i32_4: return DXGI_FORMAT_R32G32B32A32_SINT;
-
-	case skr_fmt_i16_1: return DXGI_FORMAT_R16_SINT;
-	case skr_fmt_i16_2: return DXGI_FORMAT_R16G16_SINT;
-	case skr_fmt_i16_4: return DXGI_FORMAT_R16G16B16A16_SINT;
-
-	case skr_fmt_i8_1: return DXGI_FORMAT_R8_SINT;
-	case skr_fmt_i8_2: return DXGI_FORMAT_R8G8_SINT;
-	case skr_fmt_i8_4: return DXGI_FORMAT_R8G8B8A8_SINT;
-
-	case skr_fmt_ui32_1: return DXGI_FORMAT_R32_UINT;
-	case skr_fmt_ui32_2: return DXGI_FORMAT_R32G32_UINT;
-	case skr_fmt_ui32_3: return DXGI_FORMAT_R32G32B32_UINT;
-	case skr_fmt_ui32_4: return DXGI_FORMAT_R32G32B32A32_UINT;
-
-	case skr_fmt_ui16_1: return DXGI_FORMAT_R16_UINT;
-	case skr_fmt_ui16_2: return DXGI_FORMAT_R16G16_UINT;
-	case skr_fmt_ui16_4: return DXGI_FORMAT_R16_UINT;
-
-	case skr_fmt_ui8_1: return DXGI_FORMAT_R8_UINT;
-	case skr_fmt_ui8_2: return DXGI_FORMAT_R8G8_UINT;
-	case skr_fmt_ui8_4: return DXGI_FORMAT_R8G8B8A8_UINT;
-
-	case skr_fmt_ui16_n_1: return DXGI_FORMAT_R16_UNORM;
-	case skr_fmt_ui16_n_2: return DXGI_FORMAT_R16G16_UNORM;
-	case skr_fmt_ui16_n_4: return DXGI_FORMAT_R16G16B16A16_UNORM;
-
-	case skr_fmt_ui8_n_1: return DXGI_FORMAT_R8_UNORM;
-	case skr_fmt_ui8_n_2: return DXGI_FORMAT_R8G8_UNORM;
-	case skr_fmt_ui8_n_4: return DXGI_FORMAT_R8G8B8A8_UNORM;
-	default: return DXGI_FORMAT_UNKNOWN;
-	}
-}
-
-/////////////////////////////////////////// 
-
 int64_t skr_tex_fmt_to_native(skr_tex_fmt_ format){
 	switch (format) {
 	case skr_tex_fmt_rgba32:        return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
@@ -909,11 +805,11 @@ uint32_t skr_tex_fmt_size(skr_tex_fmt_ format) {
 
 const char *skr_semantic_to_d3d(skr_el_semantic_ semantic) {
 	switch (semantic) {
-	case skr_el_semantic_none: return "";
-	case skr_el_semantic_position: return "SV_POSITION";
-	case skr_el_semantic_normal: return "NORMAL";
-	case skr_el_semantic_texcoord: return "TEXCOORD";
-	case skr_el_semantic_color: return "COLOR";
+	case skr_el_semantic_none:         return "";
+	case skr_el_semantic_position:     return "SV_POSITION";
+	case skr_el_semantic_normal:       return "NORMAL";
+	case skr_el_semantic_texcoord:     return "TEXCOORD";
+	case skr_el_semantic_color:        return "COLOR";
 	case skr_el_semantic_target_index: return "SV_RenderTargetArrayIndex";
 	default: return "";
 	}

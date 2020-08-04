@@ -295,17 +295,14 @@ static void gl_load_extensions( ) {
 
 int32_t    gl_width  = 0;
 int32_t    gl_height = 0;
-skr_tex_t *gl_active_rendertarget       = nullptr;
-skr_tex_t *gl_active_rendertarget_depth = nullptr;
-uint32_t   gl_current_framebuffer       = 0;
+skr_tex_t *gl_active_rendertarget = nullptr;
+uint32_t   gl_current_framebuffer = 0;
 
 ///////////////////////////////////////////
 
-size_t       skr_el_to_size        (skr_fmt_ desc);
-const char  *skr_semantic_to_d3d   (skr_el_semantic_ semantic);
-uint32_t     skr_buffer_type_to_gl (skr_buffer_type_ type);
-uint32_t     skr_tex_fmt_to_gl_type    (skr_tex_fmt_ format);
-uint32_t     skr_tex_fmt_to_gl_layout  (skr_tex_fmt_ format);
+uint32_t skr_buffer_type_to_gl   (skr_buffer_type_ type);
+uint32_t skr_tex_fmt_to_gl_type  (skr_tex_fmt_ format);
+uint32_t skr_tex_fmt_to_gl_layout(skr_tex_fmt_ format);
 
 ///////////////////////////////////////////
 
@@ -439,7 +436,7 @@ int32_t gl_init_win32(void *app_hwnd) {
 		skr_log("Couldn't activate GL context!");
 		return false;
 	}
-#endif
+#endif // _WIN32
 	return 1;
 }
 
@@ -455,14 +452,13 @@ int32_t gl_init_emscripten() {
 	attrs.majorVersion = 2;
 	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context("canvas", &attrs);
 	emscripten_webgl_make_context_current(ctx);
-#endif
+#endif // __EMSCRIPTEN__
 	return 1;
 }
 
 ///////////////////////////////////////////
 
 int32_t gl_init_android(void *native_window) {
-	skr_log("sk_gpu: attempting to init gles");
 #ifdef __ANDROID__
 	const EGLint attribs[] = {
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
@@ -483,8 +479,6 @@ int32_t gl_init_android(void *native_window) {
 	egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetDisplay");
 
-	skr_log("sk_gpu: got display");
-	
 	int32_t major, minor;
 	eglInitialize     (egl_display, &major, &minor);
 	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglInitialize");
@@ -493,24 +487,19 @@ int32_t gl_init_android(void *native_window) {
 	eglGetConfigAttrib(egl_display, egl_config, EGL_NATIVE_VISUAL_ID, &format);
 	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetConfigAttrib");
 	
-	skr_log("sk_gpu: egl initialized");
-
 	egl_surface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)native_window, nullptr);
 	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateWindowSurface");
 	egl_context = eglCreateContext      (egl_display, egl_config, nullptr, context_attribs);
 	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateContext");
 
-	skr_log("sk_gpu: gles context made");
-
 	if (eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_FALSE) {
-		skr_log("Unable to eglMakeCurrent");
+		skr_log("sk_gpu: Unable to eglMakeCurrent");
 		return -1;
 	}
 
 	eglQuerySurface(egl_display, egl_surface, EGL_WIDTH,  &gl_width);
 	eglQuerySurface(egl_display, egl_surface, EGL_HEIGHT, &gl_height);
-#endif
-	skr_log("sk_gpu: gles init successful");
+#endif // __ANDROID__
 	return 1;
 }
 
@@ -541,11 +530,11 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
 		if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
-			skr_log(message);
+			//skr_log(message);
 		} else {
 			skr_log(message);
 		} }, nullptr);
-#endif
+#endif // _DEBUG
 	
 	// Some default behavior
 	glEnable  (GL_DEPTH_TEST);  
@@ -997,56 +986,6 @@ void skr_tex_destroy(skr_tex_t *tex) {
 
 /////////////////////////////////////////// 
 
-size_t skr_el_to_size(skr_fmt_ desc) {
-	switch (desc) {
-	case skr_fmt_f32_1: return sizeof(float)*1;
-	case skr_fmt_f32_2: return sizeof(float)*2;
-	case skr_fmt_f32_3: return sizeof(float)*3;
-	case skr_fmt_f32_4: return sizeof(float)*4;
-
-	case skr_fmt_f16_1: return sizeof(uint16_t)*1;
-	case skr_fmt_f16_2: return sizeof(uint16_t)*2;
-	case skr_fmt_f16_4: return sizeof(uint16_t)*4;
-
-	case skr_fmt_i32_1: return sizeof(int32_t)*1;
-	case skr_fmt_i32_2: return sizeof(int32_t)*2;
-	case skr_fmt_i32_3: return sizeof(int32_t)*3;
-	case skr_fmt_i32_4: return sizeof(int32_t)*4;
-
-	case skr_fmt_i16_1: return sizeof(int16_t)*1;
-	case skr_fmt_i16_2: return sizeof(int16_t)*2;
-	case skr_fmt_i16_4: return sizeof(int16_t)*4;
-
-	case skr_fmt_i8_1: return sizeof(int8_t)*1;
-	case skr_fmt_i8_2: return sizeof(int8_t)*2;
-	case skr_fmt_i8_4: return sizeof(int8_t)*4;
-
-	case skr_fmt_ui32_1: return sizeof(uint32_t)*1;
-	case skr_fmt_ui32_2: return sizeof(uint32_t)*2;
-	case skr_fmt_ui32_3: return sizeof(uint32_t)*3;
-	case skr_fmt_ui32_4: return sizeof(uint32_t)*4;
-
-	case skr_fmt_ui16_1: return sizeof(uint16_t)*1;
-	case skr_fmt_ui16_2: return sizeof(uint16_t)*2;
-	case skr_fmt_ui16_4: return sizeof(uint16_t)*4;
-
-	case skr_fmt_ui8_1: return sizeof(uint8_t)*1;
-	case skr_fmt_ui8_2: return sizeof(uint8_t)*2;
-	case skr_fmt_ui8_4: return sizeof(uint8_t)*4;
-
-	case skr_fmt_ui16_n_1: return sizeof(uint16_t)*1;
-	case skr_fmt_ui16_n_2: return sizeof(uint16_t)*2;
-	case skr_fmt_ui16_n_4: return sizeof(uint16_t)*4;
-
-	case skr_fmt_ui8_n_1: return sizeof(uint8_t)*1;
-	case skr_fmt_ui8_n_2: return sizeof(uint8_t)*2;
-	case skr_fmt_ui8_n_4: return sizeof(uint8_t)*4;
-	default: return 0;
-	}
-}
-
-/////////////////////////////////////////// 
-
 uint32_t skr_buffer_type_to_gl(skr_buffer_type_ type) {
 	switch (type) {
 	case skr_buffer_type_vertex:   return GL_ARRAY_BUFFER;
@@ -1096,15 +1035,15 @@ skr_tex_fmt_ skr_tex_fmt_from_native(int64_t format) {
 
 uint32_t skr_tex_fmt_to_gl_layout(skr_tex_fmt_ format) {
 	switch (format) {
-	case skr_tex_fmt_rgba32:        return GL_RGBA;
-	case skr_tex_fmt_rgba32_linear: return GL_RGBA;
-	case skr_tex_fmt_rgba64:        return GL_RGBA;
+	case skr_tex_fmt_rgba32:
+	case skr_tex_fmt_rgba32_linear:
+	case skr_tex_fmt_rgba64:
 	case skr_tex_fmt_rgba128:       return GL_RGBA;
-	case skr_tex_fmt_depth16:       return GL_DEPTH_COMPONENT;
+	case skr_tex_fmt_depth16:
 	case skr_tex_fmt_depth32:       return GL_DEPTH_COMPONENT;
 	case skr_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;
-	case skr_tex_fmt_r8:            return GL_RED;
-	case skr_tex_fmt_r16:           return GL_RED;
+	case skr_tex_fmt_r8:
+	case skr_tex_fmt_r16:
 	case skr_tex_fmt_r32:           return GL_RED;
 	default: return 0;
 	}

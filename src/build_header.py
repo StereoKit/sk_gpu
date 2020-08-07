@@ -14,12 +14,12 @@ for match in re.findall(regex_includes, dest_header):
     include_filename = match.split('"')[1]
 
     # some APIs aren't ready yet
-    if include_filename == "sk_gpu_dx12.h" or include_filename == "sk_gpu_vk.h" or include_filename == "sk_gpu_common.h":
+    if include_filename == "sk_gpu_dx12.h" or include_filename == "sk_gpu_vk.h":
         dest_header = dest_header.replace(match, "")
         continue
     
     include_file     = open(include_filename, "r")
-    include_text     = include_file.read()
+    include_text     = include_file.read().replace('#pragma once', '')
     include_file.close()
     
     body_filename    = include_filename.replace(".h", ".cpp")

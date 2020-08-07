@@ -194,6 +194,12 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 
 /////////////////////////////////////////// 
 
+bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
+	return buffer->buffer != nullptr;
+}
+
+/////////////////////////////////////////// 
+
 void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic)
 		return;
@@ -350,7 +356,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 
 	ID3D11Texture2D *back_buffer;
 	result.d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, format, width, height);
+	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, format, width, height, 1);
 	result.depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
 	skr_tex_set_data(&result.depth, nullptr, 1, width, height);
 	back_buffer->Release();
@@ -379,7 +385,7 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 
 	ID3D11Texture2D *back_buffer;
 	swapchain->d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	swapchain->target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height);
+	swapchain->target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	swapchain->depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
 	skr_tex_set_data(&swapchain->depth, nullptr, 1, width, height);
 	back_buffer->Release();
@@ -408,7 +414,7 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height) {
+skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
 	result.type    = type;
 	result.use     = skr_use_static;
@@ -418,9 +424,10 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 	// Get information about the image!
 	D3D11_TEXTURE2D_DESC color_desc;
 	result.texture->GetDesc(&color_desc);
-	result.width  = color_desc.Width;
-	result.height = color_desc.Height;
-	result.format = override_format != 0 ? override_format : skr_tex_fmt_from_native(color_desc.Format);
+	result.width       = color_desc.Width;
+	result.height      = color_desc.Height;
+	result.array_count = color_desc.ArraySize;
+	result.format      = override_format != 0 ? override_format : skr_tex_fmt_from_native(color_desc.Format);
 	skr_tex_make_view(&result, color_desc.MipLevels, color_desc.ArraySize, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
 
 	return result;
@@ -439,6 +446,12 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 		skr_log("Dynamic textures don't support mip-maps!");
 
 	return result;
+}
+
+/////////////////////////////////////////// 
+
+bool skr_tex_is_valid(const skr_tex_t *tex) {
+	return tex->texture != nullptr;
 }
 
 /////////////////////////////////////////// 
@@ -594,8 +607,9 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 		return;
 	}
 
-	tex->width  = width;
-	tex->height = height;
+	tex->width       = width;
+	tex->height      = height;
+	tex->array_count = data_frame_count;
 
 	uint32_t mip_levels = (tex->mips == skr_mip_generate ? log2(width) + 1 : 1);
 	uint32_t px_size    = skr_tex_fmt_size(tex->format);

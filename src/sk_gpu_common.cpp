@@ -10,5 +10,3 @@ void skr_log_callback(void (*callback)(const char *text)) {
 void skr_log(const char *text) {
 	if (_skr_log) _skr_log(text);
 }
-
-///////////////////////////////////////////

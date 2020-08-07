@@ -1,5 +1,4 @@
 #pragma once
-
 #include <d3d11.h>
 #include <dxgi1_6.h>
 
@@ -29,6 +28,7 @@ typedef struct skr_shader_t {
 typedef struct skr_tex_t {
 	int32_t width;
 	int32_t height;
+	int32_t array_count;
 	skr_use_                  use;
 	skr_tex_type_             type;
 	skr_tex_fmt_              format;

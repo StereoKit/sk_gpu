@@ -106,7 +106,6 @@ typedef struct skr_vert_t {
 #elif defined(SKR_OPENGL)
 #include "sk_gpu_gl.h"
 #endif
-#include "sk_gpu_common.h"
 
 ///////////////////////////////////////////
 
@@ -122,6 +121,7 @@ skr_tex_fmt_        skr_tex_fmt_from_native (int64_t format);
 void                skr_log_callback        (void (*callback)(const char *text));
 
 skr_buffer_t        skr_buffer_create       (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
+bool                skr_buffer_is_valid     (const skr_buffer_t *buffer);
 void                skr_buffer_update       (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
 void                skr_buffer_set          (const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset);
 void                skr_buffer_destroy      (      skr_buffer_t *buffer);
@@ -143,10 +143,16 @@ void                skr_swapchain_present   (      skr_swapchain_t *swapchain);
 skr_tex_t          *skr_swapchain_get_next  (      skr_swapchain_t *swapchain);
 void                skr_swapchain_destroy   (      skr_swapchain_t *swapchain);
 
-skr_tex_t           skr_tex_from_native     (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height);
+skr_tex_t           skr_tex_from_native     (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
 skr_tex_t           skr_tex_create          (skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps);
+bool                skr_tex_is_valid        (const skr_tex_t *tex);
 void                skr_tex_set_depth       (      skr_tex_t *tex, skr_tex_t *depth);
 void                skr_tex_settings        (      skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy);
 void                skr_tex_set_data        (      skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
+void                skr_tex_get_data        (      skr_tex_t *tex);
 void                skr_tex_set_active      (const skr_tex_t *tex, int32_t slot);
 void                skr_tex_destroy         (      skr_tex_t *tex);
+#include "sk_gpu_common.h"
+///////////////////////////////////////////
+// Implementations!                      //
+///////////////////////////////////////////

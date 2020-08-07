@@ -631,6 +631,12 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 
 /////////////////////////////////////////// 
 
+bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
+	return buffer->buffer != 0;
+}
+
+/////////////////////////////////////////// 
+
 void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic)
 		return;
@@ -841,15 +847,16 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height) {
+skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
 	result.type    = type;
 	result.use     = skr_use_static;
 	result.mips    = skr_mip_none;
 	result.texture = (uint32_t)(uint64_t)native_tex;
 	result.format  = format;
-	result.width   = width;
-	result.height  = height;
+	result.width       = width;
+	result.height      = height;
+	result.array_count = array_count;
 
 	if (type == skr_tex_type_rendertarget) {
 		glGenFramebuffers(1, &result.framebuffer);
@@ -879,6 +886,12 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 	}
 	
 	return result;
+}
+
+/////////////////////////////////////////// 
+
+bool skr_tex_is_valid(const skr_tex_t *tex) {
+	return tex->texture != 0;
 }
 
 /////////////////////////////////////////// 
@@ -936,8 +949,9 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 	uint32_t target = tex->type == skr_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: GL_TEXTURE_2D;
-	tex->width  = width;
-	tex->height = height;
+	tex->width       = width;
+	tex->height      = height;
+	tex->array_count = data_frame_count;
 	glBindTexture(target, tex->texture);
 
 	uint32_t format = (uint32_t)skr_tex_fmt_to_native(tex->format);

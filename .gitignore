@@ -348,3 +348,7 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+!skshaderc/lib/*
+!skshaderc/lib/bin/*
+!skshaderc/lib/x64/*

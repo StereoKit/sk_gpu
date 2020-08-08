@@ -4,13 +4,14 @@
 #include <windows.h>
 #include <dxcapi.h>
 #include <d3d12shader.h>
+#include <spirv_cross/spirv_cross_c.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 ///////////////////////////////////////////
 
-typedef struct compile_settings_t {
+typedef struct settings_t {
 	bool debug;
 	bool row_major;
 	int  optimize;
@@ -19,7 +20,7 @@ typedef struct compile_settings_t {
 	const wchar_t *ps_entrypoint;
 	const wchar_t *shader_model;
 	wchar_t shader_model_str[16];
-} compile_settings_t;
+} settings_t;
 
 template <typename T> struct array_t {
 	T     *data;
@@ -58,18 +59,20 @@ IDxcUtils     *utils;
 
 ///////////////////////////////////////////
 
-void get_folder   (char *filename, char *out_dest,  size_t dest_size);
-bool read_file    (char *filename, char **out_text, size_t *out_size);
-void iterate_files(char *input_name, compile_settings_t *settings);
-void compile_file (char *filename, char *hlsl_text, compile_settings_t *settings);
+void       get_folder    (char *filename, char *out_dest,  size_t dest_size);
+bool       read_file     (char *filename, char **out_text, size_t *out_size);
+void       iterate_files (char *input_name, settings_t *settings);
+void       compile_file  (char *filename, char *hlsl_text, settings_t *settings);
+settings_t check_settings(int32_t argc, char **argv);
 
-compile_settings_t       check_settings (int argc, char **argv);
-array_t<const wchar_t *> build_dxc_flags(compile_settings_t settings, shader_type_ type);
+array_t<const wchar_t *> dxc_build_flags    (settings_t settings, shader_type_ type);
+void                     dxc_shader_meta    (IDxcResult *compile_result);
+bool                     dxc_compiler_shader(DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, settings_t *settings, shader_type_ type);
 
 ///////////////////////////////////////////
 
 int main(int argc, char **argv) {
-	compile_settings_t settings = check_settings(argc, argv);
+	settings_t settings = check_settings(argc, argv);
 
 	DxcCreateInstance(CLSID_DxcCompiler, __uuidof(IDxcCompiler3), (void **)(&compiler));	
 	DxcCreateInstance(CLSID_DxcUtils,    __uuidof(IDxcUtils),     (void **)(&utils));
@@ -82,8 +85,8 @@ int main(int argc, char **argv) {
 
 ///////////////////////////////////////////
 
-compile_settings_t check_settings(int32_t argc, char **argv) {
-	compile_settings_t result = {};
+settings_t check_settings(int32_t argc, char **argv) {
+	settings_t result = {};
 	result.debug         = true;
 	result.optimize      = 3;
 	result.ps_entrypoint = L"ps";
@@ -104,7 +107,7 @@ compile_settings_t check_settings(int32_t argc, char **argv) {
 
 ///////////////////////////////////////////
 
-void iterate_files(char *input_name, compile_settings_t *settings) {
+void iterate_files(char *input_name, settings_t *settings) {
 	HANDLE           handle;
 	WIN32_FIND_DATAA file_info;
 
@@ -129,7 +132,70 @@ void iterate_files(char *input_name, compile_settings_t *settings) {
 
 ///////////////////////////////////////////
 
-void compile_file(char *filename, char *hlsl_text, compile_settings_t *settings) {
+bool dxc_compiler_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include_handler, settings_t *settings, shader_type_ type) {
+	IDxcResult   *compile_result;
+	IDxcBlobUtf8 *errors;
+	bool result = false;
+
+	array_t<const wchar_t *> flags = dxc_build_flags(*settings, type);
+	if (FAILED(compiler->Compile(source_buff, flags.data, flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
+		printf("|Compile failed!\n|________________\n");
+		return false;
+	}
+
+	const char *type_name = type == shader_type_pixel ? "Pixel" : "Vertex";
+	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
+	if (errors && errors->GetStringLength() > 0) {
+		printf((char*)errors->GetBufferPointer());
+		printf("|%s shader error!\n|________________\n\n", type_name);
+	} else {
+		printf("|--%s shader--\n", type_name);
+		dxc_shader_meta(compile_result);
+		result = true;
+	}
+	errors        ->Release();
+	compile_result->Release();
+	flags.free();
+
+	return result;
+}
+
+///////////////////////////////////////////
+
+void dxc_shader_meta(IDxcResult *compile_result) {
+	// Get information about the shader!
+	IDxcBlob *reflection;
+	DxcBuffer reflection_buffer;
+	compile_result->GetOutput(DXC_OUT_REFLECTION,  __uuidof(IDxcBlob), (void **)(&reflection), nullptr);
+	reflection_buffer.Ptr      = reflection->GetBufferPointer();
+	reflection_buffer.Size     = reflection->GetBufferSize();
+	reflection_buffer.Encoding = 0;
+	ID3D12ShaderReflection *shader_reflection;
+	utils->CreateReflection(&reflection_buffer, __uuidof(ID3D12ShaderReflection), (void **)(&shader_reflection));
+
+	D3D12_SHADER_DESC desc;
+	shader_reflection->GetDesc(&desc);
+	for (uint32_t i = 0; i < desc.BoundResources; i++) {
+		D3D12_SHADER_INPUT_BIND_DESC bind_desc;
+		shader_reflection->GetResourceBindingDesc(i, &bind_desc);
+
+		char c = ' ';
+		switch (bind_desc.Type) {
+		case D3D_SIT_CBUFFER: c = 'b'; break;
+		case D3D_SIT_TEXTURE: c = 't'; break;
+		case D3D_SIT_SAMPLER: c = 's'; break;
+		default: c = ' '; break;
+		}
+		printf("|Param %c%u : %s\n", c, bind_desc.BindPoint, bind_desc.Name);
+	}
+
+	shader_reflection->Release();
+	reflection       ->Release();
+}
+
+///////////////////////////////////////////
+
+void compile_file(char *filename, char *hlsl_text, settings_t *settings) {
 	printf(" ________________\n|Compiling...\n|%s\n\n", filename);
 
 	IDxcBlobEncoding *source;
@@ -145,78 +211,27 @@ void compile_file(char *filename, char *hlsl_text, compile_settings_t *settings)
 	if (FAILED(utils->CreateDefaultIncludeHandler(&include_handler)))
 		printf("|CreateDefaultIncludeHandler failed!\n|________________\n\n");
 
-	IDxcResult   *compile_result;
-	IDxcBlobUtf8 *errors;
-
-	// Vertex shader
-	array_t<const wchar_t *> vs_flags = build_dxc_flags(*settings, shader_type_vertex);
-	if (FAILED(compiler->Compile(&source_buff, vs_flags.data, vs_flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result))))
-		printf("|Compile failed!\n|________________\n");
-
-	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
-	if (errors && errors->GetStringLength() > 0) {
-		printf((char*)errors->GetBufferPointer());
-		printf("|Vertex shader error!\n|________________\n\n");
-
-		errors         ->Release();
-		compile_result ->Release();
+	if (!dxc_compiler_shader(&source_buff, include_handler, settings, shader_type_vertex)) {
 		include_handler->Release();
 		source         ->Release();
-		vs_flags.free();
 		return;
 	}
-
-	// Get information about the shader!
-	IDxcBlob *reflection;
-	DxcBuffer reflection_buffer;
-	compile_result->GetOutput(DXC_OUT_REFLECTION,  __uuidof(IDxcBlob), (void **)(&reflection), nullptr);
-	reflection_buffer.Ptr      = reflection->GetBufferPointer();
-	reflection_buffer.Size     = reflection->GetBufferSize();
-	reflection_buffer.Encoding = 0;
-	ID3D12ShaderReflection *shader_reflection;
-	utils->CreateReflection(&reflection_buffer, __uuidof(ID3D12ShaderReflection), (void **)(&shader_reflection));
-	D3D12_SHADER_DESC desc;
-	shader_reflection->GetDesc(&desc);
-	printf("|Constant buffers:  %u\n", desc.ConstantBuffers);
-	printf("|Resource binds:    %u\n", desc.BoundResources);
-	shader_reflection->Release();
-	reflection       ->Release();
-
-	errors        ->Release();
-	compile_result->Release();
-	vs_flags.free();
-
-	// Pixel shader
-	array_t<const wchar_t *> ps_flags = build_dxc_flags(*settings, shader_type_pixel);
-	if (FAILED(compiler->Compile(&source_buff, ps_flags.data, ps_flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result))))
-		printf("|Compile failed!\n|________________\n\n");
-
-	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
-	if (errors && errors->GetStringLength() > 0) {
-		printf((char*)errors->GetBufferPointer());
-		printf("|Pixel shader error!\n|________________\n\n");
-
-		errors         ->Release();
-		compile_result ->Release();
+	if (!dxc_compiler_shader(&source_buff, include_handler, settings, shader_type_pixel)) {
 		include_handler->Release();
 		source         ->Release();
-		ps_flags.free();
 		return;
 	}
-	errors        ->Release();
-	compile_result->Release();
-	ps_flags.free();
 
 	// cleanup
 	include_handler->Release();
 	source         ->Release();
 
-	printf("|Success!\n|________________\n\n");
+	printf("|\n|Success!\n|________________\n\n");
 }
 
 ///////////////////////////////////////////
 
-array_t<const wchar_t *> build_dxc_flags(compile_settings_t settings, shader_type_ type) {
+array_t<const wchar_t *> dxc_build_flags(settings_t settings, shader_type_ type) {
 	// https://simoncoenen.com/blog/programming/graphics/DxcCompiling.html
 
 	array_t<const wchar_t *> result = {};

@@ -151,7 +151,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="skshaderc.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="sksc.h" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="lib\bin\x64\dxcompiler.dll">

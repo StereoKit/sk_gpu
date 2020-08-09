@@ -1,6 +1,59 @@
 // https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
+#pragma once
+
+#include <stdint.h>
+
+///////////////////////////////////////////
+
+typedef struct sksc_settings_t {
+	bool debug;
+	bool row_major;
+	int  optimize;
+	wchar_t folder[512];
+	const wchar_t *vs_entrypoint;
+	const wchar_t *ps_entrypoint;
+	const wchar_t *shader_model;
+	wchar_t shader_model_str[16];
+} sksc_settings_t;
+
+typedef enum sksc_shader_type_ {
+	sksc_shader_type_pixel,
+	sksc_shader_type_vertex,
+} sksc_shader_type_;
+
+typedef struct sksc_param_t {
+	uint8_t type;
+	uint8_t slot;
+	wchar_t name[32];
+} sksc_param_t;
+
+typedef struct sksc_stage_data_t {
+	sksc_shader_type_ type;
+	sksc_param_t     *params;
+	int32_t           param_count;
+	void             *binary;
+	size_t            binary_size;
+} sksc_stage_data_t;
+
+typedef struct sksc_shader_t {
+	sksc_stage_data_t *stages;
+	int32_t            stage_count;
+} sksc_shader_t;
+
+///////////////////////////////////////////
+
+void sksc_init    ();
+void sksc_shutdown();
+void sksc_compile (char *filename, char *hlsl_text, sksc_settings_t *settings);
+
+///////////////////////////////////////////
+
+#ifdef SKSC_IMPL
+
+///////////////////////////////////////////
 
 #pragma comment(lib,"dxcompiler.lib")
+
 #include <windows.h>
 #include <dxcapi.h>
 #include <d3d12shader.h>
@@ -10,17 +63,6 @@
 #include <stdlib.h>
 
 ///////////////////////////////////////////
-
-typedef struct settings_t {
-	bool debug;
-	bool row_major;
-	int  optimize;
-	wchar_t folder[512];
-	const wchar_t *vs_entrypoint;
-	const wchar_t *ps_entrypoint;
-	const wchar_t *shader_model;
-	wchar_t shader_model_str[16];
-} settings_t;
 
 template <typename T> struct array_t {
 	T     *data;
@@ -47,110 +89,62 @@ template <typename T> struct array_t {
 	int64_t     index_of   (const D T::*key, const D &item) const { const size_t offset = (size_t)&((T*)0->*key); for (size_t i = 0; i < count; i++) if (memcmp(((uint8_t *)&data[i]) + offset, &item, sizeof(D)) == 0) return i; return -1; }
 };
 
-enum shader_type_ {
-	shader_type_pixel,
-	shader_type_vertex,
-};
+///////////////////////////////////////////
+
+array_t<const wchar_t *> sksc_dxc_build_flags   (sksc_settings_t settings, sksc_shader_type_ type);
+void                     sksc_dxc_shader_meta   (IDxcResult *compile_result, sksc_stage_data_t *out_stage);
+bool                     sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, sksc_shader_type_ type, sksc_stage_data_t *out_stage);
 
 ///////////////////////////////////////////
 
-IDxcCompiler3 *compiler;
-IDxcUtils     *utils;
+IDxcCompiler3 *sksc_compiler;
+IDxcUtils     *sksc_utils;
 
 ///////////////////////////////////////////
 
-void       get_folder    (char *filename, char *out_dest,  size_t dest_size);
-bool       read_file     (char *filename, char **out_text, size_t *out_size);
-void       iterate_files (char *input_name, settings_t *settings);
-void       compile_file  (char *filename, char *hlsl_text, settings_t *settings);
-settings_t check_settings(int32_t argc, char **argv);
-
-array_t<const wchar_t *> dxc_build_flags    (settings_t settings, shader_type_ type);
-void                     dxc_shader_meta    (IDxcResult *compile_result);
-bool                     dxc_compiler_shader(DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, settings_t *settings, shader_type_ type);
-
-///////////////////////////////////////////
-
-int main(int argc, char **argv) {
-	settings_t settings = check_settings(argc, argv);
-
-	DxcCreateInstance(CLSID_DxcCompiler, __uuidof(IDxcCompiler3), (void **)(&compiler));	
-	DxcCreateInstance(CLSID_DxcUtils,    __uuidof(IDxcUtils),     (void **)(&utils));
-
-	iterate_files(argv[argc - 1], &settings);
-
-	utils   ->Release();
-	compiler->Release();
+void sksc_init() {
+	DxcCreateInstance(CLSID_DxcCompiler, __uuidof(IDxcCompiler3), (void **)(&sksc_compiler));	
+	DxcCreateInstance(CLSID_DxcUtils,    __uuidof(IDxcUtils),     (void **)(&sksc_utils));
 }
 
 ///////////////////////////////////////////
 
-settings_t check_settings(int32_t argc, char **argv) {
-	settings_t result = {};
-	result.debug         = true;
-	result.optimize      = 3;
-	result.ps_entrypoint = L"ps";
-	result.vs_entrypoint = L"vs";
-	result.shader_model  = L"6_0";
-
-	// Get the inlcude folder
-	char folder[512];
-	get_folder(argv[argc-1], folder, sizeof(folder));
-	mbstowcs_s(nullptr, result.folder, _countof(result.folder), folder, sizeof(folder));
-
-	for (int32_t i=1; i<argc-1; i++) {
-
-	}
-
-	return result;
+void sksc_shutdown() {
+	sksc_utils   ->Release();
+	sksc_compiler->Release();
 }
 
 ///////////////////////////////////////////
 
-void iterate_files(char *input_name, settings_t *settings) {
-	HANDLE           handle;
-	WIN32_FIND_DATAA file_info;
-
-	char folder[512] = {};
-	get_folder(input_name, folder, sizeof(folder));
-
-	if((handle = FindFirstFileA(input_name, &file_info)) != INVALID_HANDLE_VALUE) {
-		do {
-			char filename[1024];
-			sprintf_s(filename, "%s%s", folder, file_info.cFileName);
-
-			char  *file_text;
-			size_t file_size;
-			if (read_file(filename, &file_text, &file_size)) {
-				compile_file(filename, file_text, settings);
-				free(file_text);
-			}
-		} while(FindNextFileA(handle, &file_info));
-		FindClose(handle);
-	}
-}
-
-///////////////////////////////////////////
-
-bool dxc_compiler_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include_handler, settings_t *settings, shader_type_ type) {
+bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include_handler, sksc_settings_t *settings, sksc_shader_type_ type, sksc_stage_data_t *out_stage) {
 	IDxcResult   *compile_result;
 	IDxcBlobUtf8 *errors;
 	bool result = false;
 
-	array_t<const wchar_t *> flags = dxc_build_flags(*settings, type);
-	if (FAILED(compiler->Compile(source_buff, flags.data, flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
+	array_t<const wchar_t *> flags = sksc_dxc_build_flags(*settings, type);
+	if (FAILED(sksc_compiler->Compile(source_buff, flags.data, flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
 		printf("|Compile failed!\n|________________\n");
 		return false;
 	}
 
-	const char *type_name = type == shader_type_pixel ? "Pixel" : "Vertex";
+	const char *type_name = type == sksc_shader_type_pixel ? "Pixel" : "Vertex";
 	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
 	if (errors && errors->GetStringLength() > 0) {
 		printf((char*)errors->GetBufferPointer());
 		printf("|%s shader error!\n|________________\n\n", type_name);
 	} else {
+		out_stage->type = type;
+
+		// Get the shader binary
+		IDxcBlob *shader_bin;
+		compile_result->GetOutput(DXC_OUT_OBJECT, __uuidof(IDxcBlob), (void **)(&shader_bin), nullptr);
+		out_stage->binary      = malloc(shader_bin->GetBufferSize());
+		out_stage->binary_size = shader_bin->GetBufferSize();
+		memcpy(out_stage->binary, shader_bin->GetBufferPointer(), shader_bin->GetBufferSize());
+		shader_bin->Release();
+
 		printf("|--%s shader--\n", type_name);
-		dxc_shader_meta(compile_result);
+		sksc_dxc_shader_meta(compile_result, out_stage);
 		result = true;
 	}
 	errors        ->Release();
@@ -162,31 +156,39 @@ bool dxc_compiler_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include_han
 
 ///////////////////////////////////////////
 
-void dxc_shader_meta(IDxcResult *compile_result) {
+void sksc_dxc_shader_meta(IDxcResult *compile_result, sksc_stage_data_t *out_stage) {
 	// Get information about the shader!
 	IDxcBlob *reflection;
-	DxcBuffer reflection_buffer;
 	compile_result->GetOutput(DXC_OUT_REFLECTION,  __uuidof(IDxcBlob), (void **)(&reflection), nullptr);
+
+	ID3D12ShaderReflection *shader_reflection;
+	DxcBuffer               reflection_buffer;
 	reflection_buffer.Ptr      = reflection->GetBufferPointer();
 	reflection_buffer.Size     = reflection->GetBufferSize();
 	reflection_buffer.Encoding = 0;
-	ID3D12ShaderReflection *shader_reflection;
-	utils->CreateReflection(&reflection_buffer, __uuidof(ID3D12ShaderReflection), (void **)(&shader_reflection));
+	sksc_utils->CreateReflection(&reflection_buffer, __uuidof(ID3D12ShaderReflection), (void **)(&shader_reflection));
 
 	D3D12_SHADER_DESC desc;
 	shader_reflection->GetDesc(&desc);
+	out_stage->param_count = desc.BoundResources;
+	out_stage->params      = (sksc_param_t*)malloc(sizeof(sksc_param_t) * desc.BoundResources);
 	for (uint32_t i = 0; i < desc.BoundResources; i++) {
 		D3D12_SHADER_INPUT_BIND_DESC bind_desc;
 		shader_reflection->GetResourceBindingDesc(i, &bind_desc);
 
-		char c = ' ';
+		out_stage->params[i].type = 0;
+		out_stage->params[i].slot = bind_desc.BindPoint;
 		switch (bind_desc.Type) {
-		case D3D_SIT_CBUFFER: c = 'b'; break;
-		case D3D_SIT_TEXTURE: c = 't'; break;
-		case D3D_SIT_SAMPLER: c = 's'; break;
-		default: c = ' '; break;
+		case D3D_SIT_CBUFFER: out_stage->params[i].type = 'b'; break;
+		case D3D_SIT_TEXTURE: out_stage->params[i].type = 't'; break;
+		case D3D_SIT_SAMPLER: out_stage->params[i].type = 's'; break;
 		}
-		printf("|Param %c%u : %s\n", c, bind_desc.BindPoint, bind_desc.Name);
+		swprintf_s(out_stage->params[i].name, _countof(out_stage->params[i].name), L"%s", bind_desc.Name);
+
+		printf("|Param %u%u : %s\n", 
+			out_stage->params[i].type, 
+			out_stage->params[i].slot, 
+			out_stage->params[i].name);
 	}
 
 	shader_reflection->Release();
@@ -195,11 +197,11 @@ void dxc_shader_meta(IDxcResult *compile_result) {
 
 ///////////////////////////////////////////
 
-void compile_file(char *filename, char *hlsl_text, settings_t *settings) {
+void sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings) {
 	printf(" ________________\n|Compiling...\n|%s\n\n", filename);
 
 	IDxcBlobEncoding *source;
-	if (FAILED(utils->CreateBlob(hlsl_text, (uint32_t)strlen(hlsl_text), CP_UTF8, &source)))
+	if (FAILED(sksc_utils->CreateBlob(hlsl_text, (uint32_t)strlen(hlsl_text), CP_UTF8, &source)))
 		printf("|CreateBlob failed!\n|________________\n\n");
 
 	DxcBuffer source_buff;
@@ -208,15 +210,17 @@ void compile_file(char *filename, char *hlsl_text, settings_t *settings) {
 	source_buff.Encoding = 0;
 
 	IDxcIncludeHandler* include_handler = nullptr;
-	if (FAILED(utils->CreateDefaultIncludeHandler(&include_handler)))
+	if (FAILED(sksc_utils->CreateDefaultIncludeHandler(&include_handler)))
 		printf("|CreateDefaultIncludeHandler failed!\n|________________\n\n");
 
-	if (!dxc_compiler_shader(&source_buff, include_handler, settings, shader_type_vertex)) {
+	sksc_stage_data_t vs_stage = {};
+	if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, sksc_shader_type_vertex, &vs_stage)) {
 		include_handler->Release();
 		source         ->Release();
 		return;
 	}
-	if (!dxc_compiler_shader(&source_buff, include_handler, settings, shader_type_pixel)) {
+	sksc_stage_data_t ps_stage = {};
+	if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, sksc_shader_type_pixel, &ps_stage)) {
 		include_handler->Release();
 		source         ->Release();
 		return;
@@ -231,7 +235,7 @@ void compile_file(char *filename, char *hlsl_text, settings_t *settings) {
 
 ///////////////////////////////////////////
 
-array_t<const wchar_t *> dxc_build_flags(settings_t settings, shader_type_ type) {
+array_t<const wchar_t *> sksc_dxc_build_flags(sksc_settings_t settings, sksc_shader_type_ type) {
 	// https://simoncoenen.com/blog/programming/graphics/DxcCompiling.html
 
 	array_t<const wchar_t *> result = {};
@@ -245,6 +249,8 @@ array_t<const wchar_t *> dxc_build_flags(settings_t settings, shader_type_ type)
 		result.add(L"-Qembed_debug");
 		result.add(L"-Od");
 	} else {
+		result.add(L"-Qstrip_debug");
+		result.add(L"-Qstrip_reflect");
 		switch (settings.optimize) {
 		case 0: result.add(L"O0"); break;
 		case 1: result.add(L"O1"); break;
@@ -256,15 +262,15 @@ array_t<const wchar_t *> dxc_build_flags(settings_t settings, shader_type_ type)
 	// Entrypoint
 	result.add(L"-E"); 
 	switch (type) {
-	case shader_type_pixel:  result.add(settings.ps_entrypoint); break;
-	case shader_type_vertex: result.add(settings.vs_entrypoint); break;
+	case sksc_shader_type_pixel:  result.add(settings.ps_entrypoint); break;
+	case sksc_shader_type_vertex: result.add(settings.vs_entrypoint); break;
 	}
 
 	// Target
 	result.add(L"-T");
 	switch (type) {
-	case shader_type_pixel:  wsprintf(settings.shader_model_str, L"ps_%s", settings.shader_model); result.add(settings.shader_model_str); break;
-	case shader_type_vertex: wsprintf(settings.shader_model_str, L"vs_%s", settings.shader_model); result.add(settings.shader_model_str); break;
+	case sksc_shader_type_pixel:  wsprintf(settings.shader_model_str, L"ps_%s", settings.shader_model); result.add(settings.shader_model_str); break;
+	case sksc_shader_type_vertex: wsprintf(settings.shader_model_str, L"vs_%s", settings.shader_model); result.add(settings.shader_model_str); break;
 	}
 
 	// Include folder
@@ -274,37 +280,4 @@ array_t<const wchar_t *> dxc_build_flags(settings_t settings, shader_type_ type)
 	return result;
 }
 
-///////////////////////////////////////////
-
-bool read_file(char *filename, char **out_text, size_t *out_size) {
-	*out_text = nullptr;
-	*out_size = 0;
-
-	FILE *fp;
-	if (fopen_s(&fp, filename, "rb") != 0 || fp == nullptr) {
-		return false;
-	}
-
-	fseek(fp, 0L, SEEK_END);
-	*out_size = ftell(fp);
-	rewind(fp);
-
-	*out_text = (char*)malloc(*out_size+1);
-	if (*out_text == nullptr) { *out_size = 0; fclose(fp); return false; }
-	fread (*out_text, 1, *out_size, fp);
-	fclose(fp);
-
-	(*out_text)[*out_size] = 0;
-	return true;
-}
-
-void get_folder(char *filename, char *out_dest, size_t dest_size) {
-	char drive[16];
-	char dir  [512];
-	_splitpath_s(filename,
-		drive, sizeof(drive),
-		dir,   sizeof(dir),
-		nullptr, 0, nullptr, 0); 
-
-	sprintf_s(out_dest, dest_size, "%s%s", drive, dir);
-}
+#endif

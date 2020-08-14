@@ -55,7 +55,7 @@ array_t<const wchar_t *> sksc_dxc_build_flags   (sksc_settings_t settings, sksc_
 void                     sksc_dxc_shader_meta   (IDxcResult *compile_result, sksc_stage_data_t *out_stage);
 bool                     sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, sksc_shader_type_ type, sksc_shader_lang_ lang, sksc_stage_data_t *out_stage);
 
-void sksc_spvc_compile_stage(void *data, size_t data_size);
+void sksc_spvc_compile_stage(const sksc_stage_data_t *src_stage, sksc_stage_data_t *out_stage);
 
 ///////////////////////////////////////////
 
@@ -118,16 +118,15 @@ void sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings) {
 		source         ->Release();
 		return;
 	}
-
-	FILE *fp;
-	fopen_s(&fp, "test.spv", "wb");
-	fwrite(vs_stage_spirv.binary, vs_stage_spirv.binary_size, 1, fp);
-	fclose(fp);
-	sksc_spvc_compile_stage(vs_stage_spirv.binary, vs_stage_spirv.binary_size);
-
+	
 	// cleanup
 	include_handler->Release();
 	source         ->Release();
+
+	sksc_stage_data_t vs_stage_glsl = {};
+	sksc_spvc_compile_stage(&vs_stage_spirv, &vs_stage_glsl);
+	sksc_stage_data_t ps_stage_glsl = {};
+	sksc_spvc_compile_stage(&ps_stage_spirv, &ps_stage_glsl);
 
 	printf("|\n| Success!\n|________________\n\n");
 }
@@ -145,6 +144,7 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 		return false;
 	}
 
+	const char *lang_name = lang == sksc_shader_lang_hlsl ? "HLSL" : "SPIRV";
 	const char *type_name = type == sksc_shader_type_pixel ? "Pixel" : "Vertex";
 	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
 	if (errors && errors->GetStringLength() > 0) {
@@ -166,7 +166,7 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 		shader_bin->Release();
 
 		if (lang == sksc_shader_lang_hlsl) {
-			printf("| --%s shader--\n", type_name);
+			printf("|--%s %s shader--\n", lang_name, type_name);
 			sksc_dxc_shader_meta(compile_result, out_stage);
 		}
 		result = true;
@@ -225,8 +225,10 @@ array_t<const wchar_t *> sksc_dxc_build_flags(sksc_settings_t settings, sksc_sha
 	// https://simoncoenen.com/blog/programming/graphics/DxcCompiling.html
 
 	array_t<const wchar_t *> result = {};
-	if (lang == sksc_shader_lang_spirv)
+	if (lang == sksc_shader_lang_spirv) {
 		result.add(L"-spirv");
+		result.add(L"-fspv-reflect");
+	}
 	result.add(settings.row_major 
 		? DXC_ARG_PACK_MATRIX_ROW_MAJOR 
 		: DXC_ARG_PACK_MATRIX_COLUMN_MAJOR);
@@ -268,7 +270,9 @@ array_t<const wchar_t *> sksc_dxc_build_flags(sksc_settings_t settings, sksc_sha
 	return result;
 }
 
-void sksc_spvc_compile_stage(void *spirv_data, size_t spirv_data_size) {
+///////////////////////////////////////////
+
+void sksc_spvc_compile_stage(const sksc_stage_data_t *src_stage, sksc_stage_data_t *out_stage) {
 	spvc_context context = nullptr;
 	spvc_context_create            (&context);
 	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
@@ -277,32 +281,49 @@ void sksc_spvc_compile_stage(void *spirv_data, size_t spirv_data_size) {
 
 	spvc_compiler  compiler_glsl = nullptr;
 	spvc_parsed_ir ir            = nullptr;
-	spvc_context_parse_spirv    (context, (const SpvId*)spirv_data, spirv_data_size/sizeof(SpvId), &ir);
+	spvc_context_parse_spirv    (context, (const SpvId*)src_stage->binary, src_stage->binary_size/sizeof(SpvId), &ir);
 	spvc_context_create_compiler(context, SPVC_BACKEND_GLSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &compiler_glsl);
 
 	spvc_resources resources = nullptr;
 	spvc_compiler_create_shader_resources(compiler_glsl, &resources);
 
+	const char *lang_name = "GLSL";
+	const char *type_name = src_stage->type == sksc_shader_type_pixel ? "Pixel" : "Vertex";
+	printf("|--%s %s shader--\n", lang_name, type_name);
+
 	const spvc_reflected_resource *list = nullptr;
 	size_t                         count;
 	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_UNIFORM_BUFFER, &list, &count);
 	for (size_t i = 0; i < count; i++) {
-		printf("ID: %u, BaseTypeID: %u, TypeID: %u, Name: %s\n", list[i].id, list[i].base_type_id, list[i].type_id, list[i].name);
-		printf("  Set: %u, Binding: %u\n",
-			spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationDescriptorSet),
-			spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding));
+		printf("| Param b%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), spvc_compiler_get_name(compiler_glsl, list[i].id));
+	}
+	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_SAMPLERS, &list, &count);
+	for (size_t i = 0; i < count; i++) {
+		printf("| Param s%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), list[i].name);
+	}
+	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
+	for (size_t i = 0; i < count; i++) {
+		printf("| Param t%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), list[i].name);
 	}
 
 	// Modify options.
 	spvc_compiler_options options = nullptr;
 	spvc_compiler_create_compiler_options(compiler_glsl, &options);
-	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 330);
+	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
 	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
 
+	// combiner samplers/textures for OpenGL/ES
+	spvc_compiler_build_combined_image_samplers(compiler_glsl);
+
 	const char *result = nullptr;
 	spvc_compiler_compile(compiler_glsl, &result);
-	printf("Cross-compiled source: %s\n", result);
+
+	out_stage->type        = src_stage->type;
+	out_stage->lang        = sksc_shader_lang_glsl;
+	out_stage->binary_size = strlen(result) + 1;
+	out_stage->binary      = malloc(out_stage->binary_size);
+	strcpy_s((char*)out_stage->binary, out_stage->binary_size, result);
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

@@ -152,6 +152,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="sksc.cpp" />
     <ClCompile Include="sksc.h" />
   </ItemGroup>
   <ItemGroup>

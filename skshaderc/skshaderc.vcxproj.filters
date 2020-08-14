@@ -3,6 +3,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="sksc.h" />
+    <ClCompile Include="sksc.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="lib\bin\x64\dxcompiler.dll" />

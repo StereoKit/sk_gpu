@@ -3,4 +3,70 @@
 // API independant functions             //
 ///////////////////////////////////////////
 
-void skr_log(const char *text);
+typedef enum skr_shader_lang_ {
+	skr_shader_lang_hlsl,
+	skr_shader_lang_spirv,
+	skr_shader_lang_glsl,
+} skr_shader_lang_;
+
+typedef struct skr_shader_file_stage_t {
+	skr_shader_lang_ language;
+	skr_shader_      stage;
+	void            *code;
+	size_t           code_size;
+} skr_shader_file_stage_t;
+
+typedef struct skr_shader_meta_var_t {
+	char     name[32];
+	uint32_t name_hash;
+	size_t   offset;
+	size_t   size;
+	char    *extra;
+} skr_shader_meta_var_t;
+
+typedef struct skr_shader_meta_buffer_t {
+	char        name[32];
+	uint32_t    name_hash;
+	uint32_t    slot;
+	skr_shader_ used_by_bits;
+	size_t      size;
+	void       *defaults;
+	skr_shader_meta_var_t *vars;
+	uint32_t               var_count;
+} skr_shader_meta_buffer_t;
+
+typedef struct skr_shader_meta_texture_t {
+	char        name[32];
+	uint32_t    name_hash;
+	uint32_t    slot;
+	skr_shader_ used_by_bits;
+	size_t      size;
+	char       *extra;
+} skr_shader_meta_texture_t;
+
+typedef struct skr_shader_meta_t {
+	const char                 name[256];
+	skr_shader_meta_buffer_t  *buffers;
+	uint32_t                   buffer_count;
+	skr_shader_meta_texture_t *textures;
+	uint32_t                   texture_count;
+	int32_t                    references;
+} skr_shader_meta_t;
+
+typedef struct skr_shader_file_t {
+	skr_shader_meta_t       *meta;
+	skr_shader_file_stage_t *stages;
+	uint32_t                 stage_count;
+} skr_shader_file_t;
+
+///////////////////////////////////////////
+
+void               skr_log(const char *text);
+
+skr_shader_file_t  skr_shader_file_load        (const char *file);
+skr_shader_file_t  skr_shader_file_load_mem    (void *data, size_t size);
+skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, skr_shader_ stage);
+void               skr_shader_file_destroy     (      skr_shader_file_t *file);
+
+void               skr_shader_meta_reference   (skr_shader_meta_t *meta);
+void               skr_shader_meta_release     (skr_shader_meta_t *meta);

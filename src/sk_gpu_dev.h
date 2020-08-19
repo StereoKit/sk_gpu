@@ -84,8 +84,8 @@ enum skr_el_semantic_ {
 };
 
 enum skr_shader_ {
-	skr_shader_vertex,
-	skr_shader_pixel,
+	skr_shader_vertex = 1 << 0,
+	skr_shader_pixel  = 1 << 1,
 };
 
 typedef enum skr_transparency_ {
@@ -142,12 +142,12 @@ skr_mesh_t          skr_mesh_create         (const skr_buffer_t *vert_buffer, co
 void                skr_mesh_set            (const skr_mesh_t *mesh);
 void                skr_mesh_destroy        (      skr_mesh_t *mesh);
 
-skr_shader_stage_t  skr_shader_stage_create (const uint8_t *shader_data, size_t shader_size, skr_shader_ type);
+skr_shader_stage_t  skr_shader_stage_create (const void *shader_data, size_t shader_size, skr_shader_ type);
 void                skr_shader_stage_destroy(skr_shader_stage_t *stage);
 
-skr_pipeline_t      skr_pipeline_create          (skr_transparency_ transparency, skr_cull_ cull, bool wireframe);
+skr_pipeline_t      skr_pipeline_create          (skr_shader_stage_t *vertex, skr_shader_stage_t *pixel);
 void                skr_pipeline_set             (const skr_pipeline_t *pipeline);
-void                skr_pipeline_set_shader      (      skr_pipeline_t *pipeline, skr_shader_stage_t *shader_stage);
+void                skr_pipeline_set_texture     ();
 void                skr_pipeline_set_transparency(      skr_pipeline_t *pipeline, skr_transparency_ transparency);
 void                skr_pipeline_set_cull        (      skr_pipeline_t *pipeline, skr_cull_ cull);
 void                skr_pipeline_set_wireframe   (      skr_pipeline_t *pipeline, bool wireframe);

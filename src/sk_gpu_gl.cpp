@@ -708,12 +708,14 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 
 /////////////////////////////////////////// 
 
-skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
+skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_size, skr_shader_ type) {
+	const char *file_chars = (const char *)file_data;
+
 	skr_shader_stage_t result = {}; 
 	result.type = type;
 
 	// Include terminating character
-	if (shader_size > 0 && file_data[shader_size-1] != '\0')
+	if (shader_size > 0 && file_chars[shader_size-1] != '\0')
 		shader_size += 1;
 
 	uint32_t gl_type = 0;
@@ -727,20 +729,20 @@ skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shad
 	const int32_t prefix_gl_size = strlen(prefix_gl);
 	const char   *prefix_es      = "#version 300 es";
 	const int32_t prefix_es_size = strlen(prefix_es);
-	char         *final_data = (char*)file_data;
+	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;
 #if __ANDROID__
-	if (shader_size >= prefix_gl_size && memcmp(prefix_gl, file_data, prefix_gl_size) == 0) {
+	if (shader_size >= prefix_gl_size && memcmp(prefix_gl, file_chars, prefix_gl_size) == 0) {
 		final_data = (char*)malloc(sizeof(char) * ((shader_size-prefix_gl_size)+prefix_es_size));
 		memcpy(final_data, prefix_es, prefix_es_size);
-		memcpy(&final_data[prefix_es_size], &file_data[prefix_gl_size], shader_size - prefix_gl_size);
+		memcpy(&final_data[prefix_es_size], &file_chars[prefix_gl_size], shader_size - prefix_gl_size);
 		needs_free = true;
 	}
 #else
-	if (shader_size >= prefix_es_size && memcmp(prefix_es, file_data, prefix_es_size) == 0) {
+	if (shader_size >= prefix_es_size && memcmp(prefix_es, file_chars, prefix_es_size) == 0) {
 		final_data = (char*)malloc(sizeof(char) * ((shader_size-prefix_es_size)+prefix_gl_size));
 		memcpy(final_data, prefix_gl, prefix_gl_size);
-		memcpy(&final_data[prefix_gl_size], &file_data[prefix_es_size], shader_size - prefix_es_size);
+		memcpy(&final_data[prefix_gl_size], &file_chars[prefix_es_size], shader_size - prefix_es_size);
 		needs_free = true;
 	}
 #endif
@@ -781,11 +783,33 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 // skr_pipeline                          //
 ///////////////////////////////////////////
 
-skr_pipeline_t skr_pipeline_create(skr_transparency_ transparency, skr_cull_ cull, bool wireframe) {
+skr_pipeline_t skr_pipeline_create(skr_shader_stage_t *vertex, skr_shader_stage_t *pixel) {
 	skr_pipeline_t result = {};
-	result.transparency = transparency;
-	result.cull         = cull;
-	result.wireframe    = wireframe;
+	result.transparency = skr_transparency_none;
+	result.cull         = skr_cull_none;
+	result.wireframe    = false;
+	result.vertex       = vertex->shader;
+	result.pixel        = pixel ->shader;
+
+	result.program = glCreateProgram();
+	if (result.vertex) glAttachShader(result.program, result.vertex);
+	if (result.pixel)  glAttachShader(result.program, result.pixel);
+	glLinkProgram (result.program);
+
+	// check for errors?
+	int32_t err, length;
+	glGetProgramiv(result.program, GL_LINK_STATUS, &err);
+	if (err == 0) {
+		char *log;
+
+		glGetProgramiv(result.program, GL_INFO_LOG_LENGTH, &length);
+		log = (char*)malloc(length);
+		glGetShaderInfoLog(result.program, length, &err, log);
+
+		skr_log("Unable to compile shader program:");
+		skr_log(log);
+		free(log);
+	}
 
 	return result;
 }
@@ -823,45 +847,6 @@ void skr_pipeline_set(const skr_pipeline_t *pipeline) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	} else {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	}
-}
-
-/////////////////////////////////////////// 
-
-void skr_pipeline_set_shader(skr_pipeline_t *pipeline, skr_shader_stage_t *shader_stage) {
-	switch (shader_stage->type) {
-	case skr_shader_vertex: {
-		pipeline->vertex = shader_stage->shader;
-		if (pipeline->program) glDeleteProgram(pipeline->program);
-		pipeline->program = 0;
-	}break;
-	case skr_shader_pixel: {
-		pipeline->pixel = shader_stage->shader;
-		if (pipeline->program) glDeleteProgram(pipeline->program);
-		pipeline->program = 0;
-	}break;
-	}
-
-	if (pipeline->pixel != 0 && pipeline->vertex != 0) {
-		pipeline->program = glCreateProgram();
-		if (pipeline->vertex) glAttachShader(pipeline->program, pipeline->vertex);
-		if (pipeline->pixel)  glAttachShader(pipeline->program, pipeline->pixel);
-		glLinkProgram (pipeline->program);
-
-		// check for errors?
-		int32_t err, length;
-		glGetProgramiv(pipeline->program, GL_LINK_STATUS, &err);
-		if (err == 0) {
-			char *log;
-
-			glGetProgramiv(pipeline->program, GL_INFO_LOG_LENGTH, &length);
-			log = (char*)malloc(length);
-			glGetShaderInfoLog(pipeline->program, length, &err, log);
-
-			skr_log("Unable to compile shader program:");
-			skr_log(log);
-			free(log);
-		}
 	}
 }
 

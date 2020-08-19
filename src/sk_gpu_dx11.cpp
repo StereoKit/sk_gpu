@@ -255,7 +255,7 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 /////////////////////////////////////////// 
 
 #include <stdio.h>
-skr_shader_stage_t skr_shader_stage_create(const uint8_t *file_data, size_t shader_size, skr_shader_ type) {
+skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_size, skr_shader_ type) {
 	skr_shader_stage_t result = {};
 	result.type = type;
 
@@ -341,11 +341,15 @@ void skr_pipeline_update_rasterizer(skr_pipeline_t *pipeline) {
 
 /////////////////////////////////////////// 
 
-skr_pipeline_t skr_pipeline_create(skr_transparency_ transparency, skr_cull_ cull, bool wireframe) {
+skr_pipeline_t skr_pipeline_create(skr_shader_stage_t *vertex, skr_shader_stage_t *pixel) {
 	skr_pipeline_t result = {};
-	result.transparency = transparency;
-	result.cull         = cull;
-	result.wireframe    = wireframe;
+	result.transparency = skr_transparency_none;
+	result.cull         = skr_cull_back;
+	result.wireframe    = false;
+	result.vertex       = (ID3D11VertexShader*)vertex->shader;
+	result.pixel        = (ID3D11PixelShader *)pixel->shader;
+	if (result.vertex) result.vertex->AddRef();
+	if (result.pixel ) result.pixel ->AddRef();
 
 	skr_pipeline_update_blend     (&result);
 	skr_pipeline_update_rasterizer(&result);
@@ -359,23 +363,6 @@ void skr_pipeline_set(const skr_pipeline_t *pipeline) {
 	d3d_context->RSSetState     (pipeline->rasterize);
 	d3d_context->VSSetShader    (pipeline->vertex, nullptr, 0);
 	d3d_context->PSSetShader    (pipeline->pixel,  nullptr, 0);
-}
-
-/////////////////////////////////////////// 
-
-void skr_pipeline_set_shader(      skr_pipeline_t *pipeline, skr_shader_stage_t *shader_stage) {
-	switch (shader_stage->type) {
-	case skr_shader_vertex: {
-		if (pipeline->vertex) pipeline->vertex->Release();
-		pipeline->vertex = (ID3D11VertexShader*)shader_stage->shader;
-		if (pipeline->vertex) pipeline->vertex->AddRef();
-	}break;
-	case skr_shader_pixel: {
-		if (pipeline->pixel) pipeline->pixel->Release();
-		pipeline->pixel = (ID3D11PixelShader*)shader_stage->shader;
-		if (pipeline->pixel) pipeline->pixel->AddRef();
-	}break;
-	}
 }
 
 /////////////////////////////////////////// 

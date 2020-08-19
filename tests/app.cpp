@@ -124,9 +124,8 @@ bool app_init() {
 	app_cube_ps = skr_shader_stage_create((uint8_t*)shader_cube_hlsl, strlen(shader_cube_hlsl), skr_shader_pixel);
 	app_cube_vs = skr_shader_stage_create((uint8_t*)shader_cube_hlsl, strlen(shader_cube_hlsl), skr_shader_vertex);
 #endif
-	app_cube_shader = skr_pipeline_create(skr_transparency_none, skr_cull_back, true);
-	skr_pipeline_set_shader(&app_cube_shader, &app_cube_vs);
-	skr_pipeline_set_shader(&app_cube_shader, &app_cube_ps);
+	app_cube_shader = skr_pipeline_create(&app_cube_vs, &app_cube_ps);
+	skr_pipeline_set_wireframe(&app_cube_shader, true);
 
 #if defined(SKR_OPENGL)
 	app_ps = skr_shader_stage_create((uint8_t*)shader_glsl_ps, strlen(shader_glsl_ps), skr_shader_pixel);
@@ -138,9 +137,7 @@ bool app_init() {
 	app_ps = skr_shader_stage_create(shader_spirv_ps, _countof(shader_spirv_ps), skr_shader_pixel);
 	app_vs = skr_shader_stage_create(shader_spirv_vs, _countof(shader_spirv_vs), skr_shader_vertex);
 #endif
-	app_shader = skr_pipeline_create(skr_transparency_none, skr_cull_back, false);
-	skr_pipeline_set_shader(&app_shader, &app_vs);
-	skr_pipeline_set_shader(&app_shader, &app_ps);
+	app_shader = skr_pipeline_create(&app_vs, &app_ps);
 
 	app_shader_data_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t),       skr_buffer_type_constant, skr_use_dynamic);
 	app_shader_inst_buffer = skr_buffer_create(&app_shader_inst, sizeof(app_shader_inst_t) * 100, skr_buffer_type_constant, skr_use_dynamic);

@@ -23,9 +23,14 @@ typedef struct skr_shader_stage_t {
 	uint32_t    shader;
 } skr_shader_stage_t;
 
-typedef struct skr_shader_t {
-	uint32_t program;
-} skr_shader_t;
+typedef struct skr_pipeline_t {
+	skr_transparency_ transparency;
+	skr_cull_         cull;
+	bool              wireframe;
+	uint32_t          vertex;
+	uint32_t          pixel;
+	uint32_t          program;
+} skr_pipeline_t;
 
 typedef struct skr_tex_t {
 	int32_t       width;

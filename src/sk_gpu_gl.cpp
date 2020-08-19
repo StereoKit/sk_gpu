@@ -73,6 +73,10 @@ HGLRC gl_hrc;
 #define GL_VERSION 0x1F02
 #define GL_CULL_FACE 0x0B44
 #define GL_BACK 0x0405
+#define GL_FRONT 0x0404
+#define GL_FRONT_AND_BACK 0x0408
+#define GL_LINE 0x1B01
+#define GL_FILL 0x1B02
 #define GL_DEPTH_TEST 0x0B71
 #define GL_TEXTURE_2D 0x0DE1
 #define GL_TEXTURE_CUBE_MAP 0x8513
@@ -112,6 +116,8 @@ HGLRC gl_hrc;
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
+
+#define GL_BLEND 0x0BE2
 
 #define GL_RED 0x1903
 #define GL_RGBA 0x1908
@@ -205,6 +211,8 @@ typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
 	GLE(void,     ClearColor,              float r, float g, float b, float a) \
 	GLE(void,     Clear,                   uint32_t mask) \
 	GLE(void,     Enable,                  uint32_t cap) \
+	GLE(void,     Disable,                 uint32_t cap) \
+	GLE(void,     PolygonMode,             uint32_t face, uint32_t mode) \
 	GLE(uint32_t, GetError,                ) \
     GLE(void,     GetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
     GLE(uint32_t, CreateShader,            uint32_t type) \
@@ -769,45 +777,131 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 	*shader = {};
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
+// skr_pipeline                          //
+///////////////////////////////////////////
 
-skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel) {
-	skr_shader_t result = {};
-
-	result.program = glCreateProgram();
-	if (vertex) glAttachShader(result.program, vertex->shader);
-	if (pixel)  glAttachShader(result.program, pixel->shader);
-	glLinkProgram (result.program);
-
-	// check for errors?
-	int32_t err, length;
-	glGetProgramiv(result.program, GL_LINK_STATUS, &err);
-	if (err == 0) {
-		char *log;
-
-		glGetProgramiv(result.program, GL_INFO_LOG_LENGTH, &length);
-		log = (char*)malloc(length);
-		glGetShaderInfoLog(result.program, length, &err, log);
-
-		skr_log("Unable to compile shader program:");
-		skr_log(log);
-		free(log);
-	}
+skr_pipeline_t skr_pipeline_create(skr_transparency_ transparency, skr_cull_ cull, bool wireframe) {
+	skr_pipeline_t result = {};
+	result.transparency = transparency;
+	result.cull         = cull;
+	result.wireframe    = wireframe;
 
 	return result;
 }
 
 /////////////////////////////////////////// 
 
-void skr_shader_set(const skr_shader_t *program) {
-	glUseProgram(program->program);
+void skr_pipeline_set(const skr_pipeline_t *pipeline) {
+	glUseProgram(pipeline->program);
+	
+	switch (pipeline->transparency) {
+	case skr_transparency_blend: {
+		glEnable(GL_BLEND);
+	}break;
+	case skr_transparency_clip:
+	case skr_transparency_none: {
+		glDisable(GL_BLEND);
+	}break;
+	}
+
+	switch (pipeline->cull) {
+	case skr_cull_back: {
+		glEnable  (GL_CULL_FACE);
+		glCullFace(GL_BACK);
+	} break;
+	case skr_cull_front: {
+		glEnable  (GL_CULL_FACE);
+		glCullFace(GL_FRONT);
+	} break;
+	case skr_cull_none: {
+		glDisable(GL_CULL_FACE);
+	} break;
+	}
+
+	if (pipeline->wireframe) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	} else {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 }
 
 /////////////////////////////////////////// 
 
-void skr_shader_destroy(skr_shader_t *program) {
-	glDeleteProgram(program->program);
-	*program = {};
+void skr_pipeline_set_shader(skr_pipeline_t *pipeline, skr_shader_stage_t *shader_stage) {
+	switch (shader_stage->type) {
+	case skr_shader_vertex: {
+		pipeline->vertex = shader_stage->shader;
+		if (pipeline->program) glDeleteProgram(pipeline->program);
+		pipeline->program = 0;
+	}break;
+	case skr_shader_pixel: {
+		pipeline->pixel = shader_stage->shader;
+		if (pipeline->program) glDeleteProgram(pipeline->program);
+		pipeline->program = 0;
+	}break;
+	}
+
+	if (pipeline->pixel != 0 && pipeline->vertex != 0) {
+		pipeline->program = glCreateProgram();
+		if (pipeline->vertex) glAttachShader(pipeline->program, pipeline->vertex);
+		if (pipeline->pixel)  glAttachShader(pipeline->program, pipeline->pixel);
+		glLinkProgram (pipeline->program);
+
+		// check for errors?
+		int32_t err, length;
+		glGetProgramiv(pipeline->program, GL_LINK_STATUS, &err);
+		if (err == 0) {
+			char *log;
+
+			glGetProgramiv(pipeline->program, GL_INFO_LOG_LENGTH, &length);
+			log = (char*)malloc(length);
+			glGetShaderInfoLog(pipeline->program, length, &err, log);
+
+			skr_log("Unable to compile shader program:");
+			skr_log(log);
+			free(log);
+		}
+	}
+}
+
+/////////////////////////////////////////// 
+
+void skr_pipeline_set_transparency(skr_pipeline_t *pipeline, skr_transparency_ transparency) {
+	pipeline->transparency = transparency;
+}
+
+/////////////////////////////////////////// 
+void skr_pipeline_set_cull(skr_pipeline_t *pipeline, skr_cull_ cull) {
+	pipeline->cull = cull;
+}
+/////////////////////////////////////////// 
+void skr_pipeline_set_wireframe(skr_pipeline_t *pipeline, bool wireframe) {
+	pipeline->wireframe = wireframe;
+}
+/////////////////////////////////////////// 
+
+skr_transparency_ skr_pipeline_get_transparency(const skr_pipeline_t *pipeline) {
+	return pipeline->transparency;
+}
+
+/////////////////////////////////////////// 
+
+skr_cull_ skr_pipeline_get_cull(const skr_pipeline_t *pipeline) {
+	return pipeline->cull;
+}
+
+/////////////////////////////////////////// 
+
+bool skr_pipeline_get_wireframe(const skr_pipeline_t *pipeline) {
+	return pipeline->wireframe;
+}
+
+///////////////////////////////////////////
+
+void skr_pipeline_destroy(skr_pipeline_t *pipeline) {
+	glDeleteProgram(pipeline->program);
+	*pipeline = {};
 }
 
 ///////////////////////////////////////////

@@ -88,6 +88,18 @@ enum skr_shader_ {
 	skr_shader_pixel,
 };
 
+typedef enum skr_transparency_ {
+	skr_transparency_none = 1,
+	skr_transparency_blend,
+	skr_transparency_clip,
+} skr_transparency_;
+
+typedef enum skr_cull_ {
+	skr_cull_back = 0,
+	skr_cull_front,
+	skr_cull_none,
+} skr_cull_;
+
 typedef struct skr_vert_t {
 	float   pos [3];
 	float   norm[3];
@@ -133,9 +145,16 @@ void                skr_mesh_destroy        (      skr_mesh_t *mesh);
 skr_shader_stage_t  skr_shader_stage_create (const uint8_t *shader_data, size_t shader_size, skr_shader_ type);
 void                skr_shader_stage_destroy(skr_shader_stage_t *stage);
 
-skr_shader_t        skr_shader_create       (const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel);
-void                skr_shader_set          (const skr_shader_t *shader);
-void                skr_shader_destroy      (      skr_shader_t *shader);
+skr_pipeline_t      skr_pipeline_create          (skr_transparency_ transparency, skr_cull_ cull, bool wireframe);
+void                skr_pipeline_set             (const skr_pipeline_t *pipeline);
+void                skr_pipeline_set_shader      (      skr_pipeline_t *pipeline, skr_shader_stage_t *shader_stage);
+void                skr_pipeline_set_transparency(      skr_pipeline_t *pipeline, skr_transparency_ transparency);
+void                skr_pipeline_set_cull        (      skr_pipeline_t *pipeline, skr_cull_ cull);
+void                skr_pipeline_set_wireframe   (      skr_pipeline_t *pipeline, bool wireframe);
+skr_transparency_   skr_pipeline_get_transparency(const skr_pipeline_t *pipeline);
+skr_cull_           skr_pipeline_get_cull        (const skr_pipeline_t *pipeline);
+bool                skr_pipeline_get_wireframe   (const skr_pipeline_t *pipeline);
+void                skr_pipeline_destroy         (      skr_pipeline_t *pipeline);
 
 skr_swapchain_t     skr_swapchain_create    (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);
 void                skr_swapchain_resize    (      skr_swapchain_t *swapchain, int32_t width, int32_t height);

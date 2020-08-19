@@ -20,10 +20,15 @@ typedef struct skr_shader_stage_t {
 	void        *shader;
 } skr_shader_stage_t;
 
-typedef struct skr_shader_t {
-	ID3D11VertexShader *vertex;
-	ID3D11PixelShader  *pixel;
-} skr_shader_t;
+typedef struct skr_pipeline_t {
+	skr_transparency_ transparency;
+	skr_cull_         cull;
+	bool              wireframe;
+	ID3D11VertexShader    *vertex;
+	ID3D11PixelShader     *pixel;
+	ID3D11BlendState      *blend;
+	ID3D11RasterizerState *rasterize;
+} skr_pipeline_t;
 
 typedef struct skr_tex_t {
 	int32_t width;

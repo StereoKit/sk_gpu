@@ -302,37 +302,136 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 	}
 }
 
+///////////////////////////////////////////
+// skr_pipeline                          //
 /////////////////////////////////////////// 
 
-skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel) {
-	skr_shader_t result = {};
-	if (pixel) {
-		result.pixel = (ID3D11PixelShader *)pixel->shader;
-		result.pixel->AddRef();
+void skr_pipeline_update_blend(skr_pipeline_t *pipeline) {
+	if (pipeline->blend) pipeline->blend->Release();
+
+	D3D11_BLEND_DESC desc_blend = {};
+	desc_blend.AlphaToCoverageEnable  = false;
+	desc_blend.IndependentBlendEnable = false;
+	desc_blend.RenderTarget[0].BlendEnable           = pipeline->transparency == skr_transparency_blend;
+	desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	desc_blend.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+	desc_blend.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+	desc_blend.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+	desc_blend.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+	desc_blend.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+	desc_blend.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+	d3d_device->CreateBlendState(&desc_blend, &pipeline->blend);
+}
+
+/////////////////////////////////////////// 
+
+void skr_pipeline_update_rasterizer(skr_pipeline_t *pipeline) {
+	if (pipeline->rasterize) pipeline->rasterize->Release();
+
+	D3D11_RASTERIZER_DESC desc_rasterizer = {};
+	desc_rasterizer.FillMode              = pipeline->wireframe ? D3D11_FILL_WIREFRAME : D3D11_FILL_SOLID;
+	desc_rasterizer.FrontCounterClockwise = true;
+	switch (pipeline->cull) {
+	case skr_cull_none:  desc_rasterizer.CullMode = D3D11_CULL_NONE;  break;
+	case skr_cull_front: desc_rasterizer.CullMode = D3D11_CULL_FRONT; break;
+	case skr_cull_back:  desc_rasterizer.CullMode = D3D11_CULL_BACK;  break;
 	}
-	if (vertex) {
-		result.vertex = (ID3D11VertexShader *)vertex->shader;
-		result.vertex->AddRef();
-	}
+	d3d_device->CreateRasterizerState(&desc_rasterizer, &pipeline->rasterize);
+}
+
+/////////////////////////////////////////// 
+
+skr_pipeline_t skr_pipeline_create(skr_transparency_ transparency, skr_cull_ cull, bool wireframe) {
+	skr_pipeline_t result = {};
+	result.transparency = transparency;
+	result.cull         = cull;
+	result.wireframe    = wireframe;
+
+	skr_pipeline_update_blend     (&result);
+	skr_pipeline_update_rasterizer(&result);
 	return result;
 }
 
 /////////////////////////////////////////// 
 
-void skr_shader_set(const skr_shader_t *program) {
-	d3d_context->VSSetShader(program->vertex, nullptr, 0);
-	d3d_context->PSSetShader(program->pixel,  nullptr, 0);
+void skr_pipeline_set(const skr_pipeline_t *pipeline) {
+	d3d_context->OMSetBlendState(pipeline->blend,  nullptr, 0xFFFFFFFF);
+	d3d_context->RSSetState     (pipeline->rasterize);
+	d3d_context->VSSetShader    (pipeline->vertex, nullptr, 0);
+	d3d_context->PSSetShader    (pipeline->pixel,  nullptr, 0);
 }
 
 /////////////////////////////////////////// 
 
-void skr_shader_destroy(skr_shader_t *program) {
-	if (program->pixel ) program->pixel ->Release();
-	if (program->vertex) program->vertex->Release();
-	*program = {};
+void skr_pipeline_set_shader(      skr_pipeline_t *pipeline, skr_shader_stage_t *shader_stage) {
+	switch (shader_stage->type) {
+	case skr_shader_vertex: {
+		if (pipeline->vertex) pipeline->vertex->Release();
+		pipeline->vertex = (ID3D11VertexShader*)shader_stage->shader;
+		if (pipeline->vertex) pipeline->vertex->AddRef();
+	}break;
+	case skr_shader_pixel: {
+		if (pipeline->pixel) pipeline->pixel->Release();
+		pipeline->pixel = (ID3D11PixelShader*)shader_stage->shader;
+		if (pipeline->pixel) pipeline->pixel->AddRef();
+	}break;
+	}
 }
 
 /////////////////////////////////////////// 
+
+void skr_pipeline_set_transparency(skr_pipeline_t *pipeline, skr_transparency_ transparency) {
+	if (pipeline->transparency != transparency) {
+		pipeline->transparency = transparency;
+		skr_pipeline_update_blend(pipeline);
+	}
+}
+
+/////////////////////////////////////////// 
+void skr_pipeline_set_cull(skr_pipeline_t *pipeline, skr_cull_ cull) {
+	if (pipeline->cull != cull) {
+		pipeline->cull = cull;
+		skr_pipeline_update_rasterizer(pipeline);
+	}
+}
+/////////////////////////////////////////// 
+void skr_pipeline_set_wireframe(skr_pipeline_t *pipeline, bool wireframe) {
+	if (pipeline->wireframe != wireframe) {
+		pipeline->wireframe = wireframe;
+		skr_pipeline_update_rasterizer(pipeline);
+	}
+}
+/////////////////////////////////////////// 
+
+skr_transparency_ skr_pipeline_get_transparency(const skr_pipeline_t *pipeline) {
+	return pipeline->transparency;
+}
+
+/////////////////////////////////////////// 
+
+skr_cull_ skr_pipeline_get_cull(const skr_pipeline_t *pipeline) {
+	return pipeline->cull;
+}
+
+/////////////////////////////////////////// 
+
+bool skr_pipeline_get_wireframe(const skr_pipeline_t *pipeline) {
+	return pipeline->wireframe;
+}
+
+///////////////////////////////////////////
+
+void skr_pipeline_destroy(skr_pipeline_t *pipeline) {
+	if (pipeline->blend    ) pipeline->blend    ->Release();
+	if (pipeline->rasterize) pipeline->rasterize->Release();
+	if (pipeline->vertex   ) pipeline->vertex   ->Release();
+	if (pipeline->pixel    ) pipeline->pixel    ->Release();
+	*pipeline = {};
+}
+
+///////////////////////////////////////////
+// skr_swapchain                         //
+///////////////////////////////////////////
 
 skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height) {
 	skr_swapchain_t result = {};

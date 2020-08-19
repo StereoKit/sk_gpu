@@ -32,10 +32,10 @@ app_mesh_t           app_mesh1  = {};
 app_mesh_t           app_mesh2  = {};
 skr_shader_stage_t   app_ps     = {};
 skr_shader_stage_t   app_vs     = {};
-skr_shader_t         app_shader = {};
+skr_pipeline_t       app_shader = {};
 skr_shader_stage_t   app_cube_ps     = {};
 skr_shader_stage_t   app_cube_vs     = {};
-skr_shader_t         app_cube_shader = {};
+skr_pipeline_t       app_cube_shader = {};
 skr_buffer_t         app_shader_data_buffer = {};
 skr_buffer_t         app_shader_inst_buffer = {};
 skr_tex_t            app_tex    = {};
@@ -124,7 +124,9 @@ bool app_init() {
 	app_cube_ps = skr_shader_stage_create((uint8_t*)shader_cube_hlsl, strlen(shader_cube_hlsl), skr_shader_pixel);
 	app_cube_vs = skr_shader_stage_create((uint8_t*)shader_cube_hlsl, strlen(shader_cube_hlsl), skr_shader_vertex);
 #endif
-	app_cube_shader = skr_shader_create(&app_cube_vs, &app_cube_ps);
+	app_cube_shader = skr_pipeline_create(skr_transparency_none, skr_cull_back, true);
+	skr_pipeline_set_shader(&app_cube_shader, &app_cube_vs);
+	skr_pipeline_set_shader(&app_cube_shader, &app_cube_ps);
 
 #if defined(SKR_OPENGL)
 	app_ps = skr_shader_stage_create((uint8_t*)shader_glsl_ps, strlen(shader_glsl_ps), skr_shader_pixel);
@@ -136,7 +138,9 @@ bool app_init() {
 	app_ps = skr_shader_stage_create(shader_spirv_ps, _countof(shader_spirv_ps), skr_shader_pixel);
 	app_vs = skr_shader_stage_create(shader_spirv_vs, _countof(shader_spirv_vs), skr_shader_vertex);
 #endif
-	app_shader = skr_shader_create(&app_vs, &app_ps);
+	app_shader = skr_pipeline_create(skr_transparency_none, skr_cull_back, false);
+	skr_pipeline_set_shader(&app_shader, &app_vs);
+	skr_pipeline_set_shader(&app_shader, &app_ps);
 
 	app_shader_data_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t),       skr_buffer_type_constant, skr_use_dynamic);
 	app_shader_inst_buffer = skr_buffer_create(&app_shader_inst, sizeof(app_shader_inst_t) * 100, skr_buffer_type_constant, skr_use_dynamic);
@@ -152,7 +156,7 @@ void app_test_cubemap() {
 	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh1.mesh);
-	skr_shader_set    (&app_cube_shader);
+	skr_pipeline_set  (&app_cube_shader);
 	skr_tex_set_active(&app_tex, 0);
 	skr_tex_set_active(&app_cubemap, 9);
 	skr_draw(0, app_mesh1.ind_count, 1);
@@ -185,7 +189,7 @@ void app_test_rendertarget() {
 	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh1.mesh);
-	skr_shader_set    (&app_shader);
+	skr_pipeline_set  (&app_shader);
 	skr_tex_set_active(&app_tex, 0);
 	skr_draw(0, app_mesh1.ind_count, 1);
 
@@ -205,7 +209,7 @@ void app_test_instancing() {
 	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh1.mesh);
-	skr_shader_set    (&app_shader);
+	skr_pipeline_set  (&app_shader);
 	skr_tex_set_active(&app_tex, 0);
 	skr_draw(0, app_mesh1.ind_count, 100);
 
@@ -219,7 +223,7 @@ void app_test_instancing() {
 	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh2.mesh);
-	skr_shader_set    (&app_shader);
+	skr_pipeline_set  (&app_shader);
 	skr_tex_set_active(&app_target, 0);
 	skr_draw(0, app_mesh2.ind_count, 100);
 }
@@ -244,7 +248,8 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 void app_shutdown() {
 	skr_buffer_destroy(&app_shader_data_buffer);
 	skr_buffer_destroy(&app_shader_inst_buffer);
-	skr_shader_destroy(&app_shader);
+	skr_pipeline_destroy(&app_shader);
+	skr_pipeline_destroy(&app_cube_shader);
 	skr_shader_stage_destroy(&app_ps);
 	skr_shader_stage_destroy(&app_vs);
 	skr_tex_destroy(&app_target_depth);

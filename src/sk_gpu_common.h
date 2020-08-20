@@ -12,51 +12,48 @@ typedef enum skr_shader_lang_ {
 typedef struct skr_shader_file_stage_t {
 	skr_shader_lang_ language;
 	skr_shader_      stage;
-	void            *code;
 	size_t           code_size;
+	void            *code;
 } skr_shader_file_stage_t;
 
 typedef struct skr_shader_meta_var_t {
 	char     name[32];
-	uint32_t name_hash;
+	char     extra[64];
 	size_t   offset;
 	size_t   size;
-	char    *extra;
 } skr_shader_meta_var_t;
 
 typedef struct skr_shader_meta_buffer_t {
 	char        name[32];
-	uint32_t    name_hash;
 	uint32_t    slot;
 	skr_shader_ used_by_bits;
 	size_t      size;
 	void       *defaults;
-	skr_shader_meta_var_t *vars;
 	uint32_t               var_count;
+	skr_shader_meta_var_t *vars;
 } skr_shader_meta_buffer_t;
 
 typedef struct skr_shader_meta_texture_t {
 	char        name[32];
-	uint32_t    name_hash;
+	char        extra[64];
 	uint32_t    slot;
 	skr_shader_ used_by_bits;
 	size_t      size;
-	char       *extra;
 } skr_shader_meta_texture_t;
 
 typedef struct skr_shader_meta_t {
-	const char                 name[256];
-	skr_shader_meta_buffer_t  *buffers;
+	char                       name[256];
 	uint32_t                   buffer_count;
-	skr_shader_meta_texture_t *textures;
+	skr_shader_meta_buffer_t  *buffers;
 	uint32_t                   texture_count;
+	skr_shader_meta_texture_t *textures;
 	int32_t                    references;
 } skr_shader_meta_t;
 
 typedef struct skr_shader_file_t {
 	skr_shader_meta_t       *meta;
-	skr_shader_file_stage_t *stages;
 	uint32_t                 stage_count;
+	skr_shader_file_stage_t *stages;
 } skr_shader_file_t;
 
 ///////////////////////////////////////////

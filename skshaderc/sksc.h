@@ -27,17 +27,31 @@ typedef enum sksc_shader_type_ {
 	sksc_shader_type_vertex,
 } sksc_shader_type_;
 
-typedef struct sksc_param_t {
+typedef struct sksc_var_t {
+	size_t  offset;
+	size_t  size;
+	wchar_t name[32];
+} sksc_var_t;
+
+typedef struct sksc_buffer_t {
 	uint8_t type;
 	uint8_t slot;
+	size_t  size;
+	char    name[32];
+} sksc_buffer_t;
+
+typedef struct sksc_texture_t {
+	uint8_t slot;
 	wchar_t name[32];
-} sksc_param_t;
+} sksc_texture_t;
 
 typedef struct sksc_stage_data_t {
 	sksc_shader_type_ type;
 	sksc_shader_lang_ lang;
-	sksc_param_t     *params;
-	int32_t           param_count;
+	sksc_buffer_t    *buffers;
+	int32_t           buffer_count;
+	sksc_buffer_t    *textures;
+	int32_t           texture_count;
 	void             *binary;
 	size_t            binary_size;
 } sksc_stage_data_t;

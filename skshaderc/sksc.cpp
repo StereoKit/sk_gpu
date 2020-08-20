@@ -14,6 +14,10 @@
 
 #include "sksc.h"
 
+#define SKR_DIRECT3D11
+#define SKR_IMPL
+#include "../sk_gpu.h"
+
 #include <windows.h>
 #include <dxcapi.h>
 #include <d3d12shader.h>
@@ -94,6 +98,10 @@ void sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings) {
 	if (FAILED(sksc_utils->CreateDefaultIncludeHandler(&include_handler)))
 		printf("| CreateDefaultIncludeHandler failed!\n|________________\n\n");
 
+	skr_shader_file_t shader_file = {};
+	shader_file.stage_count = 6;
+	shader_file.stages      = (skr_shader_file_stage_t*)malloc(6 * sizeof(skr_shader_file_stage_t));
+
 	sksc_stage_data_t vs_stage_hlsl = {};
 	if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, sksc_shader_type_vertex, sksc_shader_lang_hlsl, &vs_stage_hlsl)) {
 		include_handler->Release();
@@ -144,7 +152,7 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 		return false;
 	}
 
-	const char *lang_name = lang == sksc_shader_lang_hlsl ? "HLSL" : "SPIRV";
+	const char *lang_name = lang == sksc_shader_lang_hlsl  ? "HLSL"  : "SPIRV";
 	const char *type_name = type == sksc_shader_type_pixel ? "Pixel" : "Vertex";
 	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
 	if (errors && errors->GetStringLength() > 0) {
@@ -191,28 +199,58 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, sksc_stage_data_t *out_sta
 	reflection_buffer.Size     = reflection->GetBufferSize();
 	reflection_buffer.Encoding = 0;
 	sksc_utils->CreateReflection(&reflection_buffer, __uuidof(ID3D12ShaderReflection), (void **)(&shader_reflection));
-
 	D3D12_SHADER_DESC desc;
 	shader_reflection->GetDesc(&desc);
-	out_stage->param_count = desc.BoundResources;
-	out_stage->params      = (sksc_param_t*)malloc(sizeof(sksc_param_t) * desc.BoundResources);
+	out_stage->buffer_count = desc.ConstantBuffers;
+	out_stage->buffers      = (sksc_buffer_t*)malloc(sizeof(sksc_buffer_t) * out_stage->buffer_count);
+	for (uint32_t i = 0; i < desc.ConstantBuffers; i++) {
+		ID3D12ShaderReflectionConstantBuffer *cb = shader_reflection->GetConstantBufferByIndex(i);
+		D3D12_SHADER_BUFFER_DESC              shader_buff;
+		cb->GetDesc(&shader_buff);
+		
+		sprintf_s(out_stage->buffers[i].name, _countof(out_stage->buffers[i].name), "%s", shader_buff.Name);
+		out_stage->buffers[i].size = shader_buff.Size;
+
+		printf("| --%s : %u bytes--\n", out_stage->buffers[i].name, shader_buff.Size);
+
+		for (size_t v = 0; v < shader_buff.Variables; v++) {
+			ID3D12ShaderReflectionVariable *var  = cb->GetVariableByIndex(v);
+			ID3D12ShaderReflectionType     *type = var->GetType();
+			D3D12_SHADER_TYPE_DESC          type_desc;
+			D3D12_SHADER_VARIABLE_DESC      var_desc;
+			type->GetDesc(&type_desc);
+			var ->GetDesc(&var_desc );
+
+			printf("|   %-8s %-15s: +%-4u [%u]\n", type_desc.Name, var_desc.Name, var_desc.StartOffset, var_desc.Size);
+		}
+	}
 	for (uint32_t i = 0; i < desc.BoundResources; i++) {
 		D3D12_SHADER_INPUT_BIND_DESC bind_desc;
 		shader_reflection->GetResourceBindingDesc(i, &bind_desc);
+		
+		if (bind_desc.Type == D3D_SIT_CBUFFER) {
+			for (size_t b = 0; b < out_stage->buffer_count; b++) {
+				if (strcmp(bind_desc.Name, out_stage->buffers[b].name) == 0) {
+					out_stage->buffers[b].slot = bind_desc.BindPoint;
 
-		out_stage->params[i].type = 0;
-		out_stage->params[i].slot = bind_desc.BindPoint;
-		switch (bind_desc.Type) {
-		case D3D_SIT_CBUFFER: out_stage->params[i].type = 'b'; break;
-		case D3D_SIT_TEXTURE: out_stage->params[i].type = 't'; break;
-		case D3D_SIT_SAMPLER: out_stage->params[i].type = 's'; break;
+					printf("| Param b%u : %s\n",  
+						out_stage->buffers[b].slot, 
+						out_stage->buffers[b].name);
+					break;
+				}
+			}
 		}
-		swprintf_s(out_stage->params[i].name, _countof(out_stage->params[i].name), L"%s", bind_desc.Name);
+		/*switch (bind_desc.Type) {
+		case D3D_SIT_CBUFFER: out_stage->buffers[i].type = 'b'; break;
+		case D3D_SIT_TEXTURE: out_stage->buffers[i].type = 't'; break;
+		case D3D_SIT_SAMPLER: out_stage->buffers[i].type = 's'; break;
+		}
+		swprintf_s(out_stage->buffers[i].name, _countof(out_stage->buffers[i].name), L"%s", bind_desc.Name);
 
 		printf("| Param %c%u : %s\n", 
-			out_stage->params[i].type, 
-			out_stage->params[i].slot, 
-			out_stage->params[i].name);
+			out_stage->buffers[i].type, 
+			out_stage->buffers[i].slot, 
+			out_stage->buffers[i].name);*/
 	}
 
 	shader_reflection->Release();
@@ -309,8 +347,8 @@ void sksc_spvc_compile_stage(const sksc_stage_data_t *src_stage, sksc_stage_data
 	// Modify options.
 	spvc_compiler_options options = nullptr;
 	spvc_compiler_create_compiler_options(compiler_glsl, &options);
-	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
-	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
+	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 300);
+	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
 
 	// combiner samplers/textures for OpenGL/ES

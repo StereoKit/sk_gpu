@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define SKR_DIRECT3D11
+#define SKR_IMPL
+#include "../sk_gpu.h"
+
 #define SKSC_IMPL
 #include "sksc.h"
 
@@ -30,7 +34,7 @@ int main(int argc, char **argv) {
 
 sksc_settings_t check_settings(int32_t argc, char **argv) {
 	sksc_settings_t result = {};
-	result.debug         = true;
+	result.debug         = false;
 	result.optimize      = 3;
 	result.ps_entrypoint = L"ps";
 	result.vs_entrypoint = L"vs";
@@ -65,7 +69,14 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 			char  *file_text;
 			size_t file_size;
 			if (read_file(filename, &file_text, &file_size)) {
-				sksc_compile(filename, file_text, settings);
+				skr_shader_file_t file;
+				sksc_compile(filename, file_text, settings, &file);
+
+				char new_filename[512];
+				sprintf_s(new_filename, "%s.sks", filename);
+				sksc_save(new_filename, &file);
+
+				skr_shader_file_destroy(&file);
 				free(file_text);
 			}
 		} while(FindNextFileA(handle, &file_info));

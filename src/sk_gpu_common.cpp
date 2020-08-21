@@ -50,7 +50,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		memcpy(&buffer->size,         &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->size);
 		memcpy(&buffer->var_count,    &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->var_count);
 		buffer->defaults = malloc(buffer->size);
-		memcpy(&buffer->defaults,     &bytes[at], buffer->size);         at += buffer->size;
+		//memcpy(&buffer->defaults,     &bytes[at], buffer->size);         at += buffer->size;
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
 
 		for (uint32_t t = 0; t < buffer->var_count; t++) {

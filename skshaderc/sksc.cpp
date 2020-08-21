@@ -15,7 +15,6 @@
 #include "sksc.h"
 
 #define SKR_DIRECT3D11
-#define SKR_IMPL
 #include "../sk_gpu.h"
 
 #include <windows.h>
@@ -83,12 +82,14 @@ void sksc_shutdown() {
 
 ///////////////////////////////////////////
 
-void sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings) {
+bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, skr_shader_file_t *out_file) {
 	printf(" ________________\n| Compiling...\n| %s\n\n", filename);
 
 	IDxcBlobEncoding *source;
-	if (FAILED(sksc_utils->CreateBlob(hlsl_text, (uint32_t)strlen(hlsl_text), CP_UTF8, &source)))
+	if (FAILED(sksc_utils->CreateBlob(hlsl_text, (uint32_t)strlen(hlsl_text), CP_UTF8, &source))) {
 		printf("| CreateBlob failed!\n|________________\n\n");
+		return false;
+	}
 
 	DxcBuffer source_buff;
 	source_buff.Ptr      = source->GetBufferPointer();
@@ -96,36 +97,38 @@ void sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings) {
 	source_buff.Encoding = 0;
 
 	IDxcIncludeHandler* include_handler = nullptr;
-	if (FAILED(sksc_utils->CreateDefaultIncludeHandler(&include_handler)))
+	if (FAILED(sksc_utils->CreateDefaultIncludeHandler(&include_handler))) {
 		printf("| CreateDefaultIncludeHandler failed!\n|________________\n\n");
+		return false;
+	}
 
-	skr_shader_file_t shader_file = {};
-	shader_file.stage_count = 6;
-	shader_file.stages      = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * 6);
-	shader_file.meta        = (skr_shader_meta_t      *)malloc(sizeof(skr_shader_meta_t));
-	*shader_file.stages = {};
-	*shader_file.meta   = {};
+	*out_file = {};
+	 out_file->stage_count = 6;
+	 out_file->stages      = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * 6);
+	 out_file->meta        = (skr_shader_meta_t      *)malloc(sizeof(skr_shader_meta_t));
+	*out_file->stages      = {};
+	*out_file->meta        = {};
 
-	if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_vertex, skr_shader_lang_hlsl,  &shader_file.stages[0], shader_file.meta) ||
-		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_pixel,  skr_shader_lang_hlsl,  &shader_file.stages[1], shader_file.meta) ||
-		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_vertex, skr_shader_lang_spirv, &shader_file.stages[2], nullptr)          ||
-		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_pixel,  skr_shader_lang_spirv, &shader_file.stages[3], nullptr)) {
+	if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_vertex, skr_shader_lang_hlsl,  &out_file->stages[0], out_file->meta) ||
+		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_pixel,  skr_shader_lang_hlsl,  &out_file->stages[1], out_file->meta) ||
+		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_vertex, skr_shader_lang_spirv, &out_file->stages[2], nullptr)          ||
+		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_shader_pixel,  skr_shader_lang_spirv, &out_file->stages[3], nullptr)) {
 		include_handler->Release();
 		source         ->Release();
-		return;
+		return false;
 	}
 	
 	// cleanup
 	include_handler->Release();
 	source         ->Release();
 
-	sksc_spvc_compile_stage(&shader_file.stages[2], &shader_file.stages[4]);
-	sksc_spvc_compile_stage(&shader_file.stages[3], &shader_file.stages[5]);
+	sksc_spvc_compile_stage(&out_file->stages[2], &out_file->stages[4]);
+	sksc_spvc_compile_stage(&out_file->stages[3], &out_file->stages[5]);
 
 	// Write out our reflection information
 	printf("|--Buffer Info--\n");
-	for (size_t i = 0; i < shader_file.meta->buffer_count; i++) {
-		skr_shader_meta_buffer_t *buff = &shader_file.meta->buffers[i];
+	for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
+		skr_shader_meta_buffer_t *buff = &out_file->meta->buffers[i];
 		printf("|  %s : %u bytes\n", buff->name, buff->size);
 		for (size_t v = 0; v < buff->var_count; v++) {
 			skr_shader_meta_var_t *var = &buff->vars[v];
@@ -136,14 +139,14 @@ void sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings) {
 	for (size_t s = 0; s < sizeof(stages)/sizeof(skr_shader_); s++) {
 		const char *stage_name = stages[s] == skr_shader_pixel ? "Pixel" : "Vertex";
 		printf("|--%s Shader--\n", stage_name);
-		for (size_t i = 0; i < shader_file.meta->buffer_count; i++) {
-			skr_shader_meta_buffer_t *buff = &shader_file.meta->buffers[i];
+		for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
+			skr_shader_meta_buffer_t *buff = &out_file->meta->buffers[i];
 			if (buff->used_by_bits & stages[s]) {
 				printf("|  b%u : %s\n", buff->slot, buff->name);
 			}
 		}
-		for (size_t i = 0; i < shader_file.meta->texture_count; i++) {
-			skr_shader_meta_texture_t *tex = &shader_file.meta->textures[i];
+		for (size_t i = 0; i < out_file->meta->texture_count; i++) {
+			skr_shader_meta_texture_t *tex = &out_file->meta->textures[i];
 			if (tex->used_by_bits & stages[s]) {
 				printf("|  s%u : %s\n", tex->slot, tex->name );
 			}
@@ -151,6 +154,61 @@ void sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings) {
 	}
 
 	printf("|\n| Success!\n|________________\n\n");
+	return true;
+}
+
+///////////////////////////////////////////
+
+void sksc_save(char *filename, const skr_shader_file_t *file) {
+	FILE *fp;
+	if (fopen_s(&fp, filename, "wb") != 0 || fp == nullptr) {
+		return;
+	}
+
+	fwrite("SKSHADER", 8, 1, fp);
+	uint16_t version = 1;
+	fwrite(&version, sizeof(version), 1, fp);
+
+	fwrite(&file->stage_count,         sizeof(file->stage_count        ), 1, fp);
+	fwrite( file->meta->name,          sizeof(file->meta->name         ), 1, fp);
+	fwrite(&file->meta->buffer_count,  sizeof(file->meta->buffer_count ), 1, fp);
+	fwrite(&file->meta->texture_count, sizeof(file->meta->texture_count), 1, fp);
+
+	for (size_t i = 0; i < file->meta->buffer_count; i++) {
+		skr_shader_meta_buffer_t *buff = &file->meta->buffers[i];
+		fwrite( buff->name,         sizeof(buff->name     ), 1, fp);
+		fwrite(&buff->slot,         sizeof(buff->slot     ), 1, fp);
+		fwrite(&buff->used_by_bits, sizeof(uint16_t       ), 1, fp);
+		fwrite(&buff->size,         sizeof(buff->size     ), 1, fp);
+		fwrite(&buff->var_count,    sizeof(buff->var_count), 1, fp);
+		//fwrite(&buff->defaults,     buff->size,              1, fp);
+
+		for (uint32_t t = 0; t < buff->var_count; t++) {
+			skr_shader_meta_var_t *var = &buff->vars[t];
+			fwrite(var->name,    sizeof(var->name),   1, fp);
+			fwrite(var->extra,   sizeof(var->extra),  1, fp);
+			fwrite(&var->offset, sizeof(var->offset), 1, fp);
+			fwrite(&var->size,   sizeof(var->size),   1, fp);
+		}
+	}
+
+	for (uint32_t i = 0; i < file->meta->texture_count; i++) {
+		skr_shader_meta_texture_t *tex = &file->meta->textures[i];
+		fwrite( tex->name,          sizeof(tex->name        ), 1, fp); 
+		fwrite( tex->extra,         sizeof(tex->extra       ), 1, fp); 
+		fwrite(&tex->slot,          sizeof(tex->slot        ), 1, fp); 
+		fwrite(&tex->used_by_bits,  sizeof(tex->used_by_bits), 1, fp); 
+	}
+
+	for (uint32_t i = 0; i < file->stage_count; i++) {
+		skr_shader_file_stage_t *stage = &file->stages[i];
+		fwrite(&stage->language,  sizeof(stage->language ), 1, fp);
+		fwrite(&stage->stage,     sizeof(stage->stage    ), 1, fp);
+		fwrite(&stage->code_size, sizeof(stage->code_size), 1, fp);
+		fwrite( stage->code,      stage->code_size,         1, fp);
+	}
+
+	fclose(fp);
 }
 
 ///////////////////////////////////////////

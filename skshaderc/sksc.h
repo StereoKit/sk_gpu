@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#define SKR_DIRECT3D11
+#include "../sk_gpu.h"
+
 ///////////////////////////////////////////
 
 typedef struct sksc_settings_t {
@@ -20,4 +23,5 @@ typedef struct sksc_settings_t {
 
 void sksc_init    ();
 void sksc_shutdown();
-void sksc_compile (char *filename, char *hlsl_text, sksc_settings_t *settings);
+bool sksc_compile (char *filename, char *hlsl_text, sksc_settings_t *settings, skr_shader_file_t *out_file);
+void sksc_save    (char *filename, const skr_shader_file_t *file);

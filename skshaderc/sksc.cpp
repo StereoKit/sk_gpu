@@ -416,7 +416,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	spvc_resources resources = nullptr;
 	spvc_compiler_create_shader_resources(compiler_glsl, &resources);
 
-	/*const char *lang_name = "GLSL";
+	const char *lang_name = "GLSL";
 	const char *type_name = src_stage->stage == skr_shader_pixel ? "Pixel" : "Vertex";
 	printf("|--%s %s shader--\n", lang_name, type_name);
 
@@ -433,17 +433,28 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
 	for (size_t i = 0; i < count; i++) {
 		printf("| Param t%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), list[i].name);
-	}*/
+	}
 
 	// Modify options.
 	spvc_compiler_options options = nullptr;
 	spvc_compiler_create_compiler_options(compiler_glsl, &options);
-	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 300);
+	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 330);
 	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+	//spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
+	//spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
 
 	// combiner samplers/textures for OpenGL/ES
 	spvc_compiler_build_combined_image_samplers(compiler_glsl);
+
+	// Make sure sampler names stay the same in GLSL
+	const spvc_combined_image_sampler *samplers = nullptr;
+	spvc_compiler_get_combined_image_samplers(compiler_glsl, &samplers, &count);
+	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
+	for (size_t i = 0; i < count; i++) {
+		spvc_compiler_set_name(compiler_glsl, samplers[i].combined_id, list[i].name);
+		spvc_compiler_set_decoration(compiler_glsl, samplers[i].combined_id, SpvDecorationBinding, spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding));
+	}
 
 	const char *result = nullptr;
 	spvc_compiler_compile(compiler_glsl, &result);
@@ -453,6 +464,8 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	out_stage->code_size = strlen(result) + 1;
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
+
+	printf("%s\n", (char*)out_stage->code);
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

@@ -74,21 +74,25 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(ProjectDir)lib\inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)lib\lib\$(PlatformShortName);$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(ProjectDir)lib\inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)lib\lib\$(PlatformShortName);$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(ProjectDir)lib\inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)lib\lib\$(PlatformShortName);$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(ProjectDir)lib\inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)lib\lib\$(PlatformShortName);$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

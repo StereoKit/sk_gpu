@@ -220,6 +220,7 @@ typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
     GLE(void,     CompileShader,           uint32_t shader) \
     GLE(void,     GetShaderiv,             uint32_t shader, uint32_t pname, int32_t *params) \
     GLE(void,     GetShaderInfoLog,        uint32_t shader, int32_t bufSize, int32_t *length, char *infoLog) \
+	GLE(void,     GetProgramInfoLog,       uint32_t program, int32_t maxLength, int32_t *length, char *infoLog) \
     GLE(void,     DeleteShader,            uint32_t shader) \
     GLE(uint32_t, CreateProgram,           void) \
     GLE(void,     AttachShader,            uint32_t program, uint32_t shader) \
@@ -727,7 +728,7 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	// Convert the prefix if it doesn't match the GL version we're using
 	const char   *prefix_gl      = "#version 450";
 	const int32_t prefix_gl_size = strlen(prefix_gl);
-	const char   *prefix_es      = "#version 300 es";
+	const char   *prefix_es      = "#version 330 es";
 	const int32_t prefix_es_size = strlen(prefix_es);
 	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;
@@ -804,7 +805,7 @@ skr_pipeline_t skr_pipeline_create(skr_shader_stage_t *vertex, skr_shader_stage_
 
 		glGetProgramiv(result.program, GL_INFO_LOG_LENGTH, &length);
 		log = (char*)malloc(length);
-		glGetShaderInfoLog(result.program, length, &err, log);
+		glGetProgramInfoLog(result.program, length, &err, log);
 
 		skr_log("Unable to compile shader program:");
 		skr_log(log);
@@ -1063,10 +1064,14 @@ void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
 		? GL_TEXTURE_2D
 		: GL_TEXTURE_CUBE_MAP;
 
+	// Added this in to fix textures initially? Removed it after I switched to
+	// explicit binding locations in GLSL. This may need further attention? I
+	// have no idea what's happening here!
+	//if (texture)
+	//	glUniform1i(slot, slot);
+
 	glActiveTexture(GL_TEXTURE0 + slot);
 	glBindTexture  (target, texture == nullptr ? 0 : texture->texture);
-	if (texture)
-		glUniform1i(slot, slot);
 }
 
 /////////////////////////////////////////// 

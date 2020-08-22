@@ -5,6 +5,7 @@
 
 #include <malloc.h>
 #include <string.h>
+#include <stdio.h>
 
 void (*_skr_log)(const char *text);
 void skr_log_callback(void (*callback)(const char *text)) {
@@ -17,7 +18,27 @@ void skr_log(const char *text) {
 ///////////////////////////////////////////
 
 bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
-	return false;
+	void  *data = nullptr;
+	size_t size = 0;
+
+	FILE *fp;
+	if (fopen_s(&fp, file, "rb") != 0 || fp == nullptr) {
+		return false;
+	}
+
+	fseek(fp, 0L, SEEK_END);
+	size = ftell(fp);
+	rewind(fp);
+
+	data = malloc(size);
+	if (data == nullptr) { size = 0; fclose(fp); return false; }
+	fread (data, 1, size, fp);
+	fclose(fp);
+
+	bool result = skr_shader_file_load_mem(data, size, out_file);
+	free(data);
+
+	return result;
 }
 
 ///////////////////////////////////////////
@@ -32,9 +53,10 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 
 	uint32_t at = 10;
 	memcpy(&out_file->stage_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
+	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
 
 	out_file->meta = (skr_shader_meta_t*)malloc(sizeof(skr_shader_meta_t));
-	out_file->meta = {};
+	*out_file->meta = {};
 	skr_shader_meta_reference(out_file->meta);
 	memcpy( out_file->meta->name,          &bytes[at], sizeof(out_file->meta->name)); at += sizeof(out_file->meta->name);
 	memcpy(&out_file->meta->buffer_count,  &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
@@ -133,4 +155,14 @@ void skr_shader_meta_release(skr_shader_meta_t *meta) {
 		free(meta->textures);
 		memset(meta, 0, sizeof(skr_shader_meta_t));
 	}
+}
+
+///////////////////////////////////////////
+
+int32_t skr_shader_meta_get_tex_bind(const skr_shader_meta_t *meta, const char *name) {
+	for (uint32_t i = 0; i < meta->texture_count; i++) {
+		if (strcmp(name, meta->textures[i].name) == 0)
+			return meta->textures[i].slot;
+	}
+	return -1;
 }

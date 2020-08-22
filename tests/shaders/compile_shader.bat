@@ -1,0 +1,1 @@
+"%~dp0..\..\skshaderc\bin\Release\skshaderc.exe" -O3 "*.hlsl"

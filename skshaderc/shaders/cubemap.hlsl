@@ -17,25 +17,26 @@ struct vsIn {
 };
 struct psIn {
 	float4 pos   : SV_POSITION;
+	float3 norm  : NORMAL;
 	float2 uv    : TEXCOORD0;
 	float3 color : COLOR0;
 };
 
-float tex_scale;
-float4 time;
-
 Texture2D    tex         : register(t0);
 SamplerState tex_sampler : register(s0);
+
+TextureCube  cubemap      : register(t8);
+SamplerState cube_sampler : register(s8);
 
 psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn output;
 	output.pos = mul(float4(input.pos.xyz, 1), inst[id].world);
 	output.pos = mul(output.pos, viewproj);
-	float3 normal = normalize(mul(float4(input.norm, 0), inst[id].world).xyz);
-	output.color = saturate(dot(normal, float3(0,1,0))).xxx * input.color.rgb;
-	output.uv = input.uv * tex_scale * time.x;
+	output.norm = normalize(mul(float4(input.norm, 0), inst[id].world).xyz);
+	output.color = input.color.rgb;
+	output.uv = input.uv;
 	return output;
 }
 float4 ps(psIn input) : SV_TARGET {
-	return float4(input.color, 1) * tex.Sample(tex_sampler, input.uv);
+	return float4(input.color, 1) * tex.Sample(tex_sampler, input.uv) * cubemap.SampleLevel(cube_sampler, input.norm, 0);
 }

@@ -266,16 +266,27 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
 #endif
 
-	ID3DBlob *compiled, *errors;
-	if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_shader_pixel ? "ps" : "vs", type == skr_shader_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
-		skr_log("Error - D3DCompile failed:");
-		skr_log((char *)errors->GetBufferPointer());
+	ID3DBlob   *compiled = nullptr;
+	const void *buffer;
+	size_t      buffer_size;
+	if (shader_size >= 4 && memcmp(file_data, "DXBC", 4) == 0) {
+		buffer      = file_data;
+		buffer_size = shader_size;
+	} else {
+		ID3DBlob *errors;
+		if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_shader_pixel ? "ps" : "vs", type == skr_shader_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
+			skr_log("Error - D3DCompile failed:");
+			skr_log((char *)errors->GetBufferPointer());
+		}
+		if (errors) errors->Release();
+
+		buffer      = compiled->GetBufferPointer();
+		buffer_size = compiled->GetBufferSize();
 	}
-	if (errors) errors->Release();
 
 	switch(type) {
-	case skr_shader_vertex: d3d_device->CreateVertexShader(compiled->GetBufferPointer(), compiled->GetBufferSize(), nullptr, (ID3D11VertexShader**)&result.shader); break;
-	case skr_shader_pixel : d3d_device->CreatePixelShader (compiled->GetBufferPointer(), compiled->GetBufferSize(), nullptr, (ID3D11PixelShader **)&result.shader); break;
+	case skr_shader_vertex: d3d_device->CreateVertexShader(buffer, buffer_size, nullptr, (ID3D11VertexShader**)&result.shader); break;
+	case skr_shader_pixel : d3d_device->CreatePixelShader (buffer, buffer_size, nullptr, (ID3D11PixelShader **)&result.shader); break;
 	}
 
 	if (d3d_vert_layout == nullptr && type == skr_shader_vertex) {
@@ -286,9 +297,9 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 			{"TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"COLOR" ,      0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"SV_RenderTargetArrayIndex" ,  0, DXGI_FORMAT_R8_UINT,  0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0} };
-		d3d_device->CreateInputLayout(vert_desc, (UINT)_countof(vert_desc), compiled->GetBufferPointer(), compiled->GetBufferSize(), &d3d_vert_layout);
+		d3d_device->CreateInputLayout(vert_desc, (UINT)_countof(vert_desc), buffer, buffer_size, &d3d_vert_layout);
 	}
-	compiled->Release();
+	if (compiled) compiled->Release();
 
 	return result;
 }

@@ -111,7 +111,6 @@ bool app_init() {
 	uint8_t *cube_cols[6];
 	for (size_t f = 0; f < 6; f++) {
 		cube_cols[f] = (uint8_t*)malloc(sizeof(uint8_t) * 4 * 4);
-		size_t offset = f * 4 * 4;
 		for (size_t p = 0; p < 4; p++) {
 			cube_cols[f][p*4 + 0] = (f/2) % 3 == 0 ? (f%2==0?128:255) : 0;
 			cube_cols[f][p*4 + 1] = (f/2) % 3 == 1 ? (f%2==0?128:255) : 0;
@@ -145,7 +144,7 @@ bool app_init() {
 ///////////////////////////////////////////
 
 void app_test_cubemap() {
-	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ 0,0,0 }) * HMM_Scale(hmm_vec3{ .4f,.4f,.4f }));
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t));
 	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
@@ -178,7 +177,7 @@ void app_test_rendertarget() {
 
 	static int frame = 0;
 	frame++;
-	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ 0,0,0 }) * HMM_Scale(hmm_vec3{ .4f,.4f,.4f }) * HMM_Rotate(frame*0.8f, hmm_vec3{1,0,0}));
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) * HMM_Rotate(frame * 0.8f, hmm_vec3{ {1,0,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t));
 	skr_buffer_set   (&app_shader_inst_buffer, 1, sizeof(app_shader_inst_t), 0);
@@ -197,7 +196,7 @@ void app_test_instancing() {
 	// Set transforms for 100 instances
 	for (size_t i = 0; i < 100; i++) {
 		int y = i / 10 - 4, x = i % 10 -4;
-		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,0,(float)y -0.5f })*HMM_Scale(hmm_vec3{.2f,.2f,.2f}));
+		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(float)x - 0.5f,0,(float)y - 0.5f} }) * HMM_Scale(hmm_vec3{ {.2f,.2f,.2f} }));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
@@ -211,7 +210,7 @@ void app_test_instancing() {
 	// Set transforms for another 100 instances
 	for (size_t i = 0; i < 100; i++) {
 		int y = i / 10 - 4, x = i % 10 -4;
-		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ (float)x -0.5f,1,(float)y-0.5f }) * HMM_Scale(hmm_vec3{.2f,.2f,.2f}));
+		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(float)x -0.5f,1,(float)y-0.5f} }) * HMM_Scale(hmm_vec3{{.2f,.2f,.2f}}));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));

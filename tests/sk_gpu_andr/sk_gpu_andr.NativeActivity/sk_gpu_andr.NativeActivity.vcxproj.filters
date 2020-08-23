@@ -27,13 +27,27 @@
     <ClCompile Include="..\..\..\src\sk_gpu_vk.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\sk_gpu_common.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
       <UniqueIdentifier>{c2dfe5e0-a7f9-4064-af09-ed93bd55ac42}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{a3ad2656-b4c6-457a-a9b8-afc9a1d9b48d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Library Include="libs\arm64-v8a\Debug\libopenxr_loader.so" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\shaders\cubemap.hlsl.sks">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\shaders\test.hlsl.sks">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -45,10 +45,39 @@ struct engine {
 	struct saved_state state;
 };
 
+// See: http://www.50ply.com/blog/2013/01/19/loading-compressed-android-assets-with-file-pointer/
+AAssetManager *android_asset_manager;
+bool android_fopen(const char *filename, void **out_data, size_t *out_size) {
+	AAsset *asset = AAssetManager_open(android_asset_manager, filename, 0);
+	if (!asset) 
+		return false;
+
+	FILE *fp = funopen(asset, 
+		[](void *cookie, char *buf, int size) {return AAsset_read((AAsset *)cookie, buf, size); }, 
+		[](void *cookie, const char *buf, int size) {return EACCES; }, 
+		[](void *cookie, fpos_t offset, int whence) {return AAsset_seek((AAsset *)cookie, offset, whence); }, 
+		[](void *cookie) { AAsset_close((AAsset *)cookie); return 0; } );
+
+	if (fp == nullptr)
+		return false;
+
+	fseek(fp, 0L, SEEK_END);
+	*out_size = ftell(fp);
+	rewind(fp);
+
+	*out_data = malloc(*out_size);
+	if (*out_data == nullptr) { *out_size = 0; fclose(fp); return false; }
+	fread (*out_data, *out_size, 1, fp);
+	fclose(fp);
+
+	return true;
+}
+
 #ifndef XR
 static int engine_init_display(struct engine* engine) {
 	if (engine->initialized)
 		return 0;
+	skr_file_read_callback(android_fopen);
 	skr_log_callback([](const char *text) { __android_log_print(ANDROID_LOG_INFO, "sk_gpu", text); });
 	int result = skr_init("skr_gpu.h", engine->app->window, nullptr);
 	if (!result) return result;
@@ -89,7 +118,8 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	engine *eng = (engine*)user_data;
 	
 	LOGI("Beginning initialization");
-	skr_log_callback([](const char *text) { LOGI(text); });
+	skr_file_read_callback(android_fopen);
+	skr_log_callback([](const char *text) { __android_log_write(ANDROID_LOG_INFO, "sk_gpu", text); });
 	if (!skr_init("sk_gpu.h", eng->app->window, nullptr))
 		return false;
 
@@ -187,7 +217,7 @@ static int engine_init_display(struct engine* engine) {
 	engine->xr_functions.depth_formats[2]   = skr_tex_fmt_to_native(skr_tex_fmt_depthstencil);
 
 	LOGI("Initializing OpenXR");
-	openxr_log_callback([](const char *text) { LOGI(text); });
+	openxr_log_callback([](const char *text) { __android_log_write(ANDROID_LOG_INFO, "sk_gpu", text); });
 	if (openxr_init("sk_gpu.h", &engine->xr_functions)) {
 		LOGI("...success!");
 	} else {
@@ -257,6 +287,8 @@ void android_main(struct android_app* state) {
 	state->onAppCmd = engine_handle_cmd;
 	state->onInputEvent = engine_handle_input;
 	engine.app = state;
+
+	android_asset_manager = state->activity->assetManager;
 
 	if (state->savedState != NULL) {
 		// We are starting with a previous saved state; restore from it.

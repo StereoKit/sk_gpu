@@ -7,6 +7,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#if __ANDROID__
+#include <android/asset_manager.h>
+#endif
+
 void (*_skr_log)(const char *text);
 void skr_log_callback(void (*callback)(const char *text)) {
 	_skr_log = callback;
@@ -17,23 +21,41 @@ void skr_log(const char *text) {
 
 ///////////////////////////////////////////
 
-bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
-	void  *data = nullptr;
-	size_t size = 0;
-
+bool (*_skr_read_file)(const char *filename, void **out_data, size_t *out_size);
+void skr_file_read_callback(bool (*callback)(const char *filename, void **out_data, size_t *out_size)) {
+	_skr_read_file = callback;
+}
+bool skr_read_file(const char *filename, void **out_data, size_t *out_size) {
+	if (_skr_read_file) return _skr_read_file(filename, out_data, out_size);
+#if _WIN32
 	FILE *fp;
 	if (fopen_s(&fp, file, "rb") != 0 || fp == nullptr) {
 		return false;
 	}
 
 	fseek(fp, 0L, SEEK_END);
-	size = ftell(fp);
+	*out_size = ftell(fp);
 	rewind(fp);
 
-	data = malloc(size);
-	if (data == nullptr) { size = 0; fclose(fp); return false; }
-	fread (data, size, 1, fp);
+	*out_data = malloc(*out_size);
+	if (*out_data == nullptr) { *out_size = 0; fclose(fp); return false; }
+	fread (*out_data, *out_size, 1, fp);
 	fclose(fp);
+
+	return result;
+#else
+	return false;
+#endif
+}
+
+///////////////////////////////////////////
+
+bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
+	void  *data = nullptr;
+	size_t size = 0;
+
+	if (!skr_read_file(file, &data, &size))
+		return false;
 
 	bool result = skr_shader_file_load_mem(data, size, out_file);
 	free(data);

@@ -843,12 +843,14 @@ void skr_pipeline_set(const skr_pipeline_t *pipeline) {
 		glDisable(GL_CULL_FACE);
 	} break;
 	}
-
+	
+#ifndef __ANDROID__
 	if (pipeline->wireframe) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	} else {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
+#endif
 }
 
 /////////////////////////////////////////// 

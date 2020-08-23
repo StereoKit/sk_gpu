@@ -131,6 +131,7 @@ void                skr_draw                (int32_t index_start, int32_t index_
 int64_t             skr_tex_fmt_to_native   (skr_tex_fmt_ format);
 skr_tex_fmt_        skr_tex_fmt_from_native (int64_t format);
 void                skr_log_callback        (void (*callback)(const char *text));
+void                skr_file_read_callback  (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
 
 skr_buffer_t        skr_buffer_create       (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
 bool                skr_buffer_is_valid     (const skr_buffer_t *buffer);

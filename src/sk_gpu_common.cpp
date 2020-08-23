@@ -32,7 +32,7 @@ bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
 
 	data = malloc(size);
 	if (data == nullptr) { size = 0; fclose(fp); return false; }
-	fread (data, 1, size, fp);
+	fread (data, size, 1, fp);
 	fclose(fp);
 
 	bool result = skr_shader_file_load_mem(data, size, out_file);

@@ -119,7 +119,9 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	
 	LOGI("Beginning initialization");
 	skr_file_read_callback(android_fopen);
-	skr_log_callback([](const char *text) { __android_log_write(ANDROID_LOG_INFO, "sk_gpu", text); });
+	skr_log_callback([](const char *text) { 
+		__android_log_write(ANDROID_LOG_INFO, "sk_gpu", text); 
+	});
 	if (!skr_init("sk_gpu.h", eng->app->window, nullptr))
 		return false;
 

@@ -152,14 +152,14 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 		printf("|--%s Shader--\n", stage_name);
 		for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
 			skr_shader_meta_buffer_t *buff = &out_file->meta->buffers[i];
-			if (buff->used_by_bits & stages[s]) {
-				printf("|  b%u : %s\n", buff->slot, buff->name);
+			if (buff->bind.stage_bits & stages[s]) {
+				printf("|  b%u : %s\n", buff->bind.slot, buff->name);
 			}
 		}
 		for (size_t i = 0; i < out_file->meta->texture_count; i++) {
 			skr_shader_meta_texture_t *tex = &out_file->meta->textures[i];
-			if (tex->used_by_bits & stages[s]) {
-				printf("|  s%u : %s\n", tex->slot, tex->name );
+			if (tex->bind.stage_bits & stages[s]) {
+				printf("|  s%u : %s\n", tex->bind.slot, tex->name );
 			}
 		}
 	}
@@ -187,11 +187,10 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 
 	for (size_t i = 0; i < file->meta->buffer_count; i++) {
 		skr_shader_meta_buffer_t *buff = &file->meta->buffers[i];
-		fwrite( buff->name,         sizeof(buff->name     ), 1, fp);
-		fwrite(&buff->slot,         sizeof(buff->slot     ), 1, fp);
-		fwrite(&buff->used_by_bits, sizeof(uint16_t       ), 1, fp);
-		fwrite(&buff->size,         sizeof(buff->size     ), 1, fp);
-		fwrite(&buff->var_count,    sizeof(buff->var_count), 1, fp);
+		fwrite( buff->name,      sizeof(buff->name     ), 1, fp);
+		fwrite(&buff->bind,      sizeof(buff->bind     ), 1, fp);
+		fwrite(&buff->size,      sizeof(buff->size     ), 1, fp);
+		fwrite(&buff->var_count, sizeof(buff->var_count), 1, fp);
 		//fwrite(&buff->defaults,     buff->size,              1, fp);
 
 		for (uint32_t t = 0; t < buff->var_count; t++) {
@@ -205,10 +204,9 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 
 	for (uint32_t i = 0; i < file->meta->texture_count; i++) {
 		skr_shader_meta_texture_t *tex = &file->meta->textures[i];
-		fwrite( tex->name,          sizeof(tex->name        ), 1, fp); 
-		fwrite( tex->extra,         sizeof(tex->extra       ), 1, fp); 
-		fwrite(&tex->slot,          sizeof(tex->slot        ), 1, fp); 
-		fwrite(&tex->used_by_bits,  sizeof(tex->used_by_bits), 1, fp); 
+		fwrite( tex->name,  sizeof(tex->name ), 1, fp); 
+		fwrite( tex->extra, sizeof(tex->extra), 1, fp); 
+		fwrite(&tex->bind,  sizeof(tex->bind ), 1, fp);
 	}
 
 	for (uint32_t i = 0; i < file->stage_count; i++) {
@@ -358,13 +356,13 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_shader_ stage, skr_sha
 			if (is_new) id = buffer_list.add({});
 
 			// flag it as used by this shader stage
-			buffer_list[id].used_by_bits = (skr_shader_)(buffer_list[id].used_by_bits | stage);
+			buffer_list[id].bind.stage_bits = (skr_shader_)(buffer_list[id].bind.stage_bits | stage);
 
 			if (!is_new) continue;
 
 			// Initialize the buffer with data from the shaders!
 			sprintf_s(buffer_list[id].name, _countof(buffer_list[id].name), "%s", bind_desc.Name);
-			buffer_list[id].slot      = bind_desc.BindPoint;
+			buffer_list[id].bind.slot = bind_desc.BindPoint;
 			buffer_list[id].size      = shader_buff.Size;
 			buffer_list[id].var_count = shader_buff.Variables;
 			buffer_list[id].vars      = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer_list[i].var_count);
@@ -391,8 +389,8 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_shader_ stage, skr_sha
 				id = texture_list.add({});
 
 			sprintf_s(texture_list[id].name, _countof(texture_list[id].name), "%s", bind_desc.Name);
-			texture_list[id].used_by_bits = (skr_shader_)(texture_list[id].used_by_bits | stage);
-			texture_list[id].slot         = bind_desc.BindPoint;
+			texture_list[id].bind.stage_bits = (skr_shader_)(texture_list[id].bind.stage_bits | stage);
+			texture_list[id].bind.slot       = bind_desc.BindPoint;
 		}
 	}
 
@@ -497,10 +495,10 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	// Modify options.
 	spvc_compiler_options options = nullptr;
 	spvc_compiler_create_compiler_options(compiler_glsl, &options);
-	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 330);
-	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
-	//spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
-	//spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
+	//spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 300);
+	//spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
+	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
 
 	// combiner samplers/textures for OpenGL/ES
@@ -515,6 +513,20 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 		spvc_compiler_set_decoration(compiler_glsl, samplers[i].combined_id, SpvDecorationBinding, spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding));
 	}
 
+	if (src_stage->stage == skr_shader_vertex || src_stage->stage == skr_shader_pixel) {
+		size_t             off = src_stage->stage == skr_shader_vertex ? 3 : 2;
+		spvc_resource_type res = src_stage->stage == skr_shader_vertex
+			? SPVC_RESOURCE_TYPE_STAGE_OUTPUT
+			: SPVC_RESOURCE_TYPE_STAGE_INPUT;
+		
+		spvc_resources_get_resource_list_for_type(resources, res, &list, &count);
+		for (size_t i = 0; i < count; i++) {
+			char fs_name[64];
+			sprintf_s(fs_name, "fs%s", list[i].name+off);
+			spvc_compiler_set_name(compiler_glsl, list[i].id, fs_name);
+		}
+	}
+
 	const char *result = nullptr;
 	spvc_compiler_compile(compiler_glsl, &result);
 
@@ -524,7 +536,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
 
-	//printf("%s\n", (char*)out_stage->code);
+	printf("%s\n", (char*)out_stage->code);
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

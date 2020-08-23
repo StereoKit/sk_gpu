@@ -29,7 +29,7 @@ bool skr_read_file(const char *filename, void **out_data, size_t *out_size) {
 	if (_skr_read_file) return _skr_read_file(filename, out_data, out_size);
 #if _WIN32
 	FILE *fp;
-	if (fopen_s(&fp, file, "rb") != 0 || fp == nullptr) {
+	if (fopen_s(&fp, filename, "rb") != 0 || fp == nullptr) {
 		return false;
 	}
 
@@ -42,7 +42,7 @@ bool skr_read_file(const char *filename, void **out_data, size_t *out_size) {
 	fread (*out_data, *out_size, 1, fp);
 	fclose(fp);
 
-	return result;
+	return true;
 #else
 	return false;
 #endif
@@ -88,11 +88,10 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skr_shader_meta_buffer_t *buffer = &out_file->meta->buffers[i];
-		memcpy( buffer->name,         &bytes[at], sizeof(buffer->name)); at += sizeof(buffer->name);
-		memcpy(&buffer->slot,         &bytes[at], sizeof(buffer->slot)); at += sizeof(buffer->slot);
-		memcpy(&buffer->used_by_bits, &bytes[at], sizeof(uint16_t));     at += sizeof(uint16_t);
-		memcpy(&buffer->size,         &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->size);
-		memcpy(&buffer->var_count,    &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->var_count);
+		memcpy( buffer->name,      &bytes[at], sizeof(buffer->name)); at += sizeof(buffer->name);
+		memcpy(&buffer->bind,      &bytes[at], sizeof(buffer->bind)); at += sizeof(buffer->bind);
+		memcpy(&buffer->size,      &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->size);
+		memcpy(&buffer->var_count, &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->var_count);
 		buffer->defaults = malloc(buffer->size);
 		//memcpy(&buffer->defaults,     &bytes[at], buffer->size);         at += buffer->size;
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
@@ -108,10 +107,9 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 
 	for (uint32_t i = 0; i < out_file->meta->texture_count; i++) {
 		skr_shader_meta_texture_t *tex = &out_file->meta->textures[i];
-		memcpy( tex->name,         &bytes[at], sizeof(tex->name        )); at += sizeof(tex->name        );
-		memcpy( tex->extra,        &bytes[at], sizeof(tex->extra       )); at += sizeof(tex->extra       );
-		memcpy(&tex->slot,         &bytes[at], sizeof(tex->slot        )); at += sizeof(tex->slot        );
-		memcpy(&tex->used_by_bits, &bytes[at], sizeof(tex->used_by_bits)); at += sizeof(tex->used_by_bits);
+		memcpy( tex->name,  &bytes[at], sizeof(tex->name )); at += sizeof(tex->name );
+		memcpy( tex->extra, &bytes[at], sizeof(tex->extra)); at += sizeof(tex->extra);
+		memcpy(&tex->bind,  &bytes[at], sizeof(tex->bind )); at += sizeof(tex->bind );
 	}
 
 	for (uint32_t i = 0; i < out_file->stage_count; i++) {
@@ -181,10 +179,10 @@ void skr_shader_meta_release(skr_shader_meta_t *meta) {
 
 ///////////////////////////////////////////
 
-int32_t skr_shader_meta_get_tex_bind(const skr_shader_meta_t *meta, const char *name) {
+skr_shader_bind_t skr_shader_meta_get_tex_bind(const skr_shader_meta_t *meta, const char *name) {
 	for (uint32_t i = 0; i < meta->texture_count; i++) {
 		if (strcmp(name, meta->textures[i].name) == 0)
-			return meta->textures[i].slot;
+			return meta->textures[i].bind;
 	}
-	return -1;
+	return {};
 }

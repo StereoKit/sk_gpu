@@ -24,21 +24,19 @@ typedef struct skr_shader_meta_var_t {
 } skr_shader_meta_var_t;
 
 typedef struct skr_shader_meta_buffer_t {
-	char        name[32];
-	uint32_t    slot;
-	skr_shader_ used_by_bits;
-	size_t      size;
-	void       *defaults;
+	char              name[32];
+	skr_shader_bind_t bind;
+	size_t            size;
+	void             *defaults;
 	uint32_t               var_count;
 	skr_shader_meta_var_t *vars;
 } skr_shader_meta_buffer_t;
 
 typedef struct skr_shader_meta_texture_t {
-	char        name[32];
-	char        extra[64];
-	uint32_t    slot;
-	skr_shader_ used_by_bits;
-	size_t      size;
+	char              name [32];
+	char              extra[64];
+	skr_shader_bind_t bind;
+	size_t            size;
 } skr_shader_meta_texture_t;
 
 typedef struct skr_shader_meta_t {
@@ -67,4 +65,4 @@ void               skr_shader_file_destroy     (      skr_shader_file_t *file);
 
 void               skr_shader_meta_reference   (      skr_shader_meta_t *meta);
 void               skr_shader_meta_release     (      skr_shader_meta_t *meta);
-int32_t            skr_shader_meta_get_tex_bind(const skr_shader_meta_t *meta, const char *name);
+skr_shader_bind_t  skr_shader_meta_get_tex_bind(const skr_shader_meta_t *meta, const char *name);

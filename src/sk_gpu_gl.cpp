@@ -656,9 +656,9 @@ void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_byt
 
 /////////////////////////////////////////// 
 
-void skr_buffer_set(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
+void skr_buffer_set(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_t stride, uint32_t offset) {
 	if (buffer->type == GL_UNIFORM_BUFFER)
-		glBindBufferBase(buffer->type, slot, buffer->buffer); 
+		glBindBufferBase(buffer->type, bind.slot, buffer->buffer); 
 	else
 		glBindBuffer(buffer->type, buffer->buffer);
 }
@@ -728,7 +728,7 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	// Convert the prefix if it doesn't match the GL version we're using
 	const char   *prefix_gl      = "#version 450";
 	const int32_t prefix_gl_size = strlen(prefix_gl);
-	const char   *prefix_es      = "#version 330 es";
+	const char   *prefix_es      = "#version 300 es";
 	const int32_t prefix_es_size = strlen(prefix_es);
 	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;
@@ -1061,7 +1061,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
+void skr_tex_set_active(const skr_tex_t *texture, skr_shader_bind_t bind) {
 	uint32_t target = texture == nullptr || texture->type != skr_tex_type_cubemap 
 		? GL_TEXTURE_2D
 		: GL_TEXTURE_CUBE_MAP;
@@ -1070,9 +1070,9 @@ void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
 	// explicit binding locations in GLSL. This may need further attention? I
 	// have no idea what's happening here!
 	//if (texture)
-	//	glUniform1i(slot, slot);
+	//	glUniform1i(bind.slot, bind.slot);
 
-	glActiveTexture(GL_TEXTURE0 + slot);
+	glActiveTexture(GL_TEXTURE0 + bind.slot);
 	glBindTexture  (target, texture == nullptr ? 0 : texture->texture);
 }
 

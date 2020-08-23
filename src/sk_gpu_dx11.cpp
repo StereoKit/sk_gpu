@@ -212,11 +212,16 @@ void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_byt
 
 /////////////////////////////////////////// 
 
-void skr_buffer_set(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
+void skr_buffer_set(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_t stride, uint32_t offset) {
 	switch (buffer->type) {
-	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (slot, 1, &buffer->buffer, &stride, &offset); break;
+	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (bind.slot, 1, &buffer->buffer, &stride, &offset); break;
 	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer    (buffer->buffer, DXGI_FORMAT_R32_UINT, offset); break;
-	case skr_buffer_type_constant: d3d_context->VSSetConstantBuffers(slot, 1, &buffer->buffer); d3d_context->PSSetConstantBuffers(slot, 1, &buffer->buffer); break;
+	case skr_buffer_type_constant: {
+		if (bind.stage_bits & skr_shader_vertex)
+			d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->buffer);
+		if (bind.stage_bits & skr_shader_pixel)
+			d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->buffer);
+	} break;
 	}
 }
 

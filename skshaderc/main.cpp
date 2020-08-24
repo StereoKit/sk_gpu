@@ -73,7 +73,15 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 				sksc_compile(filename, file_text, settings, &file);
 
 				char new_filename[512];
-				sprintf_s(new_filename, "%s.sks", filename);
+				char drive[16];
+				char dir  [512];
+				char name [128];
+				_splitpath_s(filename,
+					drive, sizeof(drive),
+					dir,   sizeof(dir),
+					name,  sizeof(name), nullptr, 0); 
+
+				sprintf_s(new_filename, "%s%s%s.sks", drive, dir, name);
 				sksc_save(new_filename, &file);
 
 				skr_shader_file_destroy(&file);

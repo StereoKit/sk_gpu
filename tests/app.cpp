@@ -37,15 +37,17 @@ skr_tex_t            app_target = {};
 skr_tex_t            app_target_depth = {};
 skr_tex_t            app_cubemap = {};
 
-skr_shader_stage_t   app_sh_default_ps        = {};
-skr_shader_stage_t   app_sh_default_vs        = {};
-skr_pipeline_t       app_sh_default           = {};
+skr_shader_t         app_sh_default           = {};
 skr_shader_bind_t    app_sh_default_tex_bind  = {};
-skr_shader_stage_t   app_sh_cube_ps           = {};
-skr_shader_stage_t   app_sh_cube_vs           = {};
-skr_pipeline_t       app_sh_cube              = {};
+skr_shader_bind_t    app_sh_default_inst_bind = {};
+skr_shader_bind_t    app_sh_default_data_bind = {};
+skr_pipeline_t       app_mat_default          = {};
+skr_shader_t         app_sh_cube              = {};
+skr_pipeline_t       app_mat_cube             = {};
 skr_shader_bind_t    app_sh_cube_tex_bind     = {};
 skr_shader_bind_t    app_sh_cube_cubemap_bind = {};
+skr_shader_bind_t    app_sh_cube_inst_bind    = {};
+skr_shader_bind_t    app_sh_cube_data_bind    = {};
 
 ///////////////////////////////////////////
 
@@ -120,22 +122,20 @@ bool app_init() {
 	}
 	skr_tex_set_data(&app_cubemap, (void**)&cube_cols, 6, 2, 2);
 
-	skr_shader_file_t cube_shader_file = {};
-	skr_shader_file_load("shaders/cubemap.hlsl.sks", &cube_shader_file);
-	app_sh_cube_vs           = skr_shader_file_create_stage(&cube_shader_file, skr_shader_vertex);
-	app_sh_cube_ps           = skr_shader_file_create_stage(&cube_shader_file, skr_shader_pixel);
-	app_sh_cube              = skr_pipeline_create(&app_sh_cube_vs, &app_sh_cube_ps);
-	app_sh_cube_tex_bind     = skr_shader_meta_get_tex_bind(cube_shader_file.meta, "tex");
-	app_sh_cube_cubemap_bind = skr_shader_meta_get_tex_bind(cube_shader_file.meta, "cubemap");
-	skr_pipeline_set_wireframe(&app_sh_cube, true);
+	app_sh_cube              = skr_shader_create_file("shaders/cubemap.sks");
+	app_sh_cube_tex_bind     = skr_shader_get_tex_bind   (&app_sh_cube, "tex");
+	app_sh_cube_cubemap_bind = skr_shader_get_tex_bind   (&app_sh_cube, "cubemap");
+	app_sh_cube_inst_bind    = skr_shader_get_buffer_bind(&app_sh_cube, "TransformBuffer");
+	app_sh_cube_data_bind    = skr_shader_get_buffer_bind(&app_sh_cube, "SystemBuffer");
+	app_mat_cube             = skr_pipeline_create(&app_sh_cube);
+	skr_pipeline_set_wireframe(&app_mat_cube, true);
 	
-	skr_shader_file_t app_shader_file = {};
-	skr_shader_file_load("shaders/test.hlsl.sks", &app_shader_file);
-	app_sh_default_vs       = skr_shader_file_create_stage(&app_shader_file, skr_shader_vertex);
-	app_sh_default_ps       = skr_shader_file_create_stage(&app_shader_file, skr_shader_pixel);
-	app_sh_default          = skr_pipeline_create(&app_sh_default_vs, &app_sh_default_ps);
-	app_sh_default_tex_bind = skr_shader_meta_get_tex_bind(app_shader_file.meta, "tex");
-
+	app_sh_default           = skr_shader_create_file("shaders/test.sks");
+	app_sh_default_tex_bind  = skr_shader_get_tex_bind   (&app_sh_default, "tex");
+	app_sh_default_inst_bind = skr_shader_get_buffer_bind(&app_sh_default, "TransformBuffer");
+	app_sh_default_data_bind = skr_shader_get_buffer_bind(&app_sh_default, "SystemBuffer");
+	app_mat_default          = skr_pipeline_create(&app_sh_default);
+	
 	app_shader_data_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t),       skr_buffer_type_constant, skr_use_dynamic);
 	app_shader_inst_buffer = skr_buffer_create(&app_shader_inst, sizeof(app_shader_inst_t) * 100, skr_buffer_type_constant, skr_use_dynamic);
 	return true;
@@ -146,12 +146,12 @@ bool app_init() {
 void app_test_cubemap() {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
-	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t));
-	skr_buffer_set   (&app_shader_inst_buffer, {1}, sizeof(app_shader_inst_t), 0);
+	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst,      sizeof(app_shader_inst_t) );
+	skr_buffer_set   (&app_shader_inst_buffer, app_sh_cube_inst_bind, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh1.mesh);
-	skr_pipeline_set  (&app_sh_cube);
-	skr_tex_set_active(&app_tex, app_sh_cube_tex_bind);
+	skr_pipeline_set  (&app_mat_cube);
+	skr_tex_set_active(&app_tex,     app_sh_cube_tex_bind);
 	skr_tex_set_active(&app_cubemap, app_sh_cube_cubemap_bind);
 	skr_draw(0, app_mesh1.ind_count, 1);
 }
@@ -172,17 +172,17 @@ void app_test_rendertarget() {
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
-	skr_buffer_set   (&app_shader_data_buffer, {0}, sizeof(app_shader_data_t), 0);
+	skr_buffer_set   (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
 
 	static int frame = 0;
 	frame++;
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) * HMM_Rotate(frame * 0.8f, hmm_vec3{ {1,0,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t));
-	skr_buffer_set   (&app_shader_inst_buffer, {1}, sizeof(app_shader_inst_t), 0);
+	skr_buffer_set   (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh1.mesh);
-	skr_pipeline_set  (&app_sh_default);
+	skr_pipeline_set  (&app_mat_default);
 	skr_tex_set_active(&app_tex, app_sh_default_tex_bind);
 	skr_draw(0, app_mesh1.ind_count, 1);
 
@@ -199,10 +199,10 @@ void app_test_instancing() {
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
-	skr_buffer_set   (&app_shader_inst_buffer, {1}, sizeof(app_shader_inst_t), 0);
+	skr_buffer_set   (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh1.mesh);
-	skr_pipeline_set  (&app_sh_default);
+	skr_pipeline_set  (&app_mat_default);
 	skr_tex_set_active(&app_tex, app_sh_default_tex_bind);
 	skr_draw(0, app_mesh1.ind_count, 100);
 
@@ -213,10 +213,10 @@ void app_test_instancing() {
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_update(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
-	skr_buffer_set   (&app_shader_inst_buffer, {1}, sizeof(app_shader_inst_t), 0);
+	skr_buffer_set   (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_set      (&app_mesh2.mesh);
-	skr_pipeline_set  (&app_sh_default);
+	skr_pipeline_set  (&app_mat_default);
 	skr_tex_set_active(&app_target, app_sh_default_tex_bind);
 	skr_draw(0, app_mesh2.ind_count, 100);
 }
@@ -230,7 +230,7 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
 	skr_buffer_update(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
-	skr_buffer_set   (&app_shader_data_buffer, {0}, sizeof(app_shader_data_t), 0);
+	skr_buffer_set   (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
 
 	app_test_instancing();
 	app_test_cubemap();
@@ -241,10 +241,10 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 void app_shutdown() {
 	skr_buffer_destroy(&app_shader_data_buffer);
 	skr_buffer_destroy(&app_shader_inst_buffer);
-	skr_pipeline_destroy(&app_sh_default);
-	skr_pipeline_destroy(&app_sh_cube);
-	skr_shader_stage_destroy(&app_sh_default_ps);
-	skr_shader_stage_destroy(&app_sh_default_vs);
+	skr_pipeline_destroy(&app_mat_default);
+	skr_pipeline_destroy(&app_mat_cube);
+	skr_shader_destroy(&app_sh_default);
+	skr_shader_destroy(&app_sh_cube);
 	skr_tex_destroy(&app_target_depth);
 	skr_tex_destroy(&app_target);
 	skr_tex_destroy(&app_tex);

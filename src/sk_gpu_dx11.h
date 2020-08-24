@@ -1,4 +1,5 @@
 #pragma once
+#include "sk_gpu_dev.h"
 #include <d3d11.h>
 #include <dxgi1_6.h>
 
@@ -19,6 +20,12 @@ typedef struct skr_shader_stage_t {
 	skr_shader_  type;
 	void        *shader;
 } skr_shader_stage_t;
+
+typedef struct skr_shader_t {
+	skr_shader_meta_t  *meta;
+	ID3D11VertexShader *vertex;
+	ID3D11PixelShader  *pixel;
+} skr_shader_t;
 
 typedef struct skr_pipeline_t {
 	skr_transparency_ transparency;

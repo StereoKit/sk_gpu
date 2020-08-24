@@ -112,6 +112,38 @@ typedef struct skr_shader_bind_t {
 	uint16_t stage_bits;
 } skr_shader_bind_t;
 
+typedef struct skr_shader_meta_var_t {
+	char     name [32];
+	char     extra[64];
+	size_t   offset;
+	size_t   size;
+} skr_shader_meta_var_t;
+
+typedef struct skr_shader_meta_buffer_t {
+	char              name[32];
+	skr_shader_bind_t bind;
+	size_t            size;
+	void             *defaults;
+	uint32_t               var_count;
+	skr_shader_meta_var_t *vars;
+} skr_shader_meta_buffer_t;
+
+typedef struct skr_shader_meta_texture_t {
+	char              name [32];
+	char              extra[64];
+	skr_shader_bind_t bind;
+	size_t            size;
+} skr_shader_meta_texture_t;
+
+typedef struct skr_shader_meta_t {
+	char                       name[256];
+	uint32_t                   buffer_count;
+	skr_shader_meta_buffer_t  *buffers;
+	uint32_t                   texture_count;
+	skr_shader_meta_texture_t *textures;
+	int32_t                    references;
+} skr_shader_meta_t;
+
 ///////////////////////////////////////////
 
 #if defined(SKR_DIRECT3D11)
@@ -152,7 +184,14 @@ void                skr_mesh_destroy        (      skr_mesh_t *mesh);
 skr_shader_stage_t  skr_shader_stage_create (const void *shader_data, size_t shader_size, skr_shader_ type);
 void                skr_shader_stage_destroy(skr_shader_stage_t *stage);
 
-skr_pipeline_t      skr_pipeline_create          (skr_shader_stage_t *vertex, skr_shader_stage_t *pixel);
+skr_shader_t        skr_shader_create_file    (const char *sks_filename);
+skr_shader_t        skr_shader_create_mem     (void *sks_data, size_t sks_data_size);
+skr_shader_t        skr_shader_create_manual  (skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader);
+skr_shader_bind_t   skr_shader_get_tex_bind   (const skr_shader_t *shader, const char *name);
+skr_shader_bind_t   skr_shader_get_buffer_bind(const skr_shader_t *shader, const char *name);
+void                skr_shader_destroy        (      skr_shader_t *shader);
+
+skr_pipeline_t      skr_pipeline_create          (skr_shader_t *shader);
 void                skr_pipeline_set             (const skr_pipeline_t *pipeline);
 void                skr_pipeline_set_texture     ();
 void                skr_pipeline_set_transparency(      skr_pipeline_t *pipeline, skr_transparency_ transparency);

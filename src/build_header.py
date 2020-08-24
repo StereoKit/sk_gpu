@@ -19,7 +19,7 @@ for match in re.findall(regex_includes, dest_header):
         continue
     
     include_file     = open(include_filename, "r")
-    include_text     = include_file.read().replace('#pragma once', '')
+    include_text     = include_file.read().replace('#pragma once', '').replace('#include "sk_gpu_dev.h"', '')
     include_file.close()
     
     body_filename    = include_filename.replace(".h", ".cpp")

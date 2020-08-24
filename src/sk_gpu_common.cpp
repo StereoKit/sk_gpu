@@ -178,11 +178,59 @@ void skr_shader_meta_release(skr_shader_meta_t *meta) {
 }
 
 ///////////////////////////////////////////
+// skr_shader_t                          //
+///////////////////////////////////////////
 
-skr_shader_bind_t skr_shader_meta_get_tex_bind(const skr_shader_meta_t *meta, const char *name) {
-	for (uint32_t i = 0; i < meta->texture_count; i++) {
-		if (strcmp(name, meta->textures[i].name) == 0)
-			return meta->textures[i].bind;
+skr_shader_t skr_shader_create_file(const char *sks_filename) {
+	skr_shader_file_t file;
+	if (!skr_shader_file_load(sks_filename, &file))
+		return {};
+
+	skr_shader_stage_t vs     = skr_shader_file_create_stage(&file, skr_shader_vertex);
+	skr_shader_stage_t ps     = skr_shader_file_create_stage(&file, skr_shader_pixel);
+	skr_shader_t       result = skr_shader_create_manual(file.meta, vs, ps );
+
+	skr_shader_stage_destroy(&vs);
+	skr_shader_stage_destroy(&ps);
+	skr_shader_file_destroy (&file);
+
+	return result;
+}
+
+///////////////////////////////////////////
+
+skr_shader_t skr_shader_create_mem(void *sks_data, size_t sks_data_size) {
+	skr_shader_file_t file;
+	if (!skr_shader_file_load_mem(sks_data, sks_data_size, &file))
+		return {};
+
+	skr_shader_stage_t vs     = skr_shader_file_create_stage(&file, skr_shader_vertex);
+	skr_shader_stage_t ps     = skr_shader_file_create_stage(&file, skr_shader_pixel);
+	skr_shader_t       result = skr_shader_create_manual( file.meta, vs, ps );
+
+	skr_shader_stage_destroy(&vs);
+	skr_shader_stage_destroy(&ps);
+	skr_shader_file_destroy (&file);
+
+	return result;
+}
+
+///////////////////////////////////////////
+
+skr_shader_bind_t skr_shader_get_tex_bind(const skr_shader_t *shader, const char *name) {
+	for (uint32_t i = 0; i < shader->meta->texture_count; i++) {
+		if (strcmp(name, shader->meta->textures[i].name) == 0)
+			return shader->meta->textures[i].bind;
+	}
+	return {};
+}
+
+///////////////////////////////////////////
+
+skr_shader_bind_t skr_shader_get_buffer_bind(const skr_shader_t *shader, const char *name) {
+	for (uint32_t i = 0; i < shader->meta->buffer_count; i++) {
+		if (strcmp(name, shader->meta->buffers[i].name) == 0)
+			return shader->meta->buffers[i].bind;
 	}
 	return {};
 }

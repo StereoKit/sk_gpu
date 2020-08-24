@@ -319,6 +319,30 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 }
 
 ///////////////////////////////////////////
+// skr_shader_t                          //
+///////////////////////////////////////////
+
+skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
+	skr_shader_t result = {};
+	result.meta   = meta;
+	result.vertex = (ID3D11VertexShader*)v_shader.shader;
+	result.pixel  = (ID3D11PixelShader *)p_shader.shader;
+	skr_shader_meta_reference(result.meta);
+	if (result.vertex) result.vertex->AddRef();
+	if (result.pixel ) result.pixel ->AddRef();
+
+	return result;
+}
+
+///////////////////////////////////////////
+
+void skr_shader_destroy(skr_shader_t *shader) {
+	if (shader->vertex) shader->vertex->Release();
+	if (shader->pixel ) shader->pixel ->Release();
+	*shader = {};
+}
+
+///////////////////////////////////////////
 // skr_pipeline                          //
 /////////////////////////////////////////// 
 
@@ -357,13 +381,13 @@ void skr_pipeline_update_rasterizer(skr_pipeline_t *pipeline) {
 
 /////////////////////////////////////////// 
 
-skr_pipeline_t skr_pipeline_create(skr_shader_stage_t *vertex, skr_shader_stage_t *pixel) {
+skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 	skr_pipeline_t result = {};
 	result.transparency = skr_transparency_none;
 	result.cull         = skr_cull_back;
 	result.wireframe    = false;
-	result.vertex       = (ID3D11VertexShader*)vertex->shader;
-	result.pixel        = (ID3D11PixelShader *)pixel->shader;
+	result.vertex       = shader->vertex;
+	result.pixel        = shader->pixel;
 	if (result.vertex) result.vertex->AddRef();
 	if (result.pixel ) result.pixel ->AddRef();
 
@@ -385,7 +409,7 @@ void skr_pipeline_set(const skr_pipeline_t *pipeline) {
 
 void skr_pipeline_set_transparency(skr_pipeline_t *pipeline, skr_transparency_ transparency) {
 	if (pipeline->transparency != transparency) {
-		pipeline->transparency = transparency;
+		pipeline->transparency  = transparency;
 		skr_pipeline_update_blend(pipeline);
 	}
 }
@@ -393,14 +417,14 @@ void skr_pipeline_set_transparency(skr_pipeline_t *pipeline, skr_transparency_ t
 /////////////////////////////////////////// 
 void skr_pipeline_set_cull(skr_pipeline_t *pipeline, skr_cull_ cull) {
 	if (pipeline->cull != cull) {
-		pipeline->cull = cull;
+		pipeline->cull  = cull;
 		skr_pipeline_update_rasterizer(pipeline);
 	}
 }
 /////////////////////////////////////////// 
 void skr_pipeline_set_wireframe(skr_pipeline_t *pipeline, bool wireframe) {
 	if (pipeline->wireframe != wireframe) {
-		pipeline->wireframe = wireframe;
+		pipeline->wireframe  = wireframe;
 		skr_pipeline_update_rasterizer(pipeline);
 	}
 }
@@ -784,12 +808,23 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_active(const skr_tex_t *texture, int32_t slot) {
+void skr_tex_set_active(const skr_tex_t *texture, skr_shader_bind_t bind) {
 	if (texture != nullptr) {
-		d3d_context->PSSetSamplers       (slot, 1, &texture->sampler);
-		d3d_context->PSSetShaderResources(slot, 1, &texture->resource);
+		if (bind.stage_bits & skr_shader_pixel) {
+			d3d_context->PSSetSamplers       (bind.slot, 1, &texture->sampler);
+			d3d_context->PSSetShaderResources(bind.slot, 1, &texture->resource);
+		}
+		if (bind.stage_bits & skr_shader_vertex) {
+			d3d_context->VSSetSamplers       (bind.slot, 1, &texture->sampler);
+			d3d_context->VSSetShaderResources(bind.slot, 1, &texture->resource);
+		}
 	} else {
-		d3d_context->PSSetShaderResources(slot, 0, nullptr);
+		if (bind.stage_bits & skr_shader_pixel) {
+			d3d_context->PSSetShaderResources(bind.slot, 0, nullptr);
+		}
+		if (bind.stage_bits & skr_shader_vertex) {
+			d3d_context->VSSetShaderResources(bind.slot, 0, nullptr);
+		}
 	}
 }
 

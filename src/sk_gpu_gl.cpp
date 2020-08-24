@@ -776,21 +776,20 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 /////////////////////////////////////////// 
 
 void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
-	glDeleteShader(shader->shader);
+	//glDeleteShader(shader->shader);
 	*shader = {};
 }
 
 ///////////////////////////////////////////
-// skr_pipeline                          //
+// skr_shader_t                          //
 ///////////////////////////////////////////
 
-skr_pipeline_t skr_pipeline_create(skr_shader_stage_t *vertex, skr_shader_stage_t *pixel) {
-	skr_pipeline_t result = {};
-	result.transparency = skr_transparency_none;
-	result.cull         = skr_cull_none;
-	result.wireframe    = false;
-	result.vertex       = vertex->shader;
-	result.pixel        = pixel ->shader;
+skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
+	skr_shader_t result = {};
+	result.meta   = meta;
+	result.vertex = v_shader.shader;
+	result.pixel  = p_shader.shader;
+	skr_shader_meta_reference(result.meta);
 
 	result.program = glCreateProgram();
 	if (result.vertex) glAttachShader(result.program, result.vertex);
@@ -815,10 +814,33 @@ skr_pipeline_t skr_pipeline_create(skr_shader_stage_t *vertex, skr_shader_stage_
 	return result;
 }
 
+///////////////////////////////////////////
+
+void skr_shader_destroy(skr_shader_t *shader) {
+	glDeleteProgram(shader->program);
+	glDeleteShader (shader->vertex);
+	glDeleteShader (shader->pixel);
+	*shader = {};
+}
+
+///////////////////////////////////////////
+// skr_pipeline                          //
+///////////////////////////////////////////
+
+skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
+	skr_pipeline_t result = {};
+	result.transparency = skr_transparency_none;
+	result.cull         = skr_cull_none;
+	result.wireframe    = false;
+	result.shader       = *shader;
+
+	return result;
+}
+
 /////////////////////////////////////////// 
 
 void skr_pipeline_set(const skr_pipeline_t *pipeline) {
-	glUseProgram(pipeline->program);
+	glUseProgram(pipeline->shader.program);
 	
 	switch (pipeline->transparency) {
 	case skr_transparency_blend: {
@@ -888,7 +910,6 @@ bool skr_pipeline_get_wireframe(const skr_pipeline_t *pipeline) {
 ///////////////////////////////////////////
 
 void skr_pipeline_destroy(skr_pipeline_t *pipeline) {
-	glDeleteProgram(pipeline->program);
 	*pipeline = {};
 }
 

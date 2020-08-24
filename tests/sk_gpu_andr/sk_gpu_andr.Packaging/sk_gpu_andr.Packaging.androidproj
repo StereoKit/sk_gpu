@@ -119,16 +119,12 @@
     </AntPackage>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <Content Include="assets\shaders\cubemap.sks" />
+    <Content Include="assets\shaders\test.sks" />
     <Content Include="res\values\strings.xml" />
     <AntBuildXml Include="build.xml" />
     <AndroidManifest Include="AndroidManifest.xml" />
     <AntProjectPropertiesFile Include="project.properties" />
-    <Content Include="assets\shaders\cubemap.hlsl.sks">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="assets\shaders\test.hlsl.sks">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\sk_gpu_andr.NativeActivity\sk_gpu_andr.NativeActivity.vcxproj">

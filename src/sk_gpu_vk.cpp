@@ -13,7 +13,7 @@
 ///////////////////////////////////////////
 
 void (*_skr_log)(const char *text);
-void skr_log_callback(void (*callback)(const char *text)) {
+void skr_callback_log(void (*callback)(const char *text)) {
 	_skr_log = callback;
 }
 void skr_log(const char *text) {
@@ -493,7 +493,7 @@ void skr_draw_begin() {
 
 ///////////////////////////////////////////
 
-void skr_set_render_target(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
+void skr_tex_target_bind(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
 	/*VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -679,7 +679,7 @@ void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_byt
 
 ///////////////////////////////////////////
 
-void skr_buffer_set(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
+void skr_buffer_bind(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
 	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
 
 	switch (buffer->type) {
@@ -708,7 +708,7 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 	skr_mesh_t result = {};
 	return result;
 }
-void skr_mesh_set(const skr_mesh_t *mesh) {
+void skr_mesh_bind(const skr_mesh_t *mesh) {
 }
 void skr_mesh_destroy(skr_mesh_t *mesh) {
 }
@@ -1193,7 +1193,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 	vkAllocateMemory(skr_device.device, &allocInfo, nullptr, &tex->texture_mem);
 	vkBindImageMemory(skr_device.device, tex->texture, tex->texture_mem, 0);
 }
-void skr_tex_set_active(const skr_tex_t *tex, int32_t slot) {}
+void skr_tex_bind(const skr_tex_t *tex, int32_t slot) {}
 
 ///////////////////////////////////////////
 

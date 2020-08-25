@@ -12,7 +12,7 @@
 #endif
 
 void (*_skr_log)(const char *text);
-void skr_log_callback(void (*callback)(const char *text)) {
+void skr_callback_log(void (*callback)(const char *text)) {
 	_skr_log = callback;
 }
 void skr_log(const char *text) {
@@ -22,7 +22,7 @@ void skr_log(const char *text) {
 ///////////////////////////////////////////
 
 bool (*_skr_read_file)(const char *filename, void **out_data, size_t *out_size);
-void skr_file_read_callback(bool (*callback)(const char *filename, void **out_data, size_t *out_size)) {
+void skr_callback_file_read(bool (*callback)(const char *filename, void **out_data, size_t *out_size)) {
 	_skr_read_file = callback;
 }
 bool skr_read_file(const char *filename, void **out_data, size_t *out_size) {

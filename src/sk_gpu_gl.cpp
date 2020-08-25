@@ -580,7 +580,7 @@ void skr_draw_begin() {
 
 ///////////////////////////////////////////
 
-void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_target) {
+void skr_tex_target_bind(skr_tex_t *render_target, bool clear, float clear_color[4]) {
 	gl_active_rendertarget = render_target;
 	gl_current_framebuffer = render_target == nullptr ? 0 : render_target->framebuffer;
 
@@ -599,7 +599,7 @@ void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_t
 
 ///////////////////////////////////////////
 
-skr_tex_t *skr_get_render_target() {
+skr_tex_t *skr_tex_target_get() {
 	return gl_active_rendertarget;
 }
 
@@ -656,7 +656,7 @@ void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_byt
 
 /////////////////////////////////////////// 
 
-void skr_buffer_set(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_t stride, uint32_t offset) {
+void skr_buffer_bind(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_t stride, uint32_t offset) {
 	if (buffer->type == GL_UNIFORM_BUFFER)
 		glBindBufferBase(buffer->type, bind.slot, buffer->buffer); 
 	else
@@ -695,7 +695,7 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 
 /////////////////////////////////////////// 
 
-void skr_mesh_set(const skr_mesh_t *mesh) {
+void skr_mesh_bind(const skr_mesh_t *mesh) {
 	glBindVertexArray(mesh->layout);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
 }
@@ -839,7 +839,7 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 
 /////////////////////////////////////////// 
 
-void skr_pipeline_set(const skr_pipeline_t *pipeline) {
+void skr_pipeline_bind(const skr_pipeline_t *pipeline) {
 	glUseProgram(pipeline->shader.program);
 	
 	switch (pipeline->transparency) {
@@ -1082,7 +1082,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_active(const skr_tex_t *texture, skr_shader_bind_t bind) {
+void skr_tex_bind(const skr_tex_t *texture, skr_shader_bind_t bind) {
 	uint32_t target = texture == nullptr || texture->type != skr_tex_type_cubemap 
 		? GL_TEXTURE_2D
 		: GL_TEXTURE_CUBE_MAP;

@@ -77,8 +77,8 @@ bool android_fopen(const char *filename, void **out_data, size_t *out_size) {
 static int engine_init_display(struct engine* engine) {
 	if (engine->initialized)
 		return 0;
-	skr_file_read_callback(android_fopen);
-	skr_log_callback([](const char *text) { __android_log_print(ANDROID_LOG_INFO, "sk_gpu", text); });
+	skr_callback_file_read(android_fopen);
+	skr_callback_log([](const char *text) { __android_log_print(ANDROID_LOG_INFO, "sk_gpu", text); });
 	int result = skr_init("skr_gpu.h", engine->app->window, nullptr);
 	if (!result) return result;
 
@@ -96,7 +96,7 @@ static void engine_draw_frame(struct engine* engine) {
 	float clear_color[4] = { 0,1,0,1 };
 	const skr_tex_t *target, *depth;
 	skr_swapchain_get_next(&engine->swapchain, &target, &depth);
-	skr_set_render_target(clear_color, target, depth);
+	skr_tex_target_bind(clear_color, target, depth);
 
 	static int32_t frame = 0;
 	frame++;
@@ -118,8 +118,8 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	engine *eng = (engine*)user_data;
 	
 	LOGI("Beginning initialization");
-	skr_file_read_callback(android_fopen);
-	skr_log_callback([](const char *text) { 
+	skr_callback_file_read(android_fopen);
+	skr_callback_log([](const char *text) { 
 		__android_log_write(ANDROID_LOG_INFO, "sk_gpu", text); 
 	});
 	if (!skr_init("sk_gpu.h", eng->app->window, nullptr))
@@ -176,7 +176,7 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 	engine *eng = (engine*)user_data;
 	float clear_color[4] = { 0,0,0,1 };
 	skr_tex_t *target = &eng->swapchain.surfaces[view_id * eng->swapchain.surf_count + surf_id].render_tex;
-	skr_set_render_target(clear_color, true, target);
+	skr_tex_target_bind(clear_color, true, target);
 
 	hmm_quaternion head_orientation;
 	memcpy(&head_orientation, &view->pose.orientation, sizeof(XrQuaternionf));

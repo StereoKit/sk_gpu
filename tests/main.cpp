@@ -58,7 +58,7 @@ int main() {
 ///////////////////////////////////////////
 
 bool main_init() {
-	skr_log_callback([](const char *text) { printf("%s\n", text); });
+	skr_callback_log([](const char *text) { printf("%s\n", text); });
 #ifdef __EMSCRIPTEN__
 	if (!skr_init(app_name, nullptr, nullptr, app_width, app_height)) return false;
 #else
@@ -114,7 +114,7 @@ bool main_step() {
 	skr_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
 	skr_tex_t *target = skr_swapchain_get_next(&app_swapchain);
-	skr_set_render_target(clear_color, true, target);
+	skr_tex_target_bind(target, true, clear_color);
 
 	static int32_t frame = 0;
 	frame++;

@@ -1,4 +1,4 @@
-
+/*
 // When using single file header like normal, do this
 //#define SKR_OPENGL
 //#define SKR_IMPL
@@ -112,7 +112,7 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 #ifdef SKR_DIRECT3D11
 	luid = (void *)&requirements->adapterLuid;
 #endif
-	skr_log_callback([](const char *text) { printf("%s\n", text); });
+	skr_callback_log([](const char *text) { printf("%s\n", text); });
 	if (!skr_init(app_name, nullptr, luid))
 		return false;
 
@@ -164,7 +164,7 @@ void main_destroy_swapchain(void *user_data) {
 void main_render(void *user_data, const XrCompositionLayerProjectionView *view, int32_t view_id, int32_t surf_id) {
 	float clear_color[4] = { 0,0,0,1 };
 	skr_tex_t *target = &app_swapchain.surfaces[view_id * app_swapchain.surf_count + surf_id].render_tex;
-	skr_set_render_target(clear_color, true, target);
+	skr_tex_target_bind(clear_color, true, target);
 
 	hmm_quaternion head_orientation;
 	memcpy(&head_orientation, &view->pose.orientation, sizeof(XrQuaternionf));
@@ -181,3 +181,4 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 }
 
 ///////////////////////////////////////////
+*/

@@ -160,25 +160,21 @@ typedef struct skr_shader_meta_t {
 
 int32_t             skr_init                (const char *app_name, void *hwnd, void *adapter_id);
 void                skr_shutdown            ();
-void                skr_log_callback        (void (*callback)(const char *text));
-void                skr_file_read_callback  (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
+void                skr_callback_log        (void (*callback)(const char *text));
+void                skr_callback_file_read  (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
+skr_platform_data_t skr_get_platform_data   ();
 
 void                skr_draw_begin          ();
-skr_platform_data_t skr_get_platform_data   ();
-void                skr_set_render_target   (float clear_color[4], bool clear, skr_tex_t *render_target);
-skr_tex_t          *skr_get_render_target   ();
 void                skr_draw                (int32_t index_start, int32_t index_count, int32_t instance_count);
-int64_t             skr_tex_fmt_to_native   (skr_tex_fmt_ format);
-skr_tex_fmt_        skr_tex_fmt_from_native (int64_t format);
 
 skr_buffer_t        skr_buffer_create       (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
 bool                skr_buffer_is_valid     (const skr_buffer_t *buffer);
 void                skr_buffer_update       (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
-void                skr_buffer_set          (const skr_buffer_t *buffer, skr_shader_bind_t slot, uint32_t stride, uint32_t offset);
+void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_shader_bind_t slot, uint32_t stride, uint32_t offset);
 void                skr_buffer_destroy      (      skr_buffer_t *buffer);
 
 skr_mesh_t          skr_mesh_create         (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);
-void                skr_mesh_set            (const skr_mesh_t *mesh);
+void                skr_mesh_bind           (const skr_mesh_t *mesh);
 void                skr_mesh_destroy        (      skr_mesh_t *mesh);
 
 skr_shader_stage_t  skr_shader_stage_create (const void *shader_data, size_t shader_size, skr_shader_ type);
@@ -192,7 +188,7 @@ skr_shader_bind_t   skr_shader_get_buffer_bind(const skr_shader_t *shader, const
 void                skr_shader_destroy        (      skr_shader_t *shader);
 
 skr_pipeline_t      skr_pipeline_create          (skr_shader_t *shader);
-void                skr_pipeline_set             (const skr_pipeline_t *pipeline);
+void                skr_pipeline_bind            (const skr_pipeline_t *pipeline);
 void                skr_pipeline_set_texture     ();
 void                skr_pipeline_set_transparency(      skr_pipeline_t *pipeline, skr_transparency_ transparency);
 void                skr_pipeline_set_cull        (      skr_pipeline_t *pipeline, skr_cull_ cull);
@@ -215,8 +211,12 @@ void                skr_tex_set_depth       (      skr_tex_t *tex, skr_tex_t *de
 void                skr_tex_settings        (      skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy);
 void                skr_tex_set_data        (      skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
 void                skr_tex_get_data        (      skr_tex_t *tex);
-void                skr_tex_set_active      (const skr_tex_t *tex, skr_shader_bind_t bind);
+void                skr_tex_bind            (const skr_tex_t *tex, skr_shader_bind_t bind);
+void                skr_tex_target_bind     (skr_tex_t *render_target, bool clear, float clear_color[4]);
+skr_tex_t          *skr_tex_target_get      ();
 void                skr_tex_destroy         (      skr_tex_t *tex);
+int64_t             skr_tex_fmt_to_native   (skr_tex_fmt_ format);
+skr_tex_fmt_        skr_tex_fmt_from_native (int64_t format);
 #include "sk_gpu_common.h"
 ///////////////////////////////////////////
 // Implementations!                      //

@@ -131,7 +131,7 @@ skr_platform_data_t skr_get_platform_data() {
 
 ///////////////////////////////////////////
 
-void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_target) {
+void skr_tex_target_bind(skr_tex_t *render_target, bool clear, float clear_color[4]) {
 	d3d_active_rendertarget = render_target;
 
 	if (render_target == nullptr) {
@@ -154,7 +154,7 @@ void skr_set_render_target(float clear_color[4], bool clear, skr_tex_t *render_t
 
 ///////////////////////////////////////////
 
-skr_tex_t *skr_get_render_target() {
+skr_tex_t *skr_tex_target_get() {
 	return d3d_active_rendertarget;
 }
 
@@ -212,7 +212,7 @@ void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_byt
 
 /////////////////////////////////////////// 
 
-void skr_buffer_set(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_t stride, uint32_t offset) {
+void skr_buffer_bind(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_t stride, uint32_t offset) {
 	switch (buffer->type) {
 	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (bind.slot, 1, &buffer->buffer, &stride, &offset); break;
 	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer    (buffer->buffer, DXGI_FORMAT_R32_UINT, offset); break;
@@ -244,7 +244,7 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 
 /////////////////////////////////////////// 
 
-void skr_mesh_set(const skr_mesh_t *mesh) {
+void skr_mesh_bind(const skr_mesh_t *mesh) {
 	UINT strides[] = { sizeof(skr_vert_t) };
 	UINT offsets[] = { 0 };
 	d3d_context->IASetVertexBuffers(0, 1, &mesh->vert_buffer, strides, offsets);
@@ -398,7 +398,7 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 
 /////////////////////////////////////////// 
 
-void skr_pipeline_set(const skr_pipeline_t *pipeline) {
+void skr_pipeline_bind(const skr_pipeline_t *pipeline) {
 	d3d_context->OMSetBlendState(pipeline->blend,  nullptr, 0xFFFFFFFF);
 	d3d_context->RSSetState     (pipeline->rasterize);
 	d3d_context->VSSetShader    (pipeline->vertex, nullptr, 0);
@@ -808,7 +808,7 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_active(const skr_tex_t *texture, skr_shader_bind_t bind) {
+void skr_tex_bind(const skr_tex_t *texture, skr_shader_bind_t bind) {
 	if (texture != nullptr) {
 		if (bind.stage_bits & skr_shader_pixel) {
 			d3d_context->PSSetSamplers       (bind.slot, 1, &texture->sampler);

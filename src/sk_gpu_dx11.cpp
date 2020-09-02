@@ -200,7 +200,7 @@ bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
 
 /////////////////////////////////////////// 
 
-void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
+void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic)
 		return;
 
@@ -217,9 +217,9 @@ void skr_buffer_bind(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_
 	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (bind.slot, 1, &buffer->buffer, &stride, &offset); break;
 	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer    (buffer->buffer, DXGI_FORMAT_R32_UINT, offset); break;
 	case skr_buffer_type_constant: {
-		if (bind.stage_bits & skr_shader_vertex)
+		if (bind.stage_bits & skr_stage_vertex)
 			d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->buffer);
-		if (bind.stage_bits & skr_shader_pixel)
+		if (bind.stage_bits & skr_stage_pixel)
 			d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->buffer);
 	} break;
 	}
@@ -260,7 +260,7 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 /////////////////////////////////////////// 
 
 #include <stdio.h>
-skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_size, skr_shader_ type) {
+skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_size, skr_stage_ type) {
 	skr_shader_stage_t result = {};
 	result.type = type;
 
@@ -279,7 +279,7 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 		buffer_size = shader_size;
 	} else {
 		ID3DBlob *errors;
-		if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_shader_pixel ? "ps" : "vs", type == skr_shader_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
+		if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_stage_pixel ? "ps" : "vs", type == skr_stage_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
 			skr_log("Error - D3DCompile failed:");
 			skr_log((char *)errors->GetBufferPointer());
 		}
@@ -290,11 +290,11 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	}
 
 	switch(type) {
-	case skr_shader_vertex: d3d_device->CreateVertexShader(buffer, buffer_size, nullptr, (ID3D11VertexShader**)&result.shader); break;
-	case skr_shader_pixel : d3d_device->CreatePixelShader (buffer, buffer_size, nullptr, (ID3D11PixelShader **)&result.shader); break;
+	case skr_stage_vertex: d3d_device->CreateVertexShader(buffer, buffer_size, nullptr, (ID3D11VertexShader**)&result.shader); break;
+	case skr_stage_pixel : d3d_device->CreatePixelShader (buffer, buffer_size, nullptr, (ID3D11PixelShader **)&result.shader); break;
 	}
 
-	if (d3d_vert_layout == nullptr && type == skr_shader_vertex) {
+	if (d3d_vert_layout == nullptr && type == skr_stage_vertex) {
 		// Describe how our mesh is laid out in memory
 		D3D11_INPUT_ELEMENT_DESC vert_desc[] = {
 			{"SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
@@ -313,8 +313,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 
 void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 	switch(shader->type) {
-	case skr_shader_vertex: ((ID3D11VertexShader*)shader->shader)->Release(); break;
-	case skr_shader_pixel : ((ID3D11PixelShader *)shader->shader)->Release(); break;
+	case skr_stage_vertex: ((ID3D11VertexShader*)shader->shader)->Release(); break;
+	case skr_stage_pixel : ((ID3D11PixelShader *)shader->shader)->Release(); break;
 	}
 }
 
@@ -484,7 +484,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	result.d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, format, width, height, 1);
 	result.depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
-	skr_tex_set_data(&result.depth, nullptr, 1, width, height);
+	skr_tex_set_contents(&result.depth, nullptr, 1, width, height);
 	back_buffer->Release();
 
 	dxgi_factory->Release();
@@ -513,7 +513,7 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 	swapchain->d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	swapchain->target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	swapchain->depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
-	skr_tex_set_data(&swapchain->depth, nullptr, 1, width, height);
+	skr_tex_set_contents(&swapchain->depth, nullptr, 1, width, height);
 	back_buffer->Release();
 }
 
@@ -722,7 +722,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 
 ///////////////////////////////////////////
 
-void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	// Some warning messages
 	if (tex->use != skr_use_dynamic && tex->texture) {
 		skr_log("Only dynamic textures can be updated!");
@@ -810,19 +810,19 @@ void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_cou
 
 void skr_tex_bind(const skr_tex_t *texture, skr_shader_bind_t bind) {
 	if (texture != nullptr) {
-		if (bind.stage_bits & skr_shader_pixel) {
+		if (bind.stage_bits & skr_stage_pixel) {
 			d3d_context->PSSetSamplers       (bind.slot, 1, &texture->sampler);
 			d3d_context->PSSetShaderResources(bind.slot, 1, &texture->resource);
 		}
-		if (bind.stage_bits & skr_shader_vertex) {
+		if (bind.stage_bits & skr_stage_vertex) {
 			d3d_context->VSSetSamplers       (bind.slot, 1, &texture->sampler);
 			d3d_context->VSSetShaderResources(bind.slot, 1, &texture->resource);
 		}
 	} else {
-		if (bind.stage_bits & skr_shader_pixel) {
+		if (bind.stage_bits & skr_stage_pixel) {
 			d3d_context->PSSetShaderResources(bind.slot, 0, nullptr);
 		}
-		if (bind.stage_bits & skr_shader_vertex) {
+		if (bind.stage_bits & skr_stage_vertex) {
 			d3d_context->VSSetShaderResources(bind.slot, 0, nullptr);
 		}
 	}

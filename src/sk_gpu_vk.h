@@ -16,7 +16,7 @@ typedef struct skr_mesh_t {
 } skr_mesh_t;
 
 typedef struct skr_shader_stage_t {
-	skr_shader_    type;
+	skr_stage_    type;
 	VkShaderModule module;
 } skr_shader_stage_t;
 

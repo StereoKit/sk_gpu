@@ -646,7 +646,7 @@ bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
 
 /////////////////////////////////////////// 
 
-void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
+void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic)
 		return;
 
@@ -709,7 +709,7 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 
 /////////////////////////////////////////// 
 
-skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_size, skr_shader_ type) {
+skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_size, skr_stage_ type) {
 	const char *file_chars = (const char *)file_data;
 
 	skr_shader_stage_t result = {}; 
@@ -721,8 +721,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 
 	uint32_t gl_type = 0;
 	switch (type) {
-	case skr_shader_pixel:  gl_type = GL_FRAGMENT_SHADER; break;
-	case skr_shader_vertex: gl_type = GL_VERTEX_SHADER;   break;
+	case skr_stage_pixel:  gl_type = GL_FRAGMENT_SHADER; break;
+	case skr_stage_vertex: gl_type = GL_VERTEX_SHADER;   break;
 	}
 
 	// Convert the prefix if it doesn't match the GL version we're using
@@ -1048,7 +1048,7 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	uint32_t target = tex->type == skr_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: GL_TEXTURE_2D;

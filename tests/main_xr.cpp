@@ -142,7 +142,7 @@ bool main_init_swapchain(void *user_data, int32_t view_count, int32_t surface_co
 	for (int32_t i = 0; i < view_count*surface_count; i++) {
 		app_swapchain.surfaces[i].render_tex = skr_tex_from_native(textures[i], skr_tex_type_rendertarget, skr_format, width, height);
 		app_swapchain.surfaces[i].depth_tex  = skr_tex_create(skr_tex_type_depth, skr_use_static, skr_tex_fmt_depth32, skr_mip_none);
-		skr_tex_set_data (&app_swapchain.surfaces[i].depth_tex, nullptr, 1, width, height);
+		skr_tex_set_contents (&app_swapchain.surfaces[i].depth_tex, nullptr, 1, width, height);
 		skr_tex_set_depth(&app_swapchain.surfaces[i].render_tex, &app_swapchain.surfaces[i].depth_tex);
 	}
 	return true;

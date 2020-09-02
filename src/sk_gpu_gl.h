@@ -19,8 +19,8 @@ typedef struct skr_gl_attr_t {
 } skr_gl_attr_t;
 
 typedef struct skr_shader_stage_t {
-	skr_shader_ type;
-	uint32_t    shader;
+	skr_stage_ type;
+	uint32_t   shader;
 } skr_shader_stage_t;
 
 typedef struct skr_shader_t {

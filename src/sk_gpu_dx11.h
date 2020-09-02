@@ -17,8 +17,8 @@ typedef struct skr_mesh_t {
 } skr_mesh_t;
 
 typedef struct skr_shader_stage_t {
-	skr_shader_  type;
-	void        *shader;
+	skr_stage_  type;
+	void       *shader;
 } skr_shader_stage_t;
 
 typedef struct skr_shader_t {

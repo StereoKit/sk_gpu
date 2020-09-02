@@ -659,7 +659,7 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&result.buffer, &result.memory);
 
-		skr_buffer_update(&result, data, size_bytes);
+		skr_buffer_set_contents(&result, data, size_bytes);
 	}
 
 	return result;
@@ -667,7 +667,7 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 
 ///////////////////////////////////////////
 
-void skr_buffer_update(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
+void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic)
 		return;
 
@@ -717,7 +717,7 @@ void skr_mesh_destroy(skr_mesh_t *mesh) {
 // Shader Stage                          //
 ///////////////////////////////////////////
 
-skr_shader_stage_t skr_shader_stage_create(const uint8_t *shader_data, size_t shader_size, skr_shader_ type) {
+skr_shader_stage_t skr_shader_stage_create(const uint8_t *shader_data, size_t shader_size, skr_stage_ type) {
 	skr_shader_stage_t result = {};
 	result.type = type;
 
@@ -1167,7 +1167,7 @@ skr_tex_t            skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fm
 	return result;
 }
 void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {}
-void skr_tex_set_data(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
 	imageInfo.imageType     = VK_IMAGE_TYPE_2D;
 	imageInfo.extent.width  = width;

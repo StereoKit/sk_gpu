@@ -240,7 +240,6 @@
     <ClInclude Include="..\..\..\src\sk_gpu_vk.h" />
     <ClInclude Include="..\..\app.h" />
     <ClInclude Include="..\..\HandmadeMath.h" />
-    <ClInclude Include="..\..\shaders.h" />
     <ClInclude Include="..\..\xr_app.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="android_native_app_glue.h" />

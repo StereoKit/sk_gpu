@@ -4,7 +4,6 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="android_native_app_glue.h" />
     <ClInclude Include="..\..\HandmadeMath.h" />
-    <ClInclude Include="..\..\shaders.h" />
     <ClInclude Include="..\..\app.h" />
     <ClInclude Include="..\..\xr_app.h" />
     <ClInclude Include="..\..\..\src\sk_gpu_dev.h">

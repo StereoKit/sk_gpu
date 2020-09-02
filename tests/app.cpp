@@ -2,7 +2,6 @@
 
 #include "../src/sk_gpu_dev.h"
 #include "HandmadeMath.h"
-#include "shaders.h"
 
 #include <stdlib.h>
 #include <string.h>

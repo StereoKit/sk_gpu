@@ -22,7 +22,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HandmadeMath.h" />
-    <ClInclude Include="shaders.h" />
     <ClInclude Include="xr_app.h" />
     <ClInclude Include="app.h" />
     <ClInclude Include="..\src\d3dx12.h">

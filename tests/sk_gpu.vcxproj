@@ -191,7 +191,6 @@ python build_header.py</Command>
     <ClInclude Include="..\src\sk_gpu_vk.h" />
     <ClInclude Include="HandmadeMath.h" />
     <ClInclude Include="app.h" />
-    <ClInclude Include="shaders.h" />
     <ClInclude Include="xr_app.h" />
   </ItemGroup>
   <ItemGroup>

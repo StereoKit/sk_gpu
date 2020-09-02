@@ -212,7 +212,7 @@ void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t si
 
 /////////////////////////////////////////// 
 
-void skr_buffer_bind(const skr_buffer_t *buffer, skr_shader_bind_t bind, uint32_t stride, uint32_t offset) {
+void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t stride, uint32_t offset) {
 	switch (buffer->type) {
 	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (bind.slot, 1, &buffer->buffer, &stride, &offset); break;
 	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer    (buffer->buffer, DXGI_FORMAT_R32_UINT, offset); break;
@@ -737,7 +737,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	tex->height      = height;
 	tex->array_count = data_frame_count;
 
-	uint32_t mip_levels = (tex->mips == skr_mip_generate ? log2(width) + 1 : 1);
+	uint32_t mip_levels = (tex->mips == skr_mip_generate ? (uint32_t)log2(width) + 1 : 1);
 	uint32_t px_size    = skr_tex_fmt_size(tex->format);
 
 	if (tex->texture == nullptr) {
@@ -808,7 +808,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 
 /////////////////////////////////////////// 
 
-void skr_tex_bind(const skr_tex_t *texture, skr_shader_bind_t bind) {
+void skr_tex_bind(const skr_tex_t *texture, skr_bind_t bind) {
 	if (texture != nullptr) {
 		if (bind.stage_bits & skr_stage_pixel) {
 			d3d_context->PSSetSamplers       (bind.slot, 1, &texture->sampler);

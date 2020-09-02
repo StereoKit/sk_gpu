@@ -26,28 +26,28 @@ struct app_shader_inst_t {
 
 ///////////////////////////////////////////
 
-app_shader_data_t    app_shader_data = {};
-app_shader_inst_t    app_shader_inst[100] = {};
-app_mesh_t           app_mesh1  = {};
-app_mesh_t           app_mesh2  = {};
-skr_buffer_t         app_shader_data_buffer = {};
-skr_buffer_t         app_shader_inst_buffer = {};
-skr_tex_t            app_tex    = {};
-skr_tex_t            app_target = {};
-skr_tex_t            app_target_depth = {};
-skr_tex_t            app_cubemap = {};
+app_shader_data_t app_shader_data = {};
+app_shader_inst_t app_shader_inst[100] = {};
+app_mesh_t        app_mesh1  = {};
+app_mesh_t        app_mesh2  = {};
+skr_buffer_t      app_shader_data_buffer = {};
+skr_buffer_t      app_shader_inst_buffer = {};
+skr_tex_t         app_tex    = {};
+skr_tex_t         app_target = {};
+skr_tex_t         app_target_depth = {};
+skr_tex_t         app_cubemap = {};
 
-skr_shader_t         app_sh_default           = {};
-skr_shader_bind_t    app_sh_default_tex_bind  = {};
-skr_shader_bind_t    app_sh_default_inst_bind = {};
-skr_shader_bind_t    app_sh_default_data_bind = {};
-skr_pipeline_t       app_mat_default          = {};
-skr_shader_t         app_sh_cube              = {};
-skr_pipeline_t       app_mat_cube             = {};
-skr_shader_bind_t    app_sh_cube_tex_bind     = {};
-skr_shader_bind_t    app_sh_cube_cubemap_bind = {};
-skr_shader_bind_t    app_sh_cube_inst_bind    = {};
-skr_shader_bind_t    app_sh_cube_data_bind    = {};
+skr_shader_t      app_sh_default           = {};
+skr_bind_t        app_sh_default_tex_bind  = {};
+skr_bind_t        app_sh_default_inst_bind = {};
+skr_bind_t        app_sh_default_data_bind = {};
+skr_pipeline_t    app_mat_default          = {};
+skr_shader_t      app_sh_cube              = {};
+skr_pipeline_t    app_mat_cube             = {};
+skr_bind_t        app_sh_cube_tex_bind     = {};
+skr_bind_t        app_sh_cube_cubemap_bind = {};
+skr_bind_t        app_sh_cube_inst_bind    = {};
+skr_bind_t        app_sh_cube_data_bind    = {};
 
 ///////////////////////////////////////////
 

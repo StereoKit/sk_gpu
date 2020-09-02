@@ -73,7 +73,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	if (size < 10 || memcmp(bytes, prefix, 8) != 0 || memcmp(&bytes[8], &version, sizeof(uint16_t)) != 0)
 		return false;
 
-	uint32_t at = 10;
+	size_t at = 10;
 	memcpy(&out_file->stage_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
 	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
 
@@ -221,7 +221,7 @@ skr_shader_t skr_shader_create_mem(void *sks_data, size_t sks_data_size) {
 
 ///////////////////////////////////////////
 
-skr_shader_bind_t skr_shader_get_tex_bind(const skr_shader_t *shader, const char *name) {
+skr_bind_t skr_shader_get_tex_bind(const skr_shader_t *shader, const char *name) {
 	for (uint32_t i = 0; i < shader->meta->texture_count; i++) {
 		if (strcmp(name, shader->meta->textures[i].name) == 0)
 			return shader->meta->textures[i].bind;
@@ -231,7 +231,7 @@ skr_shader_bind_t skr_shader_get_tex_bind(const skr_shader_t *shader, const char
 
 ///////////////////////////////////////////
 
-skr_shader_bind_t skr_shader_get_buffer_bind(const skr_shader_t *shader, const char *name) {
+skr_bind_t skr_shader_get_buffer_bind(const skr_shader_t *shader, const char *name) {
 	for (uint32_t i = 0; i < shader->meta->buffer_count; i++) {
 		if (strcmp(name, shader->meta->buffers[i].name) == 0)
 			return shader->meta->buffers[i].bind;

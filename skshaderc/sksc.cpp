@@ -58,6 +58,8 @@ template <typename T> struct array_t {
 
 ///////////////////////////////////////////
 
+void                     sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta);
+
 DWORD                    sksc_d3d11_build_flags   (const sksc_settings_t *settings);
 bool                     sksc_d3d11_compile_shader(char *filename, char *hlsl_text, sksc_settings_t *settings, skr_stage_ type, skr_shader_file_stage_t *out_stage);
 
@@ -89,7 +91,7 @@ void sksc_shutdown() {
 ///////////////////////////////////////////
 
 bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, skr_shader_file_t *out_file) {
-	printf(" ________________\n| Compiling...\n| %s\n\n", filename);
+	printf(" ________________\n| Compiling %s...\n|\n", filename);
 
 	IDxcBlobEncoding *source;
 	if (FAILED(sksc_utils->CreateBlob(hlsl_text, (uint32_t)strlen(hlsl_text), CP_UTF8, &source))) {
@@ -137,11 +139,13 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 	sksc_spvc_compile_stage(&out_file->stages[2], &out_file->stages[4]);
 	sksc_spvc_compile_stage(&out_file->stages[3], &out_file->stages[5]);
 
+	sksc_meta_find_defaults(hlsl_text, out_file->meta);
+
 	// Write out our reflection information
 	printf("|--Buffer Info--\n");
 	for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skr_shader_meta_buffer_t *buff = &out_file->meta->buffers[i];
-		printf("|  %s : %u bytes\n", buff->name, buff->size);
+		printf("|  %s - %u bytes\n", buff->name, buff->size);
 		for (size_t v = 0; v < buff->var_count; v++) {
 			skr_shader_meta_var_t *var = &buff->vars[v];
 			printf("|    %-15s: +%-4u [%u]\n", var->name, var->offset, var->size);
@@ -165,7 +169,7 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 		}
 	}
 
-	printf("|\n| Success!\n|________________\n\n");
+	printf("|________________\n\n");
 	return true;
 }
 
@@ -219,6 +223,140 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 	}
 
 	fclose(fp);
+}
+
+///////////////////////////////////////////
+
+void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
+	// Searches for metadata in comments that look like this:
+	//--name                 = unlit/test
+	//--time: color          = {1,1,1,1}
+	//--tex: 2D              = white
+	//--uv_scale: range(0,2) = 0.5
+	// Where --name is a unique keyword indicating the shader's name, and
+	// other elements follow the pattern of:
+	// |indicator|param name|tag separator|tag string|default separator|default value
+	//  --        time       :             color      =                 {1,1,1,1}
+	// Metadata can be in // as well as /**/ comments
+
+	// This function will get each line of comment from the file
+	char *(*next_comment)(char *src, char **ref_end, bool *ref_state) = [](char *src, char **ref_end, bool *ref_state) {
+		char *c      = *ref_end == nullptr ? src : *ref_end;
+		char *result = nullptr;
+
+		// If we're inside a /**/ block, continue from the previous line, we
+		// just need to skip any newline characters at the end.
+		if (*ref_state) {
+			result = (*ref_end)+1;
+			while (*result == '\n' || *result == '\r') result++;
+		}
+		
+		// Search for the start of a comment, if we don't have one already.
+		while (*c != '\0' && result == nullptr) {
+			if (*c == '/' && (*(c+1) == '/' || *(c+1) == '*')) {
+				result = (char*)(c+2);
+				*ref_state = *(c + 1) == '*';
+			}
+			c++;
+		}
+
+		// Find the end of this comment line.
+		c = result;
+		while (c != nullptr && *c != '\0' && *c != '\n' && *c != '\r') {
+			if (*ref_state && *c == '*' && *(c+1) == '/') {
+				*ref_state = false;
+				break;
+			}
+			c++;
+		}
+		*ref_end = c;
+
+		return result;
+	};
+
+	// This function checks if the line is relevant for our metadata
+	char *(*is_relevant)(char *start, char *end) = [](char *start, char *end) {
+		char *c = start;
+		while (c != end && (*c == ' ' || *c == '\t')) c++;
+
+		return end - c > 1 && c[0] == '-' && c[1] == '-' 
+			? &c[2] 
+			: (char*)nullptr;
+	};
+
+	void (*trim_str)(char **ref_start, char **ref_end) = [] (char **ref_start, char **ref_end){
+		while (**ref_start   == ' ' || **ref_start   == '\t') (*ref_start)++;
+		while (*(*ref_end-1) == ' ' || *(*ref_end-1) == '\t') (*ref_end)--;
+	};
+
+	char *(*index_of)(char *start, char *end, char ch) = [](char *start, char *end, char ch) {
+		while (start != end) {
+			if (*start == ch)
+				return start;
+			start++;
+		}
+		return (char*)nullptr;
+	};
+
+	bool  in_comment  = false;
+	char *comment_end = nullptr;
+	char *comment     = next_comment(hlsl_text, &comment_end, &in_comment);
+	while (comment) {
+		comment = is_relevant(comment, comment_end);
+		if (comment) {
+			char *tag_str   = index_of(comment, comment_end, ':');
+			char *value_str = index_of(comment, comment_end, '=');
+
+			char *name_start = comment;
+			char *name_end   = tag_str?tag_str:(value_str?value_str:comment_end);
+			trim_str(&name_start, &name_end);
+			char name[32];
+			memcpy(name, name_start, min(sizeof(name), name_end - name_start));
+			name[name_end-name_start] = '\0';
+
+			char tag[64]; tag[0] = '\0';
+			if (tag_str) {
+				char *tag_start = tag_str + 1;
+				char *tag_end   = value_str ? value_str : comment_end;
+				trim_str(&tag_start, &tag_end);
+				memcpy(tag, tag_start, min(sizeof(tag), tag_end - tag_start));
+				tag[tag_end-tag_start] = '\0';
+			}
+
+			if (value_str) {
+				char *value_start = value_str + 1;
+				char *value_end   = comment_end;
+				trim_str(&value_start, &value_end);
+				printf("value: [%.*s]\n", value_end - value_start, value_start);
+			}
+
+			skr_shader_meta_buffer_t *buff = &ref_meta->buffers[ref_meta->global_buffer_id];
+			int32_t found = 0;
+			for (size_t i = 0; i < buff->var_count; i++) {
+				if (strcmp(buff->vars[i].name, name) == 0) {
+					found += 1;
+					strcpy_s(buff->vars[i].extra, tag);
+					break;
+				}
+			}
+			for (size_t i = 0; i < ref_meta->texture_count; i++) {
+				if (strcmp(ref_meta->textures[i].name, name) == 0) {
+					found += 1;
+					strcpy_s(ref_meta->textures[i].extra, tag);
+					break;
+				}
+			}
+			if (strcmp(name, "name") == 0) {
+				found += 1;
+				strcpy_s(ref_meta->name, name);
+			}
+
+			if (found != 1) {
+				printf("| !! Invalid meta tag for '%s' !!\n", name);
+			}
+		}
+		comment = next_comment(hlsl_text, &comment_end, &in_comment);
+	}
 }
 
 ///////////////////////////////////////////
@@ -537,7 +675,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
 
-	printf("%s\n", (char*)out_stage->code);
+	//printf("%s\n", (char*)out_stage->code);
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

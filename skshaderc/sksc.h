@@ -9,6 +9,7 @@
 ///////////////////////////////////////////
 
 typedef struct sksc_settings_t {
+	bool replace_ext;
 	bool debug;
 	bool row_major;
 	int  optimize;

@@ -39,6 +39,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 	result.ps_entrypoint = L"ps";
 	result.vs_entrypoint = L"vs";
 	result.shader_model  = L"6_0";
+	result.replace_ext   = false;
 
 	// Get the inlcude folder
 	char folder[512];
@@ -81,7 +82,11 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 					dir,   sizeof(dir),
 					name,  sizeof(name), nullptr, 0); 
 
-				sprintf_s(new_filename, "%s%s%s.sks", drive, dir, name);
+				if (settings->replace_ext) {
+					sprintf_s(new_filename, "%s%s%s.sks", drive, dir, name);
+				} else {
+					sprintf_s(new_filename, "%s.sks", filename);
+				}
 				sksc_save(new_filename, &file);
 
 				skr_shader_file_destroy(&file);

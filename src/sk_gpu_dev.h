@@ -9,42 +9,42 @@
 
 ///////////////////////////////////////////
 
-enum skr_buffer_type_ {
+typedef enum skr_buffer_type_ {
 	skr_buffer_type_vertex,
 	skr_buffer_type_index,
 	skr_buffer_type_constant,
-};
+} skr_buffer_type_;
 
-enum skr_tex_type_ {
+typedef enum skr_tex_type_ {
 	skr_tex_type_image,
 	skr_tex_type_cubemap,
 	skr_tex_type_rendertarget,
 	skr_tex_type_depth,
-};
+} skr_tex_type_;
 
-enum skr_use_ {
+typedef enum skr_use_ {
 	skr_use_static,
 	skr_use_dynamic,
-};
+} skr_use_;
 
-enum skr_mip_ {
+typedef enum skr_mip_ {
 	skr_mip_generate,
 	skr_mip_none,
-};
+} skr_mip_;
 
-enum skr_tex_address_ {
+typedef enum skr_tex_address_ {
 	skr_tex_address_repeat,
 	skr_tex_address_clamp,
 	skr_tex_address_mirror,
-};
+} skr_tex_address_;
 
-enum skr_tex_sample_ {
+typedef enum skr_tex_sample_ {
 	skr_tex_sample_linear,
 	skr_tex_sample_point,
 	skr_tex_sample_anisotropic
-};
+} skr_tex_sample_;
 
-enum skr_tex_fmt_ {
+typedef enum skr_tex_fmt_ {
 	skr_tex_fmt_none = 0,
 	skr_tex_fmt_rgba32,
 	skr_tex_fmt_rgba32_linear,
@@ -58,9 +58,9 @@ enum skr_tex_fmt_ {
 	skr_tex_fmt_depthstencil,
 	skr_tex_fmt_depth32,
 	skr_tex_fmt_depth16,
-};
+} skr_tex_fmt_;
 
-enum skr_fmt_ {
+typedef enum skr_fmt_ {
 	skr_fmt_none,
 	skr_fmt_f32_1,    skr_fmt_f32_2,    skr_fmt_f32_3,    skr_fmt_f32_4,
 	skr_fmt_f16_1,    skr_fmt_f16_2,                      skr_fmt_f16_4,
@@ -72,21 +72,30 @@ enum skr_fmt_ {
 	skr_fmt_ui8_1,    skr_fmt_ui8_2,                      skr_fmt_ui8_4,
 	skr_fmt_ui16_n_1, skr_fmt_ui16_n_2,                   skr_fmt_ui16_n_4,
 	skr_fmt_ui8_n_1,  skr_fmt_ui8_n_2,                    skr_fmt_ui8_n_4,
-};
+} skr_fmt_;
 
-enum skr_el_semantic_ {
+typedef enum skr_el_semantic_ {
 	skr_el_semantic_none,
 	skr_el_semantic_position,
 	skr_el_semantic_normal,
 	skr_el_semantic_texcoord,
 	skr_el_semantic_color,
 	skr_el_semantic_target_index,
-};
+} skr_el_semantic_;
 
-enum skr_stage_ {
+typedef enum skr_stage_ {
 	skr_stage_vertex = 1 << 0,
 	skr_stage_pixel  = 1 << 1,
-};
+} skr_stage_;
+
+typedef enum skr_shader_var_ {
+	skr_shader_var_none,
+	skr_shader_var_int,
+	skr_shader_var_uint,
+	skr_shader_var_uint8,
+	skr_shader_var_float,
+	skr_shader_var_double,
+} skr_shader_var_;
 
 typedef enum skr_transparency_ {
 	skr_transparency_none = 1,
@@ -117,6 +126,8 @@ typedef struct skr_shader_meta_var_t {
 	char     extra[64];
 	size_t   offset;
 	size_t   size;
+	uint16_t type;
+	uint16_t type_count;
 } skr_shader_meta_var_t;
 
 typedef struct skr_shader_meta_buffer_t {

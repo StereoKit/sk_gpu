@@ -148,7 +148,15 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 		printf("|  %s - %u bytes\n", buff->name, buff->size);
 		for (size_t v = 0; v < buff->var_count; v++) {
 			skr_shader_meta_var_t *var = &buff->vars[v];
-			printf("|    %-15s: +%-4u [%u]\n", var->name, var->offset, var->size);
+			const char *type_name = "misc";
+			switch (var->type) {
+			case skr_shader_var_double: type_name = "dbl"; break;
+			case skr_shader_var_float:  type_name = "flt"; break;
+			case skr_shader_var_int:    type_name = "int"; break;
+			case skr_shader_var_uint:   type_name = "uint"; break;
+			case skr_shader_var_uint8:  type_name = "uint8"; break;
+			}
+			printf("|    %-15s: +%-4u [%u] - %s%u\n", var->name, var->offset, var->size, type_name, var->type_count);
 		}
 	}
 	skr_stage_ stages[2] = { skr_stage_vertex, skr_stage_pixel };
@@ -196,14 +204,23 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 		fwrite(&buff->bind,      sizeof(buff->bind     ), 1, fp);
 		fwrite(&buff->size,      sizeof(buff->size     ), 1, fp);
 		fwrite(&buff->var_count, sizeof(buff->var_count), 1, fp);
+		if (buff->defaults) {
+			fwrite(&buff->size, sizeof(buff->size), 1, fp);
+			fwrite(&buff->defaults, buff->size, 1, fp);
+		} else {
+			size_t zero = 0;
+			fwrite(&zero, sizeof(buff->size), 1, fp);
+		}
 		//fwrite(&buff->defaults,     buff->size,              1, fp);
 
 		for (uint32_t t = 0; t < buff->var_count; t++) {
 			skr_shader_meta_var_t *var = &buff->vars[t];
-			fwrite(var->name,    sizeof(var->name),   1, fp);
-			fwrite(var->extra,   sizeof(var->extra),  1, fp);
-			fwrite(&var->offset, sizeof(var->offset), 1, fp);
-			fwrite(&var->size,   sizeof(var->size),   1, fp);
+			fwrite(var->name,        sizeof(var->name),       1, fp);
+			fwrite(var->extra,       sizeof(var->extra),      1, fp);
+			fwrite(&var->offset,     sizeof(var->offset),     1, fp);
+			fwrite(&var->size,       sizeof(var->size),       1, fp);
+			fwrite(&var->type,       sizeof(var->type),       1, fp);
+			fwrite(&var->type_count, sizeof(var->type_count), 1, fp);
 		}
 	}
 
@@ -230,13 +247,13 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 	// Searches for metadata in comments that look like this:
 	//--name                 = unlit/test
-	//--time: color          = {1,1,1,1}
+	//--time: color          = 1,1,1,1
 	//--tex: 2D              = white
 	//--uv_scale: range(0,2) = 0.5
 	// Where --name is a unique keyword indicating the shader's name, and
 	// other elements follow the pattern of:
-	// |indicator|param name|tag separator|tag string|default separator|default value
-	//  --        time       :             color      =                 {1,1,1,1}
+	// |indicator|param name|tag separator|tag string|default separator|comma separated default values
+	//  --        time       :             color      =                 1,1,1,1
 	// Metadata can be in // as well as /**/ comments
 
 	// This function will get each line of comment from the file
@@ -298,6 +315,16 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 		return (char*)nullptr;
 	};
 
+	int32_t(*count_ch)(const char *str, char ch) = [](const char *str, char ch) {
+		const char *c      = str;
+		int32_t     result = 0;
+		while (*c != '\0') {
+			if (*c == ch) result++;
+			c++;
+		}
+		return result;
+	};
+
 	bool  in_comment  = false;
 	char *comment_end = nullptr;
 	char *comment     = next_comment(hlsl_text, &comment_end, &in_comment);
@@ -323,19 +350,61 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 				tag[tag_end-tag_start] = '\0';
 			}
 
+			char value[512]; value[0] = '\0';
 			if (value_str) {
 				char *value_start = value_str + 1;
 				char *value_end   = comment_end;
 				trim_str(&value_start, &value_end);
-				printf("value: [%.*s]\n", value_end - value_start, value_start);
+				memcpy(value, value_start, min(sizeof(value), value_end - value_start));
+				value[value_end-value_start] = '\0';
 			}
 
-			skr_shader_meta_buffer_t *buff = &ref_meta->buffers[ref_meta->global_buffer_id];
-			int32_t found = 0;
+			skr_shader_meta_buffer_t *buff  = &ref_meta->buffers[ref_meta->global_buffer_id];
+			int32_t                   found = 0;
 			for (size_t i = 0; i < buff->var_count; i++) {
 				if (strcmp(buff->vars[i].name, name) == 0) {
 					found += 1;
 					strcpy_s(buff->vars[i].extra, tag);
+
+					if (value_str) {
+						int32_t commas = count_ch(value, ',');
+
+						if (buff->vars[i].type == skr_shader_var_none) {
+							printf("| !! Can't set default for --%s, unimplemented type !!\n", name);
+						} else if (commas + 1 != buff->vars[i].type_count) {
+							printf("| !! default value for --%s has an incorrect number of arguments !!\n", name);
+						} else {
+							if (buff->defaults == nullptr) {
+								buff->defaults = malloc(buff->size);
+								memset(buff->defaults, 0, buff->size);
+							}
+							uint8_t *write_at = ((uint8_t *)buff->defaults) + buff->vars[i].offset;
+
+							char *start = value;
+							char *end   = strchr(start, ',');
+							char  item[64];
+							for (size_t c = 0; c <= commas; c++) {
+								int32_t length = end == nullptr ? min(sizeof(item)-1, strlen(value)) : end - start;
+								memcpy(item, start, min(sizeof(item), length));
+								item[length] = '\0';
+
+								double d = atof(item);
+
+								switch (buff->vars[i].type) {
+								case skr_shader_var_float:  {float    v = (float   )d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
+								case skr_shader_var_double: {double   v =           d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
+								case skr_shader_var_int:    {int32_t  v = (int32_t )d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
+								case skr_shader_var_uint:   {uint32_t v = (uint32_t)d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
+								case skr_shader_var_uint8:  {uint8_t  v = (uint8_t )d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
+								}
+
+								if (end != nullptr) {
+									start = end + 1;
+									end   = strchr(start, ',');
+								}
+							}
+						}
+					}
 					break;
 				}
 			}
@@ -348,11 +417,17 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 			}
 			if (strcmp(name, "name") == 0) {
 				found += 1;
-				strcpy_s(ref_meta->name, name);
+				strcpy_s(ref_meta->name, value);
 			}
+			
 
 			if (found != 1) {
-				printf("| !! Invalid meta tag for '%s' !!\n", name);
+				printf("| !! Can't find shader var named '%s' !!\n", name);
+			} else {
+				printf("| %s", name);
+				if (tag_str  ) printf(": %s", tag);
+				if (value_str) printf(" = %s", value);
+				printf("\n");
 			}
 		}
 		comment = next_comment(hlsl_text, &comment_end, &in_comment);
@@ -515,8 +590,27 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_stage_ stage, skr_shad
 				type->GetDesc(&type_desc);
 				var ->GetDesc(&var_desc );
 
-				buffer_list[id].vars[v].size   = var_desc.Size;
-				buffer_list[id].vars[v].offset = var_desc.StartOffset;
+				skr_shader_var_ skr_type = skr_shader_var_none;
+				switch (type_desc.Type) {
+				case D3D_SVT_FLOAT:  skr_type = skr_shader_var_float;  break;
+				case D3D_SVT_DOUBLE: skr_type = skr_shader_var_double; break;
+				case D3D_SVT_INT:    skr_type = skr_shader_var_int;    break;
+				case D3D_SVT_UINT:   skr_type = skr_shader_var_uint;   break;
+				case D3D_SVT_UINT8:  skr_type = skr_shader_var_uint8;  break;
+				}
+				buffer_list[id].vars[v].type = skr_type;
+				if (type_desc.Class == D3D_SVC_STRUCT) {
+					buffer_list[id].vars[v].type_count = type_desc.Elements;
+				} else {
+					buffer_list[id].vars[v].type_count = 1;
+					if (type_desc.Elements != 0)
+						buffer_list[id].vars[v].type_count = type_desc.Elements;
+					if (type_desc.Rows != 0)
+						buffer_list[id].vars[v].type_count *= type_desc.Rows * type_desc.Columns;
+				}
+
+				buffer_list[id].vars[v].size       = var_desc.Size;
+				buffer_list[id].vars[v].offset     = var_desc.StartOffset;
 				sprintf_s(buffer_list[id].vars[v].name, _countof(buffer_list[id].vars[v].name), "%s", var_desc.Name);
 			}
 		} 

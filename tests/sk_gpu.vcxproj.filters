@@ -54,5 +54,16 @@
     <Filter Include="src">
       <UniqueIdentifier>{69f1b716-342a-48ef-a7fb-991f867b21f5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{cc0b65bc-d4be-4f8c-ab96-153f113d498e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="shaders\cubemap.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\test.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

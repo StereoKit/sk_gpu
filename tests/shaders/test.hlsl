@@ -1,3 +1,6 @@
+//--name = test
+//--tex = white 
+
 cbuffer SystemBuffer : register(b0) {
 	float4x4 viewproj;
 };

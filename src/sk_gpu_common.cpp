@@ -89,20 +89,27 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skr_shader_meta_buffer_t *buffer = &out_file->meta->buffers[i];
-		memcpy( buffer->name,      &bytes[at], sizeof(buffer->name)); at += sizeof(buffer->name);
-		memcpy(&buffer->bind,      &bytes[at], sizeof(buffer->bind)); at += sizeof(buffer->bind);
-		memcpy(&buffer->size,      &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->size);
-		memcpy(&buffer->var_count, &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->var_count);
-		buffer->defaults = malloc(buffer->size);
-		//memcpy(&buffer->defaults,     &bytes[at], buffer->size);         at += buffer->size;
+		memcpy( buffer->name,      &bytes[at], sizeof(buffer->name));      at += sizeof(buffer->name);
+		memcpy(&buffer->bind,      &bytes[at], sizeof(buffer->bind));      at += sizeof(buffer->bind);
+		memcpy(&buffer->size,      &bytes[at], sizeof(buffer->size));      at += sizeof(buffer->size);
+		memcpy(&buffer->var_count, &bytes[at], sizeof(buffer->var_count)); at += sizeof(buffer->var_count);
+
+		size_t default_size = 0;
+		memcpy(&default_size, &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->size);
+		if (default_size != 0) {
+			buffer->defaults = malloc(buffer->size);
+			memcpy(&buffer->defaults, &bytes[at], default_size); at += default_size;
+		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
 
 		for (uint32_t t = 0; t < buffer->var_count; t++) {
 			skr_shader_meta_var_t *var = &buffer->vars[t];
-			memcpy( var->name,   &bytes[at], sizeof(var->name ));  at += sizeof(var->name  );
-			memcpy( var->extra,  &bytes[at], sizeof(var->extra));  at += sizeof(var->extra );
-			memcpy(&var->offset, &bytes[at], sizeof(var->offset)); at += sizeof(var->offset);
-			memcpy(&var->size,   &bytes[at], sizeof(var->size));   at += sizeof(var->size  );
+			memcpy( var->name,       &bytes[at], sizeof(var->name ));      at += sizeof(var->name  );
+			memcpy( var->extra,      &bytes[at], sizeof(var->extra));      at += sizeof(var->extra );
+			memcpy(&var->offset,     &bytes[at], sizeof(var->offset));     at += sizeof(var->offset);
+			memcpy(&var->size,       &bytes[at], sizeof(var->size));       at += sizeof(var->size  );
+			memcpy(&var->type,       &bytes[at], sizeof(var->type));       at += sizeof(var->type  );
+			memcpy(&var->type_count, &bytes[at], sizeof(var->type_count)); at += sizeof(var->type_count);
 		}
 
 		if (strcmp(buffer->name, "$Globals") == 0)

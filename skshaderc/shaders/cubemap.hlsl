@@ -1,4 +1,10 @@
-cbuffer SystemBuffer : register(b0) {
+//--name = Cubemap
+//--tex = white
+//--cubemap:Cube = white
+//--dense:thing=blue
+//--test
+
+cbuffer /* hehe */SystemBuffer : /* Here's some sneaky stuff */ register(b0) { // With some at the end
 	float4x4 viewproj;
 };
 

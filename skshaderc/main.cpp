@@ -40,6 +40,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 	result.vs_entrypoint = L"vs";
 	result.shader_model  = L"6_0";
 	result.replace_ext   = false;
+	result.output_header = false;
 
 	// Get the inlcude folder
 	char folder[512];
@@ -47,7 +48,8 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 	mbstowcs_s(nullptr, result.folder, _countof(result.folder), folder, sizeof(folder));
 
 	for (int32_t i=1; i<argc-1; i++) {
-
+		if      (strcmp(argv[i], "-h") == 0) result.output_header = true;
+		else if (strcmp(argv[i], "-e") == 0) result.replace_ext   = true;
 	}
 
 	return result;
@@ -71,25 +73,27 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 			size_t file_size;
 			if (read_file(filename, &file_text, &file_size)) {
 				skr_shader_file_t file;
-				sksc_compile(filename, file_text, settings, &file);
+				if (sksc_compile(filename, file_text, settings, &file)) {
+					char new_filename[512];
+					char drive[16];
+					char dir  [512];
+					char name [128];
+					_splitpath_s(filename,
+						drive, sizeof(drive),
+						dir,   sizeof(dir),
+						name,  sizeof(name), nullptr, 0); 
 
-				char new_filename[512];
-				char drive[16];
-				char dir  [512];
-				char name [128];
-				_splitpath_s(filename,
-					drive, sizeof(drive),
-					dir,   sizeof(dir),
-					name,  sizeof(name), nullptr, 0); 
+					if (settings->replace_ext) {
+						sprintf_s(new_filename, "%s%s%s.sks", drive, dir, name);
+					} else {
+						sprintf_s(new_filename, "%s.sks", filename);
+					}
+					sksc_save(new_filename, &file);
+					if (settings->output_header)
+						sksc_save_header(new_filename);
 
-				if (settings->replace_ext) {
-					sprintf_s(new_filename, "%s%s%s.sks", drive, dir, name);
-				} else {
-					sprintf_s(new_filename, "%s.sks", filename);
+					skr_shader_file_destroy(&file);
 				}
-				sksc_save(new_filename, &file);
-
-				skr_shader_file_destroy(&file);
 				free(file_text);
 			}
 		} while(FindNextFileA(handle, &file_info));

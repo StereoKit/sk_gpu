@@ -244,6 +244,59 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 
 ///////////////////////////////////////////
 
+void sksc_save_header(char *sks_file) {
+	FILE *fp;
+	if (fopen_s(&fp, sks_file, "rb") != 0 || fp == nullptr) {
+		return;
+	}
+
+	fseek(fp, 0L, SEEK_END);
+	size_t size = ftell(fp);
+	rewind(fp);
+
+	void* data = (char*)malloc(size+1);
+	if (data == nullptr) { size = 0; fclose(fp); return; }
+	fread (data, 1, size, fp);
+	fclose(fp);
+
+	char new_filename[512];
+	char drive[16];
+	char dir  [512];
+	char name [128];
+	_splitpath_s(sks_file,
+		drive, sizeof(drive),
+		dir,   sizeof(dir),
+		name,  sizeof(name), nullptr, 0);
+	sprintf_s(new_filename, "%s%s%s.h", drive, dir, name);
+
+	// '.' may be common, and will bork the variable name
+	size_t len = strlen(name);
+	for (size_t i = 0; i < len; i++) {
+		if (name[i] == '.') name[i] = '_';
+	}
+
+	fp = nullptr;
+	if (fopen_s(&fp, new_filename, "w") != 0 || fp == nullptr) {
+		return;
+	}
+	fprintf(fp, "#pragma once\n\n");
+	int32_t ct = fprintf_s(fp, "const unsigned char sks_%s[%lu] = {", name, size);
+	for (size_t i = 0; i < size; i++) {
+		unsigned char byte = ((unsigned char *)data)[i];
+		ct += fprintf_s(fp, "%d,", byte);
+		if (ct > 80) { 
+			fprintf(fp, "\n"); 
+			ct = 0; 
+		}
+	}
+	fprintf_s(fp, "};\n");
+	fclose(fp);
+
+	free(data);
+}
+
+///////////////////////////////////////////
+
 void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 	// Searches for metadata in comments that look like this:
 	//--name                 = unlit/test
@@ -372,7 +425,7 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 						if (buff->vars[i].type == skr_shader_var_none) {
 							printf("| !! Can't set default for --%s, unimplemented type !!\n", name);
 						} else if (commas + 1 != buff->vars[i].type_count) {
-							printf("| !! default value for --%s has an incorrect number of arguments !!\n", name);
+							printf("| !! Default value for --%s has an incorrect number of arguments !!\n", name);
 						} else {
 							if (buff->defaults == nullptr) {
 								buff->defaults = malloc(buff->size);
@@ -423,6 +476,8 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 
 			if (found != 1) {
 				printf("| !! Can't find shader var named '%s' !!\n", name);
+			} else if (!tag_str && !value_str) {
+				printf("| !! Shader var tag for %s not used, missing a ':' or '='? !!\n", name);
 			} else {
 				printf("| %s", name);
 				if (tag_str  ) printf(": %s", tag);
@@ -695,7 +750,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	spvc_context context = nullptr;
 	spvc_context_create            (&context);
 	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
-		printf("spvc err: %s\n", error);
+		printf("GLSL err: %s\n", error);
 	}, nullptr);
 
 	spvc_compiler  compiler_glsl = nullptr;

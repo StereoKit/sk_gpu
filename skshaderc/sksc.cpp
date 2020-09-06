@@ -789,6 +789,9 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
 
+	spvc_variable_id id;
+	spvc_compiler_build_dummy_sampler_for_combined_images(compiler_glsl, &id);
+
 	// combiner samplers/textures for OpenGL/ES
 	spvc_compiler_build_combined_image_samplers(compiler_glsl);
 
@@ -797,7 +800,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	spvc_compiler_get_combined_image_samplers(compiler_glsl, &samplers, &count);
 	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
 	for (size_t i = 0; i < count; i++) {
-		spvc_compiler_set_name(compiler_glsl, samplers[i].combined_id, list[i].name);
+		spvc_compiler_set_name      (compiler_glsl, samplers[i].combined_id, list[i].name);
 		spvc_compiler_set_decoration(compiler_glsl, samplers[i].combined_id, SpvDecorationBinding, spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding));
 	}
 

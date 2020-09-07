@@ -128,6 +128,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 
 		size_t default_size = 0;
 		memcpy(&default_size, &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->size);
+		buffer->defaults = nullptr;
 		if (default_size != 0) {
 			buffer->defaults = malloc(buffer->size);
 			memcpy(&buffer->defaults, &bytes[at], default_size); at += default_size;

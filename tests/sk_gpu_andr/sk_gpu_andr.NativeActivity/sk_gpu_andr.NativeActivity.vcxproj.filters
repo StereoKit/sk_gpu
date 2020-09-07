@@ -42,11 +42,7 @@
     <Library Include="libs\arm64-v8a\Debug\libopenxr_loader.so" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\shaders\cubemap.hlsl.sks">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="..\..\shaders\test.hlsl.sks">
-      <Filter>shaders</Filter>
-    </None>
+    <CopyFileToFolders Include="..\..\shaders\cubemap.hlsl.sks" />
+    <CopyFileToFolders Include="..\..\shaders\test.hlsl.sks" />
   </ItemGroup>
 </Project>

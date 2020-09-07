@@ -59,11 +59,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="shaders\cubemap.hlsl">
-      <Filter>shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="shaders\test.hlsl">
-      <Filter>shaders</Filter>
-    </FxCompile>
+    <CustomBuild Include="shaders\cubemap.hlsl" />
+    <CustomBuild Include="shaders\test.hlsl" />
   </ItemGroup>
 </Project>

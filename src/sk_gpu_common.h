@@ -24,8 +24,10 @@ typedef struct skr_shader_file_t {
 
 ///////////////////////////////////////////
 
-void               skr_log(const char *text);
+void               skr_log (const char *text);
+uint64_t           skr_hash(const char *string);
 
+bool               skr_shader_file_verify      (void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size);
 bool               skr_shader_file_load        (const char *file, skr_shader_file_t *out_file);
 bool               skr_shader_file_load_mem    (void *data, size_t size, skr_shader_file_t *out_file);
 skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, skr_stage_ stage);

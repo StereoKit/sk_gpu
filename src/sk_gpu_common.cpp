@@ -50,6 +50,16 @@ bool skr_read_file(const char *filename, void **out_data, size_t *out_size) {
 
 ///////////////////////////////////////////
 
+uint64_t skr_hash(const char *string) {
+	uint64_t hash = 14695981039346656037;
+	uint8_t  c;
+	while (c = *string++)
+		hash = (hash ^ c) * 1099511628211;
+	return hash;
+}
+
+///////////////////////////////////////////
+
 bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
 	void  *data = nullptr;
 	size_t size = 0;
@@ -65,14 +75,36 @@ bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
 
 ///////////////////////////////////////////
 
-bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_file) {
+bool skr_shader_file_verify(void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size) {
 	const char    *prefix  = "SKSHADER";
-	const uint16_t version = 1;
 	const uint8_t *bytes   = (uint8_t*)data;
+
 	// check the first 5 bytes to see if this is a SKS shader file
-	if (size < 10 || memcmp(bytes, prefix, 8) != 0 || memcmp(&bytes[8], &version, sizeof(uint16_t)) != 0)
+	if (size < 10 || memcmp(bytes, prefix, 8) != 0)
 		return false;
 
+	// Grab the file version
+	if (out_version)
+		memcpy(out_version, &bytes[8], sizeof(uint16_t));
+
+	// And grab the name of the shader
+	if (out_name != nullptr && out_name_size > 0) {
+		memcpy(out_name, &bytes[14], out_name_size < 256 ? out_name_size : 256);
+		out_name[out_name_size - 1] = '\0';
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////
+
+bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_file) {
+	uint16_t file_version = 0;
+	if (!skr_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 1) {
+		return false;
+	}
+	
+	const uint8_t *bytes = (uint8_t*)data;
 	size_t at = 10;
 	memcpy(&out_file->stage_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
 	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
@@ -101,6 +133,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			memcpy(&buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
+		buffer->name_hash = skr_hash(buffer->name);
 
 		for (uint32_t t = 0; t < buffer->var_count; t++) {
 			skr_shader_meta_var_t *var = &buffer->vars[t];
@@ -110,6 +143,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			memcpy(&var->size,       &bytes[at], sizeof(var->size));       at += sizeof(var->size  );
 			memcpy(&var->type,       &bytes[at], sizeof(var->type));       at += sizeof(var->type  );
 			memcpy(&var->type_count, &bytes[at], sizeof(var->type_count)); at += sizeof(var->type_count);
+			var->name_hash = skr_hash(var->name);
 		}
 
 		if (strcmp(buffer->name, "$Globals") == 0)
@@ -121,6 +155,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		memcpy( tex->name,  &bytes[at], sizeof(tex->name )); at += sizeof(tex->name );
 		memcpy( tex->extra, &bytes[at], sizeof(tex->extra)); at += sizeof(tex->extra);
 		memcpy(&tex->bind,  &bytes[at], sizeof(tex->bind )); at += sizeof(tex->bind );
+		tex->name_hash = skr_hash(tex->name);
 	}
 
 	for (uint32_t i = 0; i < out_file->stage_count; i++) {
@@ -256,12 +291,18 @@ int32_t skr_shader_get_var_count(const skr_shader_t *shader) {
 
 ///////////////////////////////////////////
 
-int32_t skr_shader_get_var_id(const skr_shader_t *shader, const char *name) {
+int32_t skr_shader_get_var_index(const skr_shader_t *shader, const char *name) {
+	return skr_shader_get_var_index_h(shader, skr_hash(name));
+}
+
+///////////////////////////////////////////
+
+int32_t skr_shader_get_var_index_h(const skr_shader_t *shader, uint64_t name_hash) {
 	if (shader->meta->global_buffer_id == -1) return -1;
 
 	skr_shader_meta_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	for (uint32_t i = 0; i < buffer->var_count; i++) {
-		if (strcmp(name, buffer->vars[i].name) == 0) {
+		if (buffer->vars[i].name_hash == name_hash) {
 			return i;
 		}
 	}

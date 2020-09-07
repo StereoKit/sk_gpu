@@ -580,7 +580,7 @@ void skr_draw_begin() {
 
 ///////////////////////////////////////////
 
-void skr_tex_target_bind(skr_tex_t *render_target, bool clear, float clear_color[4]) {
+void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clear_color_4) {
 	gl_active_rendertarget = render_target;
 	gl_current_framebuffer = render_target == nullptr ? 0 : render_target->framebuffer;
 
@@ -592,7 +592,7 @@ void skr_tex_target_bind(skr_tex_t *render_target, bool clear, float clear_color
 	}
 
 	if (clear) {
-		glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
+		glClearColor(clear_color_4[0], clear_color_4[1], clear_color_4[2], clear_color_4[3]);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 }
@@ -809,9 +809,19 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 		skr_log("Unable to compile shader program:");
 		skr_log(log);
 		free(log);
+
+		glDeleteProgram(result.program);
+		result.program = 0;
 	}
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+bool skr_shader_is_valid(const skr_shader_t *shader) {
+	return shader->meta
+		&& shader->program;
 }
 
 ///////////////////////////////////////////

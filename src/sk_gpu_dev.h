@@ -123,6 +123,7 @@ typedef struct skr_bind_t {
 
 typedef struct skr_shader_meta_var_t {
 	char     name [32];
+	uint64_t name_hash;
 	char     extra[64];
 	size_t   offset;
 	size_t   size;
@@ -132,6 +133,7 @@ typedef struct skr_shader_meta_var_t {
 
 typedef struct skr_shader_meta_buffer_t {
 	char       name[32];
+	uint64_t   name_hash;
 	skr_bind_t bind;
 	size_t     size;
 	void      *defaults;
@@ -141,6 +143,7 @@ typedef struct skr_shader_meta_buffer_t {
 
 typedef struct skr_shader_meta_texture_t {
 	char       name [32];
+	uint64_t   name_hash;
 	char       extra[64];
 	skr_bind_t bind;
 	size_t     size;
@@ -195,11 +198,13 @@ void                skr_shader_stage_destroy(skr_shader_stage_t *stage);
 skr_shader_t        skr_shader_create_file    (const char *sks_filename);
 skr_shader_t        skr_shader_create_mem     (void *sks_data, size_t sks_data_size);
 skr_shader_t        skr_shader_create_manual  (skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader);
+bool                skr_shader_is_valid       (const skr_shader_t *shader);
 skr_bind_t          skr_shader_get_tex_bind   (const skr_shader_t *shader, const char *name);
 skr_bind_t          skr_shader_get_buffer_bind(const skr_shader_t *shader, const char *name);
 int32_t             skr_shader_get_var_count  (const skr_shader_t *shader);
-int32_t             skr_shader_get_var_id     (const skr_shader_t *shader, const char *name);
-const skr_shader_meta_var_t *skr_shader_get_var_info (const skr_shader_t *shader, int32_t var_id);
+int32_t             skr_shader_get_var_index  (const skr_shader_t *shader, const char *name);
+int32_t             skr_shader_get_var_index_h(const skr_shader_t *shader, uint64_t name_hash);
+const skr_shader_meta_var_t *skr_shader_get_var_info (const skr_shader_t *shader, int32_t var_index);
 void                skr_shader_destroy        (      skr_shader_t *shader);
 
 skr_pipeline_t      skr_pipeline_create          (skr_shader_t *shader);
@@ -226,7 +231,7 @@ void                skr_tex_settings        (      skr_tex_t *tex, skr_tex_addre
 void                skr_tex_set_contents    (      skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
 void                skr_tex_get_contents    (      skr_tex_t *tex);
 void                skr_tex_bind            (const skr_tex_t *tex, skr_bind_t bind);
-void                skr_tex_target_bind     (      skr_tex_t *render_target, bool clear, float clear_color[4]);
+void                skr_tex_target_bind     (      skr_tex_t *render_target, bool clear, const float *clear_color_4);
 skr_tex_t          *skr_tex_target_get      ();
 void                skr_tex_destroy         (      skr_tex_t *tex);
 int64_t             skr_tex_fmt_to_native   (skr_tex_fmt_ format);

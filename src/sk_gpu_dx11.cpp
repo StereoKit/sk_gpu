@@ -131,7 +131,7 @@ skr_platform_data_t skr_get_platform_data() {
 
 ///////////////////////////////////////////
 
-void skr_tex_target_bind(skr_tex_t *render_target, bool clear, float clear_color[4]) {
+void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clear_color_4) {
 	d3d_active_rendertarget = render_target;
 
 	if (render_target == nullptr) {
@@ -145,7 +145,7 @@ void skr_tex_target_bind(skr_tex_t *render_target, bool clear, float clear_color
 	d3d_context->RSSetViewports(1, &viewport);
 
 	if (clear) {
-		d3d_context->ClearRenderTargetView(render_target->target_view, clear_color);
+		d3d_context->ClearRenderTargetView(render_target->target_view, clear_color_4);
 		if (render_target->depth_tex != nullptr)
 			d3d_context->ClearDepthStencilView(render_target->depth_tex->depth_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	}
@@ -332,6 +332,14 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 	if (result.pixel ) result.pixel ->AddRef();
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+bool skr_shader_is_valid(const skr_shader_t *shader) {
+	return shader->meta
+		&& shader->vertex
+		&& shader->pixel;
 }
 
 ///////////////////////////////////////////

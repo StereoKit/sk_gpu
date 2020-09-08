@@ -7,6 +7,7 @@ typedef struct skr_buffer_t {
 
 typedef struct skr_mesh_t {
 	uint32_t index_buffer;
+	uint32_t vert_buffer;
 	uint32_t layout;
 } skr_mesh_t;
 

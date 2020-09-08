@@ -674,7 +674,8 @@ void skr_buffer_destroy(skr_buffer_t *buffer) {
 
 skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer) {
 	skr_mesh_t result = {};
-	result.index_buffer = ind_buffer->buffer;
+	result.index_buffer = ind_buffer  ? ind_buffer ->buffer : 0;
+	result.vert_buffer  = vert_buffer ? vert_buffer->buffer : 0;
 
 	// Create a vertex layout
 	glGenVertexArrays(1, &result.layout);
@@ -695,8 +696,21 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 
 /////////////////////////////////////////// 
 
+void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
+	mesh->vert_buffer = vert_buffer->buffer;
+}
+
+/////////////////////////////////////////// 
+
+void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
+	mesh->index_buffer = ind_buffer->buffer;
+}
+
+/////////////////////////////////////////// 
+
 void skr_mesh_bind(const skr_mesh_t *mesh) {
 	glBindVertexArray(mesh->layout);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->vert_buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
 }
 

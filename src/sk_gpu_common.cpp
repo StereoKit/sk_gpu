@@ -131,7 +131,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		buffer->defaults = nullptr;
 		if (default_size != 0) {
 			buffer->defaults = malloc(buffer->size);
-			memcpy(&buffer->defaults, &bytes[at], default_size); at += default_size;
+			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);

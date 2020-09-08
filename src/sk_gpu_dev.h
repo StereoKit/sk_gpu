@@ -189,6 +189,8 @@ void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_bin
 void                skr_buffer_destroy      (      skr_buffer_t *buffer);
 
 skr_mesh_t          skr_mesh_create         (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);
+void                skr_mesh_set_verts      (      skr_mesh_t *mesh, const skr_buffer_t *vert_buffer);
+void                skr_mesh_set_inds       (      skr_mesh_t *mesh, const skr_buffer_t *ind_buffer);
 void                skr_mesh_bind           (const skr_mesh_t *mesh);
 void                skr_mesh_destroy        (      skr_mesh_t *mesh);
 

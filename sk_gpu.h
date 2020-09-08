@@ -243,6 +243,7 @@ typedef struct skr_buffer_t {
 
 typedef struct skr_mesh_t {
 	uint32_t index_buffer;
+	uint32_t vert_buffer;
 	uint32_t layout;
 } skr_mesh_t;
 
@@ -323,6 +324,8 @@ void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_bin
 void                skr_buffer_destroy      (      skr_buffer_t *buffer);
 
 skr_mesh_t          skr_mesh_create         (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);
+void                skr_mesh_set_verts      (      skr_mesh_t *mesh, const skr_buffer_t *vert_buffer);
+void                skr_mesh_set_inds       (      skr_mesh_t *mesh, const skr_buffer_t *ind_buffer);
 void                skr_mesh_bind           (const skr_mesh_t *mesh);
 void                skr_mesh_destroy        (      skr_mesh_t *mesh);
 
@@ -652,10 +655,28 @@ void skr_buffer_destroy(skr_buffer_t *buffer) {
 
 skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer) {
 	skr_mesh_t result = {};
-	result.ind_buffer  = ind_buffer ->buffer;
-	result.vert_buffer = vert_buffer->buffer;
+	result.ind_buffer  = ind_buffer  ? ind_buffer ->buffer : nullptr;
+	result.vert_buffer = vert_buffer ? vert_buffer->buffer : nullptr;
+	if (result.ind_buffer ) result.ind_buffer ->AddRef();
+	if (result.vert_buffer) result.vert_buffer->AddRef();
 
 	return result;
+}
+
+/////////////////////////////////////////// 
+
+void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
+	if (mesh->vert_buffer) mesh->vert_buffer->Release();
+	mesh->vert_buffer = vert_buffer->buffer;
+	if (mesh->vert_buffer) mesh->vert_buffer->AddRef();
+}
+
+/////////////////////////////////////////// 
+
+void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
+	if (mesh->ind_buffer) mesh->ind_buffer->Release();
+	mesh->ind_buffer = ind_buffer->buffer;
+	if (mesh->ind_buffer) mesh->ind_buffer->AddRef();
 }
 
 /////////////////////////////////////////// 
@@ -670,6 +691,8 @@ void skr_mesh_bind(const skr_mesh_t *mesh) {
 /////////////////////////////////////////// 
 
 void skr_mesh_destroy(skr_mesh_t *mesh) {
+	if (mesh->ind_buffer ) mesh->ind_buffer ->Release();
+	if (mesh->vert_buffer) mesh->vert_buffer->Release();
 	*mesh = {};
 }
 
@@ -2067,7 +2090,8 @@ void skr_buffer_destroy(skr_buffer_t *buffer) {
 
 skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer) {
 	skr_mesh_t result = {};
-	result.index_buffer = ind_buffer->buffer;
+	result.index_buffer = ind_buffer  ? ind_buffer ->buffer : 0;
+	result.vert_buffer  = vert_buffer ? vert_buffer->buffer : 0;
 
 	// Create a vertex layout
 	glGenVertexArrays(1, &result.layout);
@@ -2088,8 +2112,21 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 
 /////////////////////////////////////////// 
 
+void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
+	mesh->vert_buffer = vert_buffer->buffer;
+}
+
+/////////////////////////////////////////// 
+
+void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
+	mesh->index_buffer = ind_buffer->buffer;
+}
+
+/////////////////////////////////////////// 
+
 void skr_mesh_bind(const skr_mesh_t *mesh) {
 	glBindVertexArray(mesh->layout);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->vert_buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
 }
 
@@ -2725,7 +2762,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		buffer->defaults = nullptr;
 		if (default_size != 0) {
 			buffer->defaults = malloc(buffer->size);
-			memcpy(&buffer->defaults, &bytes[at], default_size); at += default_size;
+			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);

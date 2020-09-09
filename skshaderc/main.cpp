@@ -41,6 +41,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 	result.shader_model  = L"6_0";
 	result.replace_ext   = false;
 	result.output_header = false;
+	result.row_major     = false;
 
 	// Get the inlcude folder
 	char folder[512];
@@ -50,6 +51,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 	for (int32_t i=1; i<argc-1; i++) {
 		if      (strcmp(argv[i], "-h") == 0) result.output_header = true;
 		else if (strcmp(argv[i], "-e") == 0) result.replace_ext   = true;
+		else if (strcmp(argv[i], "-r") == 0) result.row_major     = true;
 	}
 
 	return result;

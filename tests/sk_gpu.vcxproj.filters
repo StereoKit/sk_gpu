@@ -59,7 +59,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="shaders\cubemap.hlsl" />
-    <CustomBuild Include="shaders\test.hlsl" />
+    <CustomBuild Include="shaders\cubemap.hlsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\test.hlsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

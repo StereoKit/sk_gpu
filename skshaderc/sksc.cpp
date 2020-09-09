@@ -493,7 +493,8 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 DWORD sksc_d3d11_build_flags(const sksc_settings_t *settings) {
 	DWORD result = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
 
-	if (settings->row_major) result |= D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR;
+	if (settings->row_major) result |= D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
+	else                     result |= D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR;
 	if (settings->debug) {
 		result |= D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG;
 	} else {

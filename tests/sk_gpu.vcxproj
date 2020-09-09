@@ -207,13 +207,13 @@ python build_header.py</Command>
   <ItemGroup>
     <CustomBuild Include="shaders\cubemap.hlsl">
       <FileType>Document</FileType>
-      <Command>$(ProjectDir)..\skshaderc\bin\$(Configuration)\skshaderc.exe %(FullPath)</Command>
+      <Command>$(ProjectDir)..\bin\$(Configuration)\skshaderc.exe %(FullPath)</Command>
       <Outputs>%(FullPath).sks</Outputs>
       <TreatOutputAsContent>true</TreatOutputAsContent>
     </CustomBuild>
     <CustomBuild Include="shaders\test.hlsl">
       <FileType>Document</FileType>
-      <Command>$(ProjectDir)..\skshaderc\bin\$(Configuration)\skshaderc.exe %(FullPath)</Command>
+      <Command>$(ProjectDir)..\bin\$(Configuration)\skshaderc.exe %(FullPath)</Command>
       <Outputs>%(FullPath).sks</Outputs>
       <TreatOutputAsContent>true</TreatOutputAsContent>
     </CustomBuild>

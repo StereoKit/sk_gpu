@@ -741,9 +741,9 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 
 	// Convert the prefix if it doesn't match the GL version we're using
 	const char   *prefix_gl      = "#version 450";
-	const int32_t prefix_gl_size = strlen(prefix_gl);
+	const size_t  prefix_gl_size = strlen(prefix_gl);
 	const char   *prefix_es      = "#version 300 es";
-	const int32_t prefix_es_size = strlen(prefix_es);
+	const size_t  prefix_es_size = strlen(prefix_es);
 	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;
 #if __ANDROID__
@@ -1089,7 +1089,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 			skr_log("sk_gpu: cubemaps need 6 data frames");
 			return;
 		}
-		for (size_t f = 0; f < 6; f++)
+		for (int32_t f = 0; f < 6; f++)
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, format, width, height, 0, layout, type, data_frames[f]);
 	} else {
 		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);

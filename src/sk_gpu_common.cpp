@@ -108,8 +108,10 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	size_t at = 10;
 	memcpy(&out_file->stage_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
 	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
+	if (out_file->stages == nullptr) { skr_log("Out of memory"); return false; }
 
 	out_file->meta = (skr_shader_meta_t*)malloc(sizeof(skr_shader_meta_t));
+	if (out_file->meta == nullptr) { skr_log("Out of memory"); return false; }
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skr_shader_meta_reference(out_file->meta);
@@ -118,6 +120,9 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
 	out_file->meta->buffers  = (skr_shader_meta_buffer_t *)malloc(sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count );
 	out_file->meta->textures = (skr_shader_meta_texture_t*)malloc(sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
+	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log("Out of memory"); return false; }
+	memset(out_file->meta->buffers,  0, sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count);
+	memset(out_file->meta->textures, 0, sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skr_shader_meta_buffer_t *buffer = &out_file->meta->buffers[i];
@@ -134,6 +139,8 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
+		if (buffer->vars == nullptr) { skr_log("Out of memory"); return false; }
+		memset(buffer->vars, 0, sizeof(skr_shader_meta_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);
 
 		for (uint32_t t = 0; t < buffer->var_count; t++) {
@@ -165,8 +172,12 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		memcpy( &stage->stage,    &bytes[at], sizeof(stage->stage));    at += sizeof(stage->stage);
 		memcpy( &stage->code_size,&bytes[at], sizeof(stage->code_size));at += sizeof(stage->code_size);
 
-		stage->code = malloc(stage->code_size);
-		memcpy(stage->code, &bytes[at], stage->code_size); at += stage->code_size;
+		stage->code = 0;
+		if (stage->code_size > 0) {
+			stage->code = malloc(stage->code_size);
+			if (stage->code == nullptr) { skr_log("Out of memory"); return false; }
+			memcpy(stage->code, &bytes[at], stage->code_size); at += stage->code_size;
+		}
 	}
 
 	return true;

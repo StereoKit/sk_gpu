@@ -192,13 +192,13 @@ void app_test_rendertarget() {
 
 void app_test_instancing() {
 	// Set transforms for 100 instances
-	for (size_t i = 0; i < 100; i++) {
-		int y = i / 10 - 4, x = i % 10 -4;
+	for (int32_t i = 0; i < 100; i++) {
+		int32_t y = i / 10 - 4, x = i % 10 -4;
 		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(float)x - 0.5f,0,(float)y - 0.5f} }) * HMM_Scale(hmm_vec3{ {.2f,.2f,.2f} }));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
-	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
-	skr_buffer_bind  (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
+	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_bind    (&app_mesh1.mesh);
 	skr_pipeline_bind(&app_mat_default);
@@ -206,13 +206,13 @@ void app_test_instancing() {
 	skr_draw         (0, app_mesh1.ind_count, 100);
 
 	// Set transforms for another 100 instances
-	for (size_t i = 0; i < 100; i++) {
-		int y = i / 10 - 4, x = i % 10 -4;
+	for (int32_t i = 0; i < 100; i++) {
+		int32_t y = i / 10 - 4, x = i % 10 -4;
 		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(float)x -0.5f,1,(float)y-0.5f} }) * HMM_Scale(hmm_vec3{{.2f,.2f,.2f}}));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
-	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
-	skr_buffer_bind  (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
+	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
 	skr_mesh_bind    (&app_mesh2.mesh);
 	skr_pipeline_bind(&app_mat_default);
@@ -228,8 +228,8 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
-	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
-	skr_buffer_bind  (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
+	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
+	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
 
 	app_test_instancing();
 	app_test_cubemap();

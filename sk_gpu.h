@@ -1227,7 +1227,9 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
 		if (data_frames != nullptr && data_frames[0] != nullptr) {
-			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc(data_frame_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
+			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)data_frame_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
+			if (!tex_mem) { skr_log("Out of memory"); return;  }
+
 			for (int32_t i = 0; i < data_frame_count; i++) {
 				tex_mem[i*mip_levels] = {};
 				tex_mem[i*mip_levels].pSysMem     = data_frames[i];
@@ -1266,7 +1268,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		for (int i = 0; i < height; i++) {
 			memcpy(dest_line, src_line, (size_t)width * px_size);
 			dest_line += tex_mem.RowPitch;
-			src_line  += (UINT)(px_size * width);
+			src_line  += px_size * (uint64_t)width;
 		}
 		d3d_context->Unmap(tex->texture, 0);
 	}
@@ -1318,8 +1320,9 @@ void skr_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_width  = w = max(1, (1 << w) >> 1);
 	*out_height = h = max(1, (1 << h) >> 1);
 
-	*out_data = (T*)malloc(w * h * sizeof(T) * 4);
-	memset(*out_data, 0, w * h * sizeof(T) * 4);
+	*out_data = (T*)malloc((int64_t)w * h * sizeof(T) * 4);
+	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	memset(*out_data, 0, (int64_t)w * h * sizeof(T) * 4);
 	T *result = *out_data;
 
 	for (int32_t y = 0; y < height; y++) {
@@ -1348,8 +1351,9 @@ void skr_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_width  = w = (1 << w) >> 1;
 	*out_height = h = (1 << h) >> 1;
 
-	*out_data = (T*)malloc(w * h * sizeof(T));
-	memset(*out_data, 0, w * h * sizeof(T));
+	*out_data = (T*)malloc((int64_t)w * h * sizeof(T));
+	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	memset(*out_data, 0, (int64_t)w * h * sizeof(T));
 	T *result = *out_data;
 
 	for (int32_t y = 0; y < height; y++) {
@@ -2181,9 +2185,9 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 
 	// Convert the prefix if it doesn't match the GL version we're using
 	const char   *prefix_gl      = "#version 450";
-	const int32_t prefix_gl_size = strlen(prefix_gl);
+	const size_t  prefix_gl_size = strlen(prefix_gl);
 	const char   *prefix_es      = "#version 300 es";
-	const int32_t prefix_es_size = strlen(prefix_es);
+	const size_t  prefix_es_size = strlen(prefix_es);
 	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;
 #if __ANDROID__
@@ -2529,7 +2533,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 			skr_log("sk_gpu: cubemaps need 6 data frames");
 			return;
 		}
-		for (size_t f = 0; f < 6; f++)
+		for (int32_t f = 0; f < 6; f++)
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, format, width, height, 0, layout, type, data_frames[f]);
 	} else {
 		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
@@ -2763,8 +2767,10 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	size_t at = 10;
 	memcpy(&out_file->stage_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
 	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
+	if (out_file->stages == nullptr) { skr_log("Out of memory"); return false; }
 
 	out_file->meta = (skr_shader_meta_t*)malloc(sizeof(skr_shader_meta_t));
+	if (out_file->meta == nullptr) { skr_log("Out of memory"); return false; }
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skr_shader_meta_reference(out_file->meta);
@@ -2773,6 +2779,9 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
 	out_file->meta->buffers  = (skr_shader_meta_buffer_t *)malloc(sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count );
 	out_file->meta->textures = (skr_shader_meta_texture_t*)malloc(sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
+	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log("Out of memory"); return false; }
+	memset(out_file->meta->buffers,  0, sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count);
+	memset(out_file->meta->textures, 0, sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skr_shader_meta_buffer_t *buffer = &out_file->meta->buffers[i];
@@ -2789,6 +2798,8 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
+		if (buffer->vars == nullptr) { skr_log("Out of memory"); return false; }
+		memset(buffer->vars, 0, sizeof(skr_shader_meta_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);
 
 		for (uint32_t t = 0; t < buffer->var_count; t++) {
@@ -2820,8 +2831,12 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		memcpy( &stage->stage,    &bytes[at], sizeof(stage->stage));    at += sizeof(stage->stage);
 		memcpy( &stage->code_size,&bytes[at], sizeof(stage->code_size));at += sizeof(stage->code_size);
 
-		stage->code = malloc(stage->code_size);
-		memcpy(stage->code, &bytes[at], stage->code_size); at += stage->code_size;
+		stage->code = 0;
+		if (stage->code_size > 0) {
+			stage->code = malloc(stage->code_size);
+			if (stage->code == nullptr) { skr_log("Out of memory"); return false; }
+			memcpy(stage->code, &bytes[at], stage->code_size); at += stage->code_size;
+		}
 	}
 
 	return true;

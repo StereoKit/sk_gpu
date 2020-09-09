@@ -809,7 +809,9 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
 		if (data_frames != nullptr && data_frames[0] != nullptr) {
-			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc(data_frame_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
+			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)data_frame_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
+			if (!tex_mem) { skr_log("Out of memory"); return;  }
+
 			for (int32_t i = 0; i < data_frame_count; i++) {
 				tex_mem[i*mip_levels] = {};
 				tex_mem[i*mip_levels].pSysMem     = data_frames[i];
@@ -848,7 +850,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		for (int i = 0; i < height; i++) {
 			memcpy(dest_line, src_line, (size_t)width * px_size);
 			dest_line += tex_mem.RowPitch;
-			src_line  += (UINT)(px_size * width);
+			src_line  += px_size * (uint64_t)width;
 		}
 		d3d_context->Unmap(tex->texture, 0);
 	}
@@ -900,8 +902,9 @@ void skr_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_width  = w = max(1, (1 << w) >> 1);
 	*out_height = h = max(1, (1 << h) >> 1);
 
-	*out_data = (T*)malloc(w * h * sizeof(T) * 4);
-	memset(*out_data, 0, w * h * sizeof(T) * 4);
+	*out_data = (T*)malloc((int64_t)w * h * sizeof(T) * 4);
+	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	memset(*out_data, 0, (int64_t)w * h * sizeof(T) * 4);
 	T *result = *out_data;
 
 	for (int32_t y = 0; y < height; y++) {
@@ -930,8 +933,9 @@ void skr_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_width  = w = (1 << w) >> 1;
 	*out_height = h = (1 << h) >> 1;
 
-	*out_data = (T*)malloc(w * h * sizeof(T));
-	memset(*out_data, 0, w * h * sizeof(T));
+	*out_data = (T*)malloc((int64_t)w * h * sizeof(T));
+	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	memset(*out_data, 0, (int64_t)w * h * sizeof(T));
 	T *result = *out_data;
 
 	for (int32_t y = 0; y < height; y++) {

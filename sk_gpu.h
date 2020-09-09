@@ -214,7 +214,6 @@ typedef struct skr_tex_t {
 	ID3D11ShaderResourceView *resource;
 	ID3D11RenderTargetView   *target_view;
 	ID3D11DepthStencilView   *depth_view;
-	skr_tex_t                *depth_tex;
 } skr_tex_t;
 
 typedef struct skr_swapchain_t {
@@ -435,13 +434,14 @@ void               skr_shader_meta_release     (      skr_shader_meta_t *meta);
 
 ///////////////////////////////////////////
 
-ID3D11Device          *d3d_device      = nullptr;
-ID3D11DeviceContext   *d3d_context     = nullptr;
-ID3D11InfoQueue       *d3d_info        = nullptr;
-ID3D11InputLayout     *d3d_vert_layout = nullptr;
-ID3D11RasterizerState *d3d_rasterstate = nullptr;
-void                  *d3d_hwnd        = nullptr;
-skr_tex_t             *d3d_active_rendertarget = nullptr;
+ID3D11Device            *d3d_device      = nullptr;
+ID3D11DeviceContext     *d3d_context     = nullptr;
+ID3D11InfoQueue         *d3d_info        = nullptr;
+ID3D11InputLayout       *d3d_vert_layout = nullptr;
+ID3D11RasterizerState   *d3d_rasterstate = nullptr;
+ID3D11DepthStencilState *d3d_depthstate  = nullptr;
+void                    *d3d_hwnd        = nullptr;
+skr_tex_t               *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
 
@@ -520,6 +520,24 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 	d3d_device->CreateRasterizerState(&desc_rasterizer, &d3d_rasterstate);
 	d3d_context->RSSetState(d3d_rasterstate);
 
+	D3D11_DEPTH_STENCIL_DESC desc_depthstate = {};
+	desc_depthstate.DepthEnable    = true;
+	desc_depthstate.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	desc_depthstate.DepthFunc      = D3D11_COMPARISON_LESS;
+	desc_depthstate.StencilEnable    = false;
+	desc_depthstate.StencilReadMask  = 0xFF;
+	desc_depthstate.StencilWriteMask = 0xFF;
+	desc_depthstate.FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+	desc_depthstate.FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
+	desc_depthstate.BackFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
+	desc_depthstate.BackFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.BackFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
+	d3d_device->CreateDepthStencilState(&desc_depthstate, &d3d_depthstate);
+	d3d_context->OMSetDepthStencilState(d3d_depthstate, 1);
+
 	return 1;
 }
 
@@ -527,6 +545,7 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 
 void skr_shutdown() {
 	if (d3d_rasterstate) { d3d_rasterstate->Release(); d3d_rasterstate = nullptr; }
+	if (d3d_depthstate ) { d3d_depthstate ->Release(); d3d_depthstate  = nullptr; }
 	if (d3d_info     ) { d3d_info     ->Release(); d3d_info      = nullptr; }
 	if (d3d_context  ) { d3d_context  ->Release(); d3d_context   = nullptr; }
 	if (d3d_device   ) { d3d_device   ->Release(); d3d_device    = nullptr; }
@@ -565,10 +584,12 @@ void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clea
 
 	if (clear) {
 		d3d_context->ClearRenderTargetView(render_target->target_view, clear_color_4);
-		if (render_target->depth_tex != nullptr)
-			d3d_context->ClearDepthStencilView(render_target->depth_tex->depth_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+		if (&render_target->depth_view) {
+			UINT clear_flags = D3D11_CLEAR_DEPTH;
+			d3d_context->ClearDepthStencilView(render_target->depth_view, clear_flags, 1.0f, 0);
+		}
 	}
-	d3d_context->OMSetRenderTargets(1, &render_target->target_view, render_target->depth_tex == nullptr ? nullptr : render_target->depth_tex->depth_view);
+	d3d_context->OMSetRenderTargets(1, &render_target->target_view, render_target->depth_view);
 }
 
 ///////////////////////////////////////////
@@ -932,6 +953,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, format, width, height, 1);
 	result.depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
 	skr_tex_set_contents(&result.depth, nullptr, 1, width, height);
+	skr_tex_set_depth   (&result.target, &result.depth);
 	back_buffer->Release();
 
 	dxgi_factory->Release();
@@ -1031,7 +1053,9 @@ bool skr_tex_is_valid(const skr_tex_t *tex) {
 
 void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 	if (depth->type == skr_tex_type_depth) {
-		tex->depth_tex = depth;
+		if (tex->depth_view) tex->depth_view->Release();
+		tex->depth_view = depth->depth_view;
+		tex->depth_view->AddRef();
 	} else {
 		skr_log("Can't bind a depth texture to a non-rendertarget");
 	}

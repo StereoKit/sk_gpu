@@ -206,7 +206,7 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 		fwrite(&buff->var_count, sizeof(buff->var_count), 1, fp);
 		if (buff->defaults) {
 			fwrite(&buff->size, sizeof(buff->size), 1, fp);
-			fwrite(&buff->defaults, buff->size, 1, fp);
+			fwrite( buff->defaults, buff->size, 1, fp);
 		} else {
 			size_t zero = 0;
 			fwrite(&zero, sizeof(buff->size), 1, fp);

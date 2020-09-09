@@ -12,7 +12,7 @@ typedef enum skr_shader_lang_ {
 typedef struct skr_shader_file_stage_t {
 	skr_shader_lang_ language;
 	skr_stage_       stage;
-	size_t           code_size;
+	uint32_t         code_size;
 	void            *code;
 } skr_shader_file_stage_t;
 

@@ -208,10 +208,9 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 			fwrite(&buff->size, sizeof(buff->size), 1, fp);
 			fwrite( buff->defaults, buff->size, 1, fp);
 		} else {
-			size_t zero = 0;
+			uint32_t zero = 0;
 			fwrite(&zero, sizeof(buff->size), 1, fp);
 		}
-		//fwrite(&buff->defaults,     buff->size,              1, fp);
 
 		for (uint32_t t = 0; t < buff->var_count; t++) {
 			skr_shader_meta_var_t *var = &buff->vars[t];
@@ -280,7 +279,7 @@ void sksc_save_header(char *sks_file) {
 		return;
 	}
 	fprintf(fp, "#pragma once\n\n");
-	int32_t ct = fprintf_s(fp, "const unsigned char sks_%s[%lu] = {", name, size);
+	int32_t ct = fprintf_s(fp, "const unsigned char sks_%s[%zu] = {", name, size);
 	for (size_t i = 0; i < size; i++) {
 		unsigned char byte = ((unsigned char *)data)[i];
 		ct += fprintf_s(fp, "%d,", byte);
@@ -437,7 +436,7 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 							char *end   = strchr(start, ',');
 							char  item[64];
 							for (size_t c = 0; c <= commas; c++) {
-								int32_t length = end == nullptr ? min(sizeof(item)-1, strlen(value)) : end - start;
+								int32_t length = (int32_t)(end == nullptr ? min(sizeof(item)-1, strlen(value)) : end - start);
 								memcpy(item, start, min(sizeof(item), length));
 								item[length] = '\0';
 
@@ -516,9 +515,7 @@ bool sksc_d3d11_compile_shader(char *filename, char *hlsl_text, sksc_settings_t 
 	char entry[128];
 	wcstombs_s(nullptr, entry, type == skr_stage_pixel ? settings->ps_entrypoint : settings->vs_entrypoint, sizeof(entry));
 
-	ID3DBlob   *errors, *compiled = nullptr;
-	const void *buffer;
-	size_t      buffer_size;
+	ID3DBlob *errors, *compiled = nullptr;
 	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entry, type == skr_stage_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
 		printf("| Error - D3DCompile failed:\n");
 		printf((char *)errors->GetBufferPointer());
@@ -529,7 +526,7 @@ bool sksc_d3d11_compile_shader(char *filename, char *hlsl_text, sksc_settings_t 
 
 	out_stage->language  = skr_shader_lang_hlsl;
 	out_stage->stage     = type;
-	out_stage->code_size = compiled->GetBufferSize();
+	out_stage->code_size = (uint32_t)compiled->GetBufferSize();
 	out_stage->code       = malloc(out_stage->code_size);
 	memcpy(out_stage->code, compiled->GetBufferPointer(), out_stage->code_size);
 
@@ -545,7 +542,7 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 	bool result = false;
 
 	array_t<const wchar_t *> flags = sksc_dxc_build_flags(*settings, type, lang);
-	if (FAILED(sksc_compiler->Compile(source_buff, flags.data, flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
+	if (FAILED(sksc_compiler->Compile(source_buff, flags.data, (uint32_t)flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
 		printf("| Compile failed!\n|________________\n");
 		return false;
 	}
@@ -567,7 +564,7 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 		void  *src  = shader_bin->GetBufferPointer();
 		size_t size = shader_bin->GetBufferSize();
 		out_stage->code      = malloc(size);
-		out_stage->code_size = size;
+		out_stage->code_size = (uint32_t)size;
 		memcpy(out_stage->code, src, size);
 		shader_bin->Release();
 
@@ -637,7 +634,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_stage_ stage, skr_shad
 			buffer_list[id].vars      = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer_list[i].var_count);
 			*buffer_list[id].vars     = {};
 
-			for (size_t v = 0; v < shader_buff.Variables; v++) {
+			for (uint32_t v = 0; v < shader_buff.Variables; v++) {
 				ID3D12ShaderReflectionVariable *var  = cb->GetVariableByIndex(v);
 				ID3D12ShaderReflectionType     *type = var->GetType();
 				D3D12_SHADER_TYPE_DESC          type_desc;
@@ -684,10 +681,10 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_stage_ stage, skr_shad
 
 	buffer_list .trim();
 	texture_list.trim();
-	out_meta->buffers       = buffer_list .data;
-	out_meta->buffer_count  = buffer_list .count;
-	out_meta->textures      = texture_list.data;
-	out_meta->texture_count = texture_list.count;
+	out_meta->buffers       =           buffer_list .data;
+	out_meta->buffer_count  = (uint32_t)buffer_list .count;
+	out_meta->textures      =           texture_list.data;
+	out_meta->texture_count = (uint32_t)texture_list.count;
 
 	shader_reflection->Release();
 	reflection       ->Release();
@@ -823,7 +820,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 
 	out_stage->stage     = src_stage->stage;
 	out_stage->language  = skr_shader_lang_glsl;
-	out_stage->code_size = strlen(result) + 1;
+	out_stage->code_size = (uint32_t)strlen(result) + 1;
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
 

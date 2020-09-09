@@ -125,8 +125,8 @@ typedef struct skr_shader_meta_var_t {
 	char     name [32];
 	uint64_t name_hash;
 	char     extra[64];
-	size_t   offset;
-	size_t   size;
+	uint32_t offset;
+	uint32_t size;
 	uint16_t type;
 	uint16_t type_count;
 } skr_shader_meta_var_t;
@@ -135,7 +135,7 @@ typedef struct skr_shader_meta_buffer_t {
 	char       name[32];
 	uint64_t   name_hash;
 	skr_bind_t bind;
-	size_t     size;
+	uint32_t   size;
 	void      *defaults;
 	uint32_t               var_count;
 	skr_shader_meta_var_t *vars;
@@ -146,7 +146,6 @@ typedef struct skr_shader_meta_texture_t {
 	uint64_t   name_hash;
 	char       extra[64];
 	skr_bind_t bind;
-	size_t     size;
 } skr_shader_meta_texture_t;
 
 typedef struct skr_shader_meta_t {
@@ -185,7 +184,7 @@ void                skr_draw                (int32_t index_start, int32_t index_
 skr_buffer_t        skr_buffer_create       (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
 bool                skr_buffer_is_valid     (const skr_buffer_t *buffer);
 void                skr_buffer_set_contents (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
-void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_bind_t slot, uint32_t stride, uint32_t offset);
+void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_bind_t slot_vc, uint32_t stride_v, uint32_t offset_vi);
 void                skr_buffer_destroy      (      skr_buffer_t *buffer);
 
 skr_mesh_t          skr_mesh_create         (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);

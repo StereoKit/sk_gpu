@@ -125,8 +125,8 @@ typedef struct skr_shader_meta_var_t {
 	char     name [32];
 	uint64_t name_hash;
 	char     extra[64];
-	size_t   offset;
-	size_t   size;
+	uint32_t offset;
+	uint32_t size;
 	uint16_t type;
 	uint16_t type_count;
 } skr_shader_meta_var_t;
@@ -135,7 +135,7 @@ typedef struct skr_shader_meta_buffer_t {
 	char       name[32];
 	uint64_t   name_hash;
 	skr_bind_t bind;
-	size_t     size;
+	uint32_t   size;
 	void      *defaults;
 	uint32_t               var_count;
 	skr_shader_meta_var_t *vars;
@@ -146,7 +146,6 @@ typedef struct skr_shader_meta_texture_t {
 	uint64_t   name_hash;
 	char       extra[64];
 	skr_bind_t bind;
-	size_t     size;
 } skr_shader_meta_texture_t;
 
 typedef struct skr_shader_meta_t {
@@ -319,7 +318,7 @@ void                skr_draw                (int32_t index_start, int32_t index_
 skr_buffer_t        skr_buffer_create       (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
 bool                skr_buffer_is_valid     (const skr_buffer_t *buffer);
 void                skr_buffer_set_contents (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
-void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_bind_t slot, uint32_t stride, uint32_t offset);
+void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_bind_t slot_vc, uint32_t stride_v, uint32_t offset_vi);
 void                skr_buffer_destroy      (      skr_buffer_t *buffer);
 
 skr_mesh_t          skr_mesh_create         (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);
@@ -387,7 +386,7 @@ typedef enum skr_shader_lang_ {
 typedef struct skr_shader_file_stage_t {
 	skr_shader_lang_ language;
 	skr_stage_       stage;
-	size_t           code_size;
+	uint32_t         code_size;
 	void            *code;
 } skr_shader_file_stage_t;
 
@@ -2765,7 +2764,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	
 	const uint8_t *bytes = (uint8_t*)data;
 	size_t at = 10;
-	memcpy(&out_file->stage_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
+	memcpy(&out_file->stage_count, &bytes[at], sizeof(out_file->stage_count)); at += sizeof(out_file->stage_count);
 	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
 	if (out_file->stages == nullptr) { skr_log("Out of memory"); return false; }
 
@@ -2774,9 +2773,9 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skr_shader_meta_reference(out_file->meta);
-	memcpy( out_file->meta->name,          &bytes[at], sizeof(out_file->meta->name)); at += sizeof(out_file->meta->name);
-	memcpy(&out_file->meta->buffer_count,  &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
-	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(uint32_t)); at += sizeof(uint32_t);
+	memcpy( out_file->meta->name,          &bytes[at], sizeof(out_file->meta->name         )); at += sizeof(out_file->meta->name);
+	memcpy(&out_file->meta->buffer_count,  &bytes[at], sizeof(out_file->meta->buffer_count )); at += sizeof(out_file->meta->buffer_count);
+	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(out_file->meta->texture_count)); at += sizeof(out_file->meta->texture_count);
 	out_file->meta->buffers  = (skr_shader_meta_buffer_t *)malloc(sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count );
 	out_file->meta->textures = (skr_shader_meta_texture_t*)malloc(sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
 	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log("Out of memory"); return false; }
@@ -2790,7 +2789,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		memcpy(&buffer->size,      &bytes[at], sizeof(buffer->size));      at += sizeof(buffer->size);
 		memcpy(&buffer->var_count, &bytes[at], sizeof(buffer->var_count)); at += sizeof(buffer->var_count);
 
-		size_t default_size = 0;
+		uint32_t default_size = 0;
 		memcpy(&default_size, &bytes[at], sizeof(buffer->size)); at += sizeof(buffer->size);
 		buffer->defaults = nullptr;
 		if (default_size != 0) {

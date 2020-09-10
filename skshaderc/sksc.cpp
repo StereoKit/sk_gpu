@@ -786,6 +786,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
 	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
+	spvc_compiler_require_extension(compiler_glsl, "GL_AMD_vertex_shader_layer");
 
 	spvc_variable_id id;
 	spvc_compiler_build_dummy_sampler_for_combined_images(compiler_glsl, &id);

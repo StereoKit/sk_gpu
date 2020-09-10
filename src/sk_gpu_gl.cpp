@@ -550,6 +550,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	glEnable  (GL_DEPTH_TEST);  
 	glEnable  (GL_CULL_FACE);
 	glCullFace(GL_BACK);
+	glEnable  (GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	
 	return 1;
 }
@@ -677,22 +678,8 @@ void skr_buffer_destroy(skr_buffer_t *buffer) {
 
 skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer) {
 	skr_mesh_t result = {};
-	result.index_buffer = ind_buffer  ? ind_buffer ->buffer : 0;
-	result.vert_buffer  = vert_buffer ? vert_buffer->buffer : 0;
-
-	// Create a vertex layout
-	glGenVertexArrays(1, &result.layout);
-	glBindVertexArray(result.layout);
-	// enable the vertex data for the shader
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glEnableVertexAttribArray(2);
-	glEnableVertexAttribArray(3);
-	// tell the shader how our vertex data binds to the shader inputs
-	glVertexAttribPointer(0, 3, GL_FLOAT, 0, sizeof(skr_vert_t), nullptr);
-	glVertexAttribPointer(1, 3, GL_FLOAT, 0, sizeof(skr_vert_t), (void*)(sizeof(float) * 3));
-	glVertexAttribPointer(2, 2, GL_FLOAT, 0, sizeof(skr_vert_t), (void*)(sizeof(float) * 6));
-	glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, 1, sizeof(skr_vert_t), (void*)(sizeof(float) * 8));
+	skr_mesh_set_verts(&result, vert_buffer);
+	skr_mesh_set_inds (&result, ind_buffer);
 
 	return result;
 }
@@ -700,13 +687,30 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 /////////////////////////////////////////// 
 
 void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
-	mesh->vert_buffer = vert_buffer->buffer;
+	mesh->vert_buffer = vert_buffer ? vert_buffer->buffer : 0;
+	if (mesh->vert_buffer != 0 && mesh->layout == 0) {
+		glBindBuffer(GL_ARRAY_BUFFER, mesh->vert_buffer);
+
+		// Create a vertex layout
+		glGenVertexArrays(1, &mesh->layout);
+		glBindVertexArray(mesh->layout);
+		// enable the vertex data for the shader
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(2);
+		glEnableVertexAttribArray(3);
+		// tell the shader how our vertex data binds to the shader inputs
+		glVertexAttribPointer(0, 3, GL_FLOAT, 0, sizeof(skr_vert_t), nullptr);
+		glVertexAttribPointer(1, 3, GL_FLOAT, 0, sizeof(skr_vert_t), (void*)(sizeof(float) * 3));
+		glVertexAttribPointer(2, 2, GL_FLOAT, 0, sizeof(skr_vert_t), (void*)(sizeof(float) * 6));
+		glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, 1, sizeof(skr_vert_t), (void*)(sizeof(float) * 8));
+	}
 }
 
 /////////////////////////////////////////// 
 
 void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
-	mesh->index_buffer = ind_buffer->buffer;
+	mesh->index_buffer = ind_buffer ? ind_buffer->buffer : 0;
 }
 
 /////////////////////////////////////////// 

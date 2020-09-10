@@ -166,7 +166,7 @@ void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clea
 
 	if (clear) {
 		d3d_context->ClearRenderTargetView(render_target->target_view, clear_color_4);
-		if (&render_target->depth_view) {
+		if (render_target->depth_view) {
 			UINT clear_flags = D3D11_CLEAR_DEPTH;
 			d3d_context->ClearDepthStencilView(render_target->depth_view, clear_flags, 1.0f, 0);
 		}
@@ -528,7 +528,10 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	IDXGIAdapter  *dxgi_adapter; dxgi_device ->GetParent     (__uuidof(IDXGIAdapter),  (void **)&dxgi_adapter);
 	IDXGIFactory2 *dxgi_factory; dxgi_adapter->GetParent     (__uuidof(IDXGIFactory2), (void **)&dxgi_factory);
 
-	dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result.d3d_swapchain);
+	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result.d3d_swapchain))) {
+		skr_log("sk_gpu couldn't create swapchain!");
+		return {};
+	}
 
 	ID3D11Texture2D *back_buffer;
 	result.d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));

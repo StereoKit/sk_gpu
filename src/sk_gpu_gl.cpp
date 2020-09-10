@@ -690,7 +690,12 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 
 void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
 	mesh->vert_buffer = vert_buffer ? vert_buffer->buffer : 0;
-	if (mesh->vert_buffer != 0 && mesh->layout == 0) {
+	if (mesh->vert_buffer != 0) {
+		if (mesh->layout != 0) {
+			glDeleteVertexArrays(1, &mesh->layout);
+			mesh->layout = 0;
+		}
+
 		glBindBuffer(GL_ARRAY_BUFFER, mesh->vert_buffer);
 
 		// Create a vertex layout

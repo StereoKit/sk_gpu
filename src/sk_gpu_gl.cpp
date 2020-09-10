@@ -59,6 +59,7 @@ HGLRC gl_hrc;
 #define WGL_CONTEXT_MINOR_VERSION_ARB     0x2092
 #define WGL_CONTEXT_FLAGS_ARB             0x2094
 #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB  0x00000001
+#define GL_FRAMEBUFFER_SRGB               0x8DB9
 
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_COLOR_BUFFER_BIT 0x00004000
@@ -587,8 +588,10 @@ void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clea
 	glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	if (render_target) {
 		glViewport(0, 0, render_target->width, render_target->height);
+		glDisable(GL_FRAMEBUFFER_SRGB); 
 	} else {
 		glViewport(0, 0, gl_width, gl_height);
+		glEnable(GL_FRAMEBUFFER_SRGB); 
 	}
 
 	if (clear) {

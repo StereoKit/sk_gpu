@@ -29,9 +29,11 @@ app_shader_data_t app_shader_data = {};
 app_shader_inst_t app_shader_inst[100] = {};
 app_mesh_t        app_mesh1  = {};
 app_mesh_t        app_mesh2  = {};
+app_mesh_t        app_mesh3  = {};
 skr_buffer_t      app_shader_data_buffer = {};
 skr_buffer_t      app_shader_inst_buffer = {};
-skr_tex_t         app_tex    = {};
+skr_tex_t         app_tex       = {};
+skr_tex_t         app_tex_white = {};
 skr_tex_t         app_target = {};
 skr_tex_t         app_target_depth = {};
 skr_tex_t         app_cubemap = {};
@@ -84,6 +86,15 @@ bool app_init() {
 		2,1,0, 3,2,0, 4,3,0, 1,4,0, 1,2,3, 1,3,4 };
 	app_mesh2 = app_mesh_create(verts2, sizeof(verts2)/sizeof(skr_vert_t), inds2, sizeof(inds2)/sizeof(uint32_t));
 
+	// make a double-sided triangle
+	skr_vert_t verts3[] = {
+		skr_vert_t{ {-1,0,0}, {0,1,0}, {0,0}, {255,0,0,255}},
+		skr_vert_t{ { 0,1,0}, {0,1,0}, {0,0}, {0,255,0,255}},
+		skr_vert_t{ { 1,0,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
+	uint32_t inds3[] = {
+		0,1,2, 2,1,0 };
+	app_mesh3 = app_mesh_create(verts3, sizeof(verts3)/sizeof(skr_vert_t), inds3, sizeof(inds3)/sizeof(uint32_t));
+
 	// Make a checkered texture
 	const int w = 128, h = 64;
 	uint8_t colors[w * h * 4];
@@ -102,8 +113,17 @@ bool app_init() {
 	skr_tex_settings    (&app_tex, skr_tex_address_repeat, skr_tex_sample_linear, 0);
 	skr_tex_set_contents(&app_tex, color_arr, 1, w, h);
 
-	app_target       = skr_tex_create(skr_tex_type_rendertarget, skr_use_static, skr_tex_fmt_rgba32,  skr_mip_none);
-	app_target_depth = skr_tex_create(skr_tex_type_depth,        skr_use_static, skr_tex_fmt_depth16, skr_mip_none);
+	// Make a plain white texture
+	uint8_t colors_wht[2*2*4];
+	for (int32_t i = 0; i < _countof(colors_wht); i++) {
+		colors_wht[i] = 255;
+	}
+	void *color_wht_arr[1] = { colors };
+	app_tex_white = skr_tex_create(skr_tex_type_image, skr_use_static, skr_tex_fmt_rgba32, skr_mip_generate);
+	skr_tex_set_contents(&app_tex_white, color_wht_arr, 1, 2, 2);
+
+	app_target       = skr_tex_create(skr_tex_type_rendertarget, skr_use_static, skr_tex_fmt_rgba32_linear, skr_mip_none);
+	app_target_depth = skr_tex_create(skr_tex_type_depth,        skr_use_static, skr_tex_fmt_depth16,       skr_mip_none);
 	skr_tex_set_contents (&app_target,       nullptr, 1, 512, 512);
 	skr_tex_set_contents (&app_target_depth, nullptr, 1, 512, 512);
 	skr_tex_set_depth    (&app_target, &app_target_depth);
@@ -127,7 +147,7 @@ bool app_init() {
 	app_sh_cube_inst_bind    = skr_shader_get_buffer_bind(&app_sh_cube, "TransformBuffer");
 	app_sh_cube_data_bind    = skr_shader_get_buffer_bind(&app_sh_cube, "SystemBuffer");
 	app_mat_cube             = skr_pipeline_create(&app_sh_cube);
-	skr_pipeline_set_wireframe(&app_mat_cube, true);
+	skr_pipeline_set_cull(&app_mat_cube, skr_cull_front);
 	
 	app_sh_default           = skr_shader_create_file("shaders/test.hlsl.sks");
 	app_sh_default_tex_bind  = skr_shader_get_tex_bind   (&app_sh_default, "tex");
@@ -142,8 +162,25 @@ bool app_init() {
 
 ///////////////////////////////////////////
 
+void app_test_colors() {
+	// Here's how this triangle should look:
+	// https://medium.com/@heypete/hello-triangle-meet-swift-and-wide-color-6f9e246616d9
+
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
+
+	skr_mesh_bind    (&app_mesh3.mesh);
+	skr_pipeline_bind(&app_mat_default);
+	skr_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
+	skr_draw(0, app_mesh3.ind_count, 1);
+}
+
+///////////////////////////////////////////
+
 void app_test_cubemap() {
-	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }));
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {6,6,6} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind, 0, 0);
@@ -164,8 +201,8 @@ void app_test_rendertarget() {
 	skr_tex_target_bind(&app_target, true, color);
 
 	hmm_mat4 view = HMM_LookAt(
-		HMM_Vec3(1,1,1),
-		HMM_Vec3(0,0,0),
+		HMM_Vec3(0,0.25f,.75f),
+		HMM_Vec3(0,0.25f,0),
 		HMM_Vec3(0,1,0));
 	hmm_mat4 proj      = HMM_Perspective(45, 1, 0.01f, 100);
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
@@ -175,15 +212,16 @@ void app_test_rendertarget() {
 
 	static int frame = 0;
 	frame++;
-	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) * HMM_Rotate(frame * 0.8f, hmm_vec3{ {1,0,0} }));
+
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) *HMM_Rotate(frame * 0.8f, hmm_vec3{ {0,1,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst_t));
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
 
-	skr_mesh_bind    (&app_mesh1.mesh);
+	skr_mesh_bind    (&app_mesh3.mesh);
 	skr_pipeline_bind(&app_mat_default);
-	skr_tex_bind     (&app_tex, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh1.ind_count, 1);
+	skr_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
+	skr_draw         (0, app_mesh3.ind_count, 1);
 
 	skr_tex_target_bind(old_target, false, color);
 }
@@ -231,6 +269,7 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
 	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
 
+	app_test_colors();
 	app_test_instancing();
 	app_test_cubemap();
 }

@@ -100,8 +100,7 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 	desc_rasterizer.CullMode = D3D11_CULL_BACK;
 	desc_rasterizer.FrontCounterClockwise = true;
 	d3d_device->CreateRasterizerState(&desc_rasterizer, &d3d_rasterstate);
-	d3d_context->RSSetState(d3d_rasterstate);
-
+	
 	D3D11_DEPTH_STENCIL_DESC desc_depthstate = {};
 	desc_depthstate.DepthEnable    = true;
 	desc_depthstate.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -118,7 +117,6 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 	desc_depthstate.BackFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
 	desc_depthstate.BackFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
 	d3d_device->CreateDepthStencilState(&desc_depthstate, &d3d_depthstate);
-	d3d_context->OMSetDepthStencilState(d3d_depthstate, 1);
 
 	return 1;
 }
@@ -136,6 +134,8 @@ void skr_shutdown() {
 ///////////////////////////////////////////
 
 void skr_draw_begin() {
+	d3d_context->RSSetState            (d3d_rasterstate);
+	d3d_context->OMSetDepthStencilState(d3d_depthstate, 1);
 	d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	d3d_context->IASetInputLayout      (d3d_vert_layout);
 }
@@ -533,9 +533,17 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 		return {};
 	}
 
+	// Set the target view to an sRGB format for proper presentation of 
+	// linear color data.
+	skr_tex_fmt_ target_fmt = format;
+	switch (format) {
+	case skr_tex_fmt_bgra32_linear: target_fmt = skr_tex_fmt_bgra32; break;
+	case skr_tex_fmt_rgba32_linear: target_fmt = skr_tex_fmt_rgba32; break;
+	}
+
 	ID3D11Texture2D *back_buffer;
 	result.d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, format, width, height, 1);
+	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	result.depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
 	skr_tex_set_contents(&result.depth, nullptr, 1, width, height);
 	skr_tex_set_depth   (&result.target, &result.depth);
@@ -568,6 +576,7 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 	swapchain->target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	swapchain->depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
 	skr_tex_set_contents(&swapchain->depth, nullptr, 1, width, height);
+	skr_tex_set_depth   (&swapchain->target, &swapchain->depth);
 	back_buffer->Release();
 }
 

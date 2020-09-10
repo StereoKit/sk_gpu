@@ -223,8 +223,10 @@ bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
 /////////////////////////////////////////// 
 
 void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
-	if (buffer->use != skr_use_dynamic)
+	if (buffer->use != skr_use_dynamic) {
+		skr_log("Attempting to dynamically set contents of a static buffer!");
 		return;
+	}
 
 	D3D11_MAPPED_SUBRESOURCE resource;
 	d3d_context->Map(buffer->buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);

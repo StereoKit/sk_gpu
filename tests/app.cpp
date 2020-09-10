@@ -27,9 +27,10 @@ struct app_shader_inst_t {
 
 app_shader_data_t app_shader_data = {};
 app_shader_inst_t app_shader_inst[100] = {};
-app_mesh_t        app_mesh1  = {};
-app_mesh_t        app_mesh2  = {};
-app_mesh_t        app_mesh3  = {};
+app_mesh_t        app_mesh_cube    = {};
+app_mesh_t        app_mesh_pyramid = {};
+app_mesh_t        app_mesh_tri     = {};
+app_mesh_t        app_mesh_wave    = {};
 skr_buffer_t      app_shader_data_buffer = {};
 skr_buffer_t      app_shader_inst_buffer = {};
 skr_tex_t         app_tex       = {};
@@ -50,9 +51,12 @@ skr_bind_t        app_sh_cube_cubemap_bind = {};
 skr_bind_t        app_sh_cube_inst_bind    = {};
 skr_bind_t        app_sh_cube_data_bind    = {};
 
+const int32_t app_wave_size = 32;
+skr_vert_t    app_wave_verts[app_wave_size * app_wave_size];
+
 ///////////////////////////////////////////
 
-app_mesh_t app_mesh_create(const skr_vert_t *verts, int32_t vert_count, const uint32_t *inds, int32_t ind_count);
+app_mesh_t app_mesh_create(const skr_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count);
 void       app_mesh_destroy(app_mesh_t *mesh);
 
 ///////////////////////////////////////////
@@ -73,7 +77,7 @@ bool app_init() {
 		0,2,1, 0,3,2, 5,6,4, 4,6,7,
 		1,2,6, 1,6,5, 4,7,3, 4,3,0,
 		1,5,4, 1,4,0, 3,7,2, 7,6,2, };
-	app_mesh1 = app_mesh_create(verts, sizeof(verts)/sizeof(skr_vert_t), inds, sizeof(inds)/sizeof(uint32_t));
+	app_mesh_cube = app_mesh_create(verts, sizeof(verts)/sizeof(skr_vert_t), false, inds, sizeof(inds)/sizeof(uint32_t));
 
 	// Make a pyramid
 	skr_vert_t verts2[] = {
@@ -84,16 +88,32 @@ bool app_init() {
 		skr_vert_t{ {-1,-1, 1}, { 1,-1, 1}, {0.75f,0}, {255,0,255,255}},};
 	uint32_t inds2[] = {
 		2,1,0, 3,2,0, 4,3,0, 1,4,0, 1,2,3, 1,3,4 };
-	app_mesh2 = app_mesh_create(verts2, sizeof(verts2)/sizeof(skr_vert_t), inds2, sizeof(inds2)/sizeof(uint32_t));
+	app_mesh_pyramid = app_mesh_create(verts2, sizeof(verts2)/sizeof(skr_vert_t), false, inds2, sizeof(inds2)/sizeof(uint32_t));
 
 	// make a double-sided triangle
 	skr_vert_t verts3[] = {
-		skr_vert_t{ {-1,0,0}, {0,1,0}, {0,0}, {255,0,0,255}},
-		skr_vert_t{ { 0,1,0}, {0,1,0}, {0,0}, {0,255,0,255}},
-		skr_vert_t{ { 1,0,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
+		skr_vert_t{ {-.5f,-0.5f,0}, {0,1,0}, {0,0}, {255,0,0,255}},
+		skr_vert_t{ { 0,    .5f,0}, {0,1,0}, {0,0}, {0,255,0,255}},
+		skr_vert_t{ { .5f,-0.5f,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
 	uint32_t inds3[] = {
 		0,1,2, 2,1,0 };
-	app_mesh3 = app_mesh_create(verts3, sizeof(verts3)/sizeof(skr_vert_t), inds3, sizeof(inds3)/sizeof(uint32_t));
+	app_mesh_tri = app_mesh_create(verts3, sizeof(verts3)/sizeof(skr_vert_t), false, inds3, sizeof(inds3)/sizeof(uint32_t));
+
+	// Make wave indices
+	uint32_t inds_wave[(app_wave_size - 1) * (app_wave_size - 1) * 6];
+	int32_t curr = 0;
+	for (int32_t y = 0; y < app_wave_size-1; y++) {
+		for (int32_t x = 0; x < app_wave_size-1; x++) {
+			inds_wave[curr++] = (x+1) + (y+1) * app_wave_size;
+			inds_wave[curr++] = (x+1) + (y  ) * app_wave_size;
+			inds_wave[curr++] = (x  ) + (y+1) * app_wave_size;
+
+			inds_wave[curr++] = (x  ) + (y+1) * app_wave_size;
+			inds_wave[curr++] = (x+1) + (y  ) * app_wave_size;
+			inds_wave[curr++] = (x  ) + (y  ) * app_wave_size;
+		}
+	}
+	app_mesh_wave = app_mesh_create(app_wave_verts, _countof(app_wave_verts), true, inds_wave, _countof(inds_wave));
 
 	// Make a checkered texture
 	const int w = 128, h = 64;
@@ -162,6 +182,50 @@ bool app_init() {
 
 ///////////////////////////////////////////
 
+void app_test_dyn_update() {
+	static int frame = 0;
+	frame++;
+
+	for (int32_t y = 0; y < app_wave_size; y++) {
+		for (int32_t x = 0; x < app_wave_size; x++) {
+			int32_t i  = x + y * app_wave_size;
+			float   xp = x/(float)(app_wave_size-1);
+			float   yp = y/(float)(app_wave_size-1);
+			float   t  = ((xp + yp)*8 + (frame*0.05f)) * 0.7f;
+			app_wave_verts[i].pos[0] = x/(float)app_wave_size-0.5f;
+			app_wave_verts[i].pos[1] = sinf(t)*0.1f;
+			app_wave_verts[i].pos[2] = y/(float)app_wave_size-0.5f;
+
+			float c   = -cosf(t);
+			float mag = sqrtf(c*c + 1*1 + c*c);
+			app_wave_verts[i].norm[0] = c/mag;
+			app_wave_verts[i].norm[1] = .6f/mag;
+			app_wave_verts[i].norm[2] = c/mag;
+
+			app_wave_verts[i].col[0] = 255;
+			app_wave_verts[i].col[1] = 255;
+			app_wave_verts[i].col[2] = 255;
+			app_wave_verts[i].col[3] = 255;
+
+			app_wave_verts[i].uv[0] = xp;
+			app_wave_verts[i].uv[1] = yp;
+		}
+	}
+	skr_buffer_set_contents(&app_mesh_wave.vert_buffer, app_wave_verts, sizeof(app_wave_verts));
+
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,-2,0} }) * HMM_Scale(hmm_vec3{ {6,6,6} }));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
+
+	skr_mesh_bind    (&app_mesh_wave.mesh);
+	skr_pipeline_bind(&app_mat_default);
+	skr_tex_bind     (&app_target, app_sh_default_tex_bind);
+	skr_draw(0, app_mesh_wave.ind_count, 1);
+}
+
+///////////////////////////////////////////
+
 void app_test_colors() {
 	// Here's how this triangle should look:
 	// https://medium.com/@heypete/hello-triangle-meet-swift-and-wide-color-6f9e246616d9
@@ -171,10 +235,10 @@ void app_test_colors() {
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
 
-	skr_mesh_bind    (&app_mesh3.mesh);
+	skr_mesh_bind    (&app_mesh_tri.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
-	skr_draw(0, app_mesh3.ind_count, 1);
+	skr_draw(0, app_mesh_tri.ind_count, 1);
 }
 
 ///////////////////////////////////////////
@@ -185,11 +249,11 @@ void app_test_cubemap() {
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind, 0, 0);
 
-	skr_mesh_bind    (&app_mesh1.mesh);
+	skr_mesh_bind    (&app_mesh_cube.mesh);
 	skr_pipeline_bind(&app_mat_cube);
 	skr_tex_bind     (&app_tex,     app_sh_cube_tex_bind);
 	skr_tex_bind     (&app_cubemap, app_sh_cube_cubemap_bind);
-	skr_draw(0, app_mesh1.ind_count, 1);
+	skr_draw(0, app_mesh_cube.ind_count, 1);
 }
 
 ///////////////////////////////////////////
@@ -201,8 +265,8 @@ void app_test_rendertarget() {
 	skr_tex_target_bind(&app_target, true, color);
 
 	hmm_mat4 view = HMM_LookAt(
-		HMM_Vec3(0,0.25f,.75f),
-		HMM_Vec3(0,0.25f,0),
+		HMM_Vec3(0,0,.75f),
+		HMM_Vec3(0,0,0),
 		HMM_Vec3(0,1,0));
 	hmm_mat4 proj      = HMM_Perspective(45, 1, 0.01f, 100);
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
@@ -218,10 +282,10 @@ void app_test_rendertarget() {
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst_t));
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
 
-	skr_mesh_bind    (&app_mesh3.mesh);
+	skr_mesh_bind    (&app_mesh_tri.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh3.ind_count, 1);
+	skr_draw         (0, app_mesh_tri.ind_count, 1);
 
 	skr_tex_target_bind(old_target, false, color);
 }
@@ -238,10 +302,10 @@ void app_test_instancing() {
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
-	skr_mesh_bind    (&app_mesh1.mesh);
+	skr_mesh_bind    (&app_mesh_cube.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_tex, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh1.ind_count, 100);
+	skr_draw         (0, app_mesh_cube.ind_count, 100);
 
 	// Set transforms for another 100 instances
 	for (int32_t i = 0; i < 100; i++) {
@@ -252,10 +316,10 @@ void app_test_instancing() {
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
-	skr_mesh_bind    (&app_mesh2.mesh);
+	skr_mesh_bind    (&app_mesh_pyramid.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_target, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh2.ind_count, 100);
+	skr_draw         (0, app_mesh_pyramid.ind_count, 100);
 }
 
 ///////////////////////////////////////////
@@ -269,6 +333,7 @@ void app_render(hmm_mat4 view, hmm_mat4 proj) {
 	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
 	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
 
+	app_test_dyn_update();
 	app_test_colors();
 	app_test_instancing();
 	app_test_cubemap();
@@ -286,15 +351,17 @@ void app_shutdown() {
 	skr_tex_destroy(&app_target_depth);
 	skr_tex_destroy(&app_target);
 	skr_tex_destroy(&app_tex);
-	app_mesh_destroy(&app_mesh1);
-	app_mesh_destroy(&app_mesh2);
+	app_mesh_destroy(&app_mesh_cube);
+	app_mesh_destroy(&app_mesh_pyramid);
+	app_mesh_destroy(&app_mesh_tri);
+	app_mesh_destroy(&app_mesh_wave);
 }
 
 ///////////////////////////////////////////
 
-app_mesh_t app_mesh_create(const skr_vert_t *verts, int32_t vert_count, const uint32_t *inds, int32_t ind_count) {
+app_mesh_t app_mesh_create(const skr_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count) {
 	app_mesh_t result = {};
-	result.vert_buffer = skr_buffer_create(verts, vert_count * sizeof(skr_vert_t), skr_buffer_type_vertex, skr_use_static);
+	result.vert_buffer = skr_buffer_create(verts, vert_count * sizeof(skr_vert_t), skr_buffer_type_vertex, vert_dyn ? skr_use_dynamic : skr_use_static);
 	result.ind_buffer  = skr_buffer_create(inds,  ind_count  * sizeof(uint32_t),   skr_buffer_type_index,  skr_use_static);
 	result.mesh        = skr_mesh_create(&result.vert_buffer, &result.ind_buffer);
 	result.ind_count   = ind_count;

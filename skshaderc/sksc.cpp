@@ -468,8 +468,12 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 			}
 			for (size_t i = 0; i < ref_meta->texture_count; i++) {
 				if (strcmp(ref_meta->textures[i].name, name) == 0) {
-					found += 1;
-					strcpy_s(ref_meta->textures[i].extra, tag);
+					if (value_str) {
+						found += 1;
+						strcpy_s(ref_meta->textures[i].extra, value);
+					} else {
+						printf("| !! --%s doesn't properly provide a value !!\n", name);
+					}
 					break;
 				}
 			}
@@ -483,11 +487,6 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 				printf("| !! Can't find shader var named '%s' !!\n", name);
 			} else if (!tag_str && !value_str) {
 				printf("| !! Shader var tag for %s not used, missing a ':' or '='? !!\n", name);
-			} else {
-				printf("| %s", name);
-				if (tag_str  ) printf(": %s", tag);
-				if (value_str) printf(" = %s", value);
-				printf("\n");
 			}
 		}
 		comment = next_comment(hlsl_text, &comment_end, &in_comment);
@@ -795,7 +794,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 				break;
 			}
 		}
-		printf("| Param b%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), spvc_compiler_get_name(compiler_glsl, list[i].id));
+		//printf("| Param b%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), spvc_compiler_get_name(compiler_glsl, list[i].id));
 	}
 	/*spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_SAMPLERS, &list, &count);
 	for (size_t i = 0; i < count; i++) {

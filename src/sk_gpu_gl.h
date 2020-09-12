@@ -48,6 +48,7 @@ typedef struct skr_tex_t {
 	skr_mip_      mips;
 	uint32_t      texture;
 	uint32_t      framebuffer;
+	uint32_t      gl_target;
 } skr_tex_t;
 
 typedef struct skr_platform_data_t {

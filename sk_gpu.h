@@ -234,9 +234,10 @@ typedef struct skr_platform_data_t {
 #elif defined(SKR_OPENGL)
 
 typedef struct skr_buffer_t {
-	skr_use_ use;
-	uint32_t _type;
-	uint32_t _buffer;
+	skr_use_         use;
+	skr_buffer_type_ type;
+	uint32_t         _target;
+	uint32_t         _buffer;
 } skr_buffer_t;
 
 typedef struct skr_mesh_t {
@@ -534,9 +535,9 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 void skr_shutdown() {
 	if (d3d_rasterstate) { d3d_rasterstate->Release(); d3d_rasterstate = nullptr; }
 	if (d3d_depthstate ) { d3d_depthstate ->Release(); d3d_depthstate  = nullptr; }
-	if (d3d_info     ) { d3d_info     ->Release(); d3d_info      = nullptr; }
-	if (d3d_context  ) { d3d_context  ->Release(); d3d_context   = nullptr; }
-	if (d3d_device   ) { d3d_device   ->Release(); d3d_device    = nullptr; }
+	if (d3d_info       ) { d3d_info     ->Release(); d3d_info      = nullptr; }
+	if (d3d_context    ) { d3d_context  ->Release(); d3d_context   = nullptr; }
+	if (d3d_device     ) { d3d_device   ->Release(); d3d_device    = nullptr; }
 }
 
 ///////////////////////////////////////////
@@ -776,7 +777,7 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 
 skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
 	skr_shader_t result = {};
-	result.meta   = meta;
+	result.meta    = meta;
 	result._vertex = (ID3D11VertexShader*)v_shader._shader;
 	result._pixel  = (ID3D11PixelShader *)p_shader._shader;
 	skr_shader_meta_reference(result.meta);
@@ -846,8 +847,8 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 	result.transparency = skr_transparency_none;
 	result.cull         = skr_cull_back;
 	result.wireframe    = false;
-	result._vertex       = shader->_vertex;
-	result._pixel        = shader->_pixel;
+	result._vertex      = shader->_vertex;
+	result._pixel       = shader->_pixel;
 	if (result._vertex) result._vertex->AddRef();
 	if (result._pixel ) result._pixel ->AddRef();
 
@@ -1015,8 +1016,8 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
-	result.type    = type;
-	result.use     = skr_use_static;
+	result.type     = type;
+	result.use      = skr_use_static;
 	result._texture = (ID3D11Texture2D *)native_tex;
 	result._texture->AddRef();
 
@@ -1464,9 +1465,6 @@ const char *skr_semantic_to_d3d(skr_el_semantic_ semantic) {
 #elif __ANDROID__
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-//#include <GLES/gl.h>
-//#include <GLES3/gl3.h>
-//#include <GLES3/gl3ext.h>
 
 EGLDisplay egl_display;
 EGLSurface egl_surface;
@@ -1665,108 +1663,97 @@ HGLRC gl_hrc;
 #if defined(_WIN32) || defined(__ANDROID__)
 
 #ifdef _WIN32
-#define GLDECL __stdcall
+	#define GLDECL __stdcall
+	// from https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions
+	// Some GL functions can only be loaded with wglGetProcAddress, and others
+	// can only be loaded by GetProcAddress.
+	void *gl_get_function(const char *name) {
+		static HMODULE dll = LoadLibraryA("opengl32.dll");
+		void *f = (void *)wglGetProcAddress(name);
+		if (f == 0 || (f == (void*)0x1) || (f == (void*)0x2) || (f == (void*)0x3) || (f == (void*)-1) ) {
+			f = (void *)GetProcAddress(dll, name);
+		}
+		return f;
+	}
 #else
-#define GLDECL
-#endif
+	#define GLDECL
+	#define gl_get_function(x) eglGetProcAddress(x)
+#endif // _WIN32
 
 typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char* message, const void* userParam);
 
 #define GL_API \
-    GLE(void,     LinkProgram,             uint32_t program) \
-	GLE(void,     ClearColor,              float r, float g, float b, float a) \
-	GLE(void,     Clear,                   uint32_t mask) \
-	GLE(void,     Enable,                  uint32_t cap) \
-	GLE(void,     Disable,                 uint32_t cap) \
-	GLE(void,     PolygonMode,             uint32_t face, uint32_t mode) \
-	GLE(uint32_t, GetError,                ) \
-    GLE(void,     GetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
-    GLE(uint32_t, CreateShader,            uint32_t type) \
-    GLE(void,     ShaderSource,            uint32_t shader, int32_t count, const char* const *string, const int32_t *length) \
-    GLE(void,     CompileShader,           uint32_t shader) \
-    GLE(void,     GetShaderiv,             uint32_t shader, uint32_t pname, int32_t *params) \
-	GLE(void,     GetIntegerv,             uint32_t pname, int32_t *params) \
-    GLE(void,     GetShaderInfoLog,        uint32_t shader, int32_t bufSize, int32_t *length, char *infoLog) \
-	GLE(void,     GetProgramInfoLog,       uint32_t program, int32_t maxLength, int32_t *length, char *infoLog) \
-    GLE(void,     DeleteShader,            uint32_t shader) \
-    GLE(uint32_t, CreateProgram,           void) \
-    GLE(void,     AttachShader,            uint32_t program, uint32_t shader) \
-    GLE(void,     DetachShader,            uint32_t program, uint32_t shader) \
-    GLE(void,     UseProgram,              uint32_t program) \
-    GLE(void,     DeleteProgram,           uint32_t program) \
-    GLE(void,     GenVertexArrays,         int32_t n, uint32_t *arrays) \
-    GLE(void,     BindVertexArray,         uint32_t array) \
-    GLE(void,     BufferData,              uint32_t target, int32_t size, const void *data, uint32_t usage) \
-    GLE(void,     GenBuffers,              int32_t n, uint32_t *buffers) \
-    GLE(void,     BindBuffer,              uint32_t target, uint32_t buffer) \
-    GLE(void,     DeleteBuffers,           int32_t n, const uint32_t *buffers) \
-	GLE(void,     GenTextures,             int32_t n, uint32_t *textures) \
-	GLE(void,     GenFramebuffers,         int32_t n, uint32_t *ids) \
-	GLE(void,     DeleteFramebuffers,      int32_t n, uint32_t *ids) \
-	GLE(void,     BindFramebuffer,         uint32_t target, uint32_t framebuffer) \
-	GLE(void,     FramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
-	GLE(void,     FramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
-	GLE(void,     FramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
-	GLE(void,     DeleteTextures,          int32_t n, const uint32_t *textures) \
-	GLE(void,     BindTexture,             uint32_t target, uint32_t texture) \
-    GLE(void,     TexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
-	GLE(void,     GetInternalformativ,     uint32_t target, uint32_t internalformat, uint32_t pname, int32_t bufSize, int32_t *params)\
-	GLE(void,     GetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
-	GLE(void,     TexParameterf,           uint32_t target, uint32_t pname, float param) \
-	GLE(void,     TexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
-    GLE(void,     ActiveTexture,           uint32_t texture) \
-	GLE(void,     GenerateMipmap,          uint32_t target) \
-    GLE(void,     BindAttribLocation,      uint32_t program, uint32_t index, const char *name) \
-    GLE(int32_t,  GetUniformLocation,      uint32_t program, const char *name) \
-    GLE(void,     Uniform4f,               int32_t location, float v0, float v1, float v2, float v3) \
-    GLE(void,     Uniform4fv,              int32_t location, int32_t count, const float *value) \
-    GLE(void,     DeleteVertexArrays,      int32_t n, const uint32_t *arrays) \
-    GLE(void,     EnableVertexAttribArray, uint32_t index) \
-    GLE(void,     VertexAttribPointer,     uint32_t index, int32_t size, uint32_t type, uint8_t normalized, int32_t stride, const void *pointer) \
-    GLE(void,     Uniform1i,               int32_t location, int32_t v0) \
-	GLE(void,     DrawElementsInstanced,   uint32_t mode, int32_t count, uint32_t type, const void *indices, int32_t primcount) \
-	GLE(void,     DrawElements,            uint32_t mode, int32_t count, uint32_t type, const void *indices) \
-	GLE(void,     DebugMessageCallback,    GLDEBUGPROC callback, const void *userParam) \
-	GLE(void,     BindBufferBase,          uint32_t target, uint32_t index, uint32_t buffer) \
-	GLE(void,     BufferSubData,           uint32_t target, int64_t offset, int32_t size, const void *data) \
-	GLE(void,     Viewport,                int32_t x, int32_t y, int32_t width, int32_t height) \
-	GLE(void,     CullFace,                uint32_t mode) \
-	GLE(void,     BlendFunc,               uint32_t sfactor, uint32_t dfactor) \
-	GLE(void,     BlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
-	GLE(const char *, GetString,           uint32_t name)
+    GLE(void,     glLinkProgram,             uint32_t program) \
+	GLE(void,     glClearColor,              float r, float g, float b, float a) \
+	GLE(void,     glClear,                   uint32_t mask) \
+	GLE(void,     glEnable,                  uint32_t cap) \
+	GLE(void,     glDisable,                 uint32_t cap) \
+	GLE(void,     glPolygonMode,             uint32_t face, uint32_t mode) \
+	GLE(uint32_t, glGetError,                ) \
+    GLE(void,     glGetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
+    GLE(uint32_t, glCreateShader,            uint32_t type) \
+    GLE(void,     glShaderSource,            uint32_t shader, int32_t count, const char* const *string, const int32_t *length) \
+    GLE(void,     glCompileShader,           uint32_t shader) \
+    GLE(void,     glGetShaderiv,             uint32_t shader, uint32_t pname, int32_t *params) \
+	GLE(void,     glGetIntegerv,             uint32_t pname, int32_t *params) \
+    GLE(void,     glGetShaderInfoLog,        uint32_t shader, int32_t bufSize, int32_t *length, char *infoLog) \
+	GLE(void,     glGetProgramInfoLog,       uint32_t program, int32_t maxLength, int32_t *length, char *infoLog) \
+    GLE(void,     glDeleteShader,            uint32_t shader) \
+    GLE(uint32_t, glCreateProgram,           void) \
+    GLE(void,     glAttachShader,            uint32_t program, uint32_t shader) \
+    GLE(void,     glDetachShader,            uint32_t program, uint32_t shader) \
+    GLE(void,     glUseProgram,              uint32_t program) \
+    GLE(void,     glDeleteProgram,           uint32_t program) \
+    GLE(void,     glGenVertexArrays,         int32_t n, uint32_t *arrays) \
+    GLE(void,     glBindVertexArray,         uint32_t array) \
+    GLE(void,     glBufferData,              uint32_t target, int32_t size, const void *data, uint32_t usage) \
+    GLE(void,     glGenBuffers,              int32_t n, uint32_t *buffers) \
+    GLE(void,     glBindBuffer,              uint32_t target, uint32_t buffer) \
+    GLE(void,     glDeleteBuffers,           int32_t n, const uint32_t *buffers) \
+	GLE(void,     glGenTextures,             int32_t n, uint32_t *textures) \
+	GLE(void,     glGenFramebuffers,         int32_t n, uint32_t *ids) \
+	GLE(void,     glDeleteFramebuffers,      int32_t n, uint32_t *ids) \
+	GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) \
+	GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
+	GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
+	GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
+	GLE(void,     glDeleteTextures,          int32_t n, const uint32_t *textures) \
+	GLE(void,     glBindTexture,             uint32_t target, uint32_t texture) \
+    GLE(void,     glTexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
+	GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalformat, uint32_t pname, int32_t bufSize, int32_t *params)\
+	GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
+	GLE(void,     glTexParameterf,           uint32_t target, uint32_t pname, float param) \
+	GLE(void,     glTexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
+    GLE(void,     glActiveTexture,           uint32_t texture) \
+	GLE(void,     glGenerateMipmap,          uint32_t target) \
+    GLE(void,     glBindAttribLocation,      uint32_t program, uint32_t index, const char *name) \
+    GLE(int32_t,  glGetUniformLocation,      uint32_t program, const char *name) \
+    GLE(void,     glUniform4f,               int32_t location, float v0, float v1, float v2, float v3) \
+    GLE(void,     glUniform4fv,              int32_t location, int32_t count, const float *value) \
+    GLE(void,     glDeleteVertexArrays,      int32_t n, const uint32_t *arrays) \
+    GLE(void,     glEnableVertexAttribArray, uint32_t index) \
+    GLE(void,     glVertexAttribPointer,     uint32_t index, int32_t size, uint32_t type, uint8_t normalized, int32_t stride, const void *pointer) \
+    GLE(void,     glUniform1i,               int32_t location, int32_t v0) \
+	GLE(void,     glDrawElementsInstanced,   uint32_t mode, int32_t count, uint32_t type, const void *indices, int32_t primcount) \
+	GLE(void,     glDrawElements,            uint32_t mode, int32_t count, uint32_t type, const void *indices) \
+	GLE(void,     glDebugMessageCallback,    GLDEBUGPROC callback, const void *userParam) \
+	GLE(void,     glBindBufferBase,          uint32_t target, uint32_t index, uint32_t buffer) \
+	GLE(void,     glBufferSubData,           uint32_t target, int64_t offset, int32_t size, const void *data) \
+	GLE(void,     glViewport,                int32_t x, int32_t y, int32_t width, int32_t height) \
+	GLE(void,     glCullFace,                uint32_t mode) \
+	GLE(void,     glBlendFunc,               uint32_t sfactor, uint32_t dfactor) \
+	GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
+	GLE(const char *, glGetString,           uint32_t name)
 
-#define GLE(ret, name, ...) typedef ret GLDECL name##proc(__VA_ARGS__); static name##proc * gl##name;
+#define GLE(ret, name, ...) typedef ret GLDECL name##_proc(__VA_ARGS__); static name##_proc * name;
 GL_API
 #undef GLE
 
-#ifdef _WIN32
-
-// from https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions
-// Some GL functions can only be loaded with wglGetProcAddress, and others
-// can only be loaded by GetProcAddress.
-void *gl_get_func(const char *name, HMODULE module) {
-	void *f = (void *)wglGetProcAddress(name);
-	if(f == 0 || (f == (void*)0x1) || (f == (void*)0x2) || (f == (void*)0x3) || (f == (void*)-1) ) {
-		f = (void *)GetProcAddress(module, name);
-	}
-	return f;
-}
 static void gl_load_extensions( ) {
-	HMODULE dll = LoadLibraryA("opengl32.dll");
-#define GLE(ret, name, ...) gl##name = (name##proc *) gl_get_func("gl" #name, dll); if (gl##name == nullptr) skr_log("Couldn't load gl function gl" #name);
+#define GLE(ret, name, ...) name = (name##_proc *) gl_get_function(#name); if (name == nullptr) skr_log("Couldn't load gl function " #name);
 	GL_API
 #undef GLE
 }
-
-#else
-
-static void gl_load_extensions( ) {
-#define GLE(ret, name, ...) gl##name = (name##proc *) eglGetProcAddress("gl" #name); if (gl##name == nullptr) skr_log("Couldn't load gl function gl" #name);
-	GL_API
-#undef GLE
-}
-
-#endif
 
 #endif // _WIN32 or __ANDROID__
 
@@ -2019,8 +2006,10 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	glEnable   (GL_DEPTH_TEST);  
 	glEnable   (GL_CULL_FACE);
 	glCullFace (GL_BACK);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
+#if _WIN32
 	glEnable   (GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+#endif
 	
 	return 1;
 }
@@ -2102,12 +2091,13 @@ void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) 
 
 skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
-	result.use  = use;
-	result._type = skr_buffer_type_to_gl(type);
+	result.use   = use;
+	result.type  = type;
+	result._target = skr_buffer_type_to_gl(type);
 
 	glGenBuffers(1, &result._buffer);
-	glBindBuffer(result._type, result._buffer);
-	glBufferData(result._type, size_bytes, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
+	glBindBuffer(result._target, result._buffer);
+	glBufferData(result._target, size_bytes, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
 
 	return result;
 }
@@ -2126,17 +2116,17 @@ void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t si
 		return;
 	}
 
-	glBindBuffer   (buffer->_type, buffer->_buffer);
-	glBufferSubData(buffer->_type, 0, size_bytes, data);
+	glBindBuffer   (buffer->_target, buffer->_buffer);
+	glBufferSubData(buffer->_target, 0, size_bytes, data);
 }
 
 /////////////////////////////////////////// 
 
 void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t stride, uint32_t offset) {
-	if (buffer->_type == GL_UNIFORM_BUFFER)
-		glBindBufferBase(buffer->_type, bind.slot, buffer->_buffer); 
+	if (buffer->type == skr_buffer_type_constant)
+		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer); 
 	else
-		glBindBuffer(buffer->_type, buffer->_buffer);
+		glBindBuffer(buffer->_target, buffer->_buffer);
 }
 
 /////////////////////////////////////////// 
@@ -2226,7 +2216,7 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	// Convert the prefix if it doesn't match the GL version we're using
 	const char   *prefix_gl      = "#version 450";
 	const size_t  prefix_gl_size = strlen(prefix_gl);
-	const char   *prefix_es      = "#version 300 es";
+	const char   *prefix_es      = "#version 320 es";
 	const size_t  prefix_es_size = strlen(prefix_es);
 	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;
@@ -2284,7 +2274,7 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 
 skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
 	skr_shader_t result = {};
-	result.meta   = meta;
+	result.meta    = meta;
 	result._vertex = v_shader._shader;
 	result._pixel  = p_shader._shader;
 	skr_shader_meta_reference(result.meta);
@@ -2340,7 +2330,7 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 	result.transparency = skr_transparency_none;
 	result.cull         = skr_cull_none;
 	result.wireframe    = false;
-	result._shader       = *shader;
+	result._shader      = *shader;
 
 	return result;
 }
@@ -2499,10 +2489,10 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 
 skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps) {
 	skr_tex_t result = {};
-	result.type      = type;
-	result.use       = use;
-	result.format    = format;
-	result.mips      = mip_maps;
+	result.type    = type;
+	result.use     = use;
+	result.format  = format;
+	result.mips    = mip_maps;
 	result._target = type == skr_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: GL_TEXTURE_2D;
@@ -2563,13 +2553,13 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	default: filter = GL_LINEAR; min_filter = GL_LINEAR;
 	}
 
-	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S,     mode  );	
-	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_T,     mode  );
+	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);	
+	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_T, mode);
 	if (tex->type == skr_tex_type_cubemap) {
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
 	}
 	glTexParameteri(tex->_target, GL_TEXTURE_MIN_FILTER, min_filter);
-	glTexParameteri(tex->_target, GL_TEXTURE_MAG_FILTER, filter);
+	glTexParameteri(tex->_target, GL_TEXTURE_MAG_FILTER, filter    );
 #ifdef _WIN32
 	glTexParameterf(tex->_target, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif

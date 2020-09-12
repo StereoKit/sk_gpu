@@ -1,8 +1,9 @@
 #pragma once
 typedef struct skr_buffer_t {
-	skr_use_ use;
-	uint32_t _type;
-	uint32_t _buffer;
+	skr_use_         use;
+	skr_buffer_type_ type;
+	uint32_t         _target;
+	uint32_t         _buffer;
 } skr_buffer_t;
 
 typedef struct skr_mesh_t {

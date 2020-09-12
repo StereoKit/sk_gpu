@@ -642,12 +642,13 @@ void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) 
 
 skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
-	result.use  = use;
-	result._type = skr_buffer_type_to_gl(type);
+	result.use     = use;
+	result.type    = type;
+	result._target = skr_buffer_type_to_gl(type);
 
 	glGenBuffers(1, &result._buffer);
-	glBindBuffer(result._type, result._buffer);
-	glBufferData(result._type, size_bytes, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
+	glBindBuffer(result._target, result._buffer);
+	glBufferData(result._target, size_bytes, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
 
 	return result;
 }
@@ -666,17 +667,17 @@ void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t si
 		return;
 	}
 
-	glBindBuffer   (buffer->_type, buffer->_buffer);
-	glBufferSubData(buffer->_type, 0, size_bytes, data);
+	glBindBuffer   (buffer->_target, buffer->_buffer);
+	glBufferSubData(buffer->_target, 0, size_bytes, data);
 }
 
 /////////////////////////////////////////// 
 
 void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t stride, uint32_t offset) {
-	if (buffer->_type == GL_UNIFORM_BUFFER)
-		glBindBufferBase(buffer->_type, bind.slot, buffer->_buffer); 
+	if (buffer->type == skr_buffer_type_constant)
+		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer); 
 	else
-		glBindBuffer(buffer->_type, buffer->_buffer);
+		glBindBuffer(buffer->_target, buffer->_buffer);
 }
 
 /////////////////////////////////////////// 
@@ -734,8 +735,8 @@ void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
 
 void skr_mesh_bind(const skr_mesh_t *mesh) {
 	glBindVertexArray(mesh->_layout);
-	glBindBuffer(GL_ARRAY_BUFFER, mesh->_vert_buffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER,         mesh->_vert_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer );
 }
 
 /////////////////////////////////////////// 

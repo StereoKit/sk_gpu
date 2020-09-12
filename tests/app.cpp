@@ -92,9 +92,9 @@ bool app_init() {
 
 	// make a double-sided triangle
 	skr_vert_t verts3[] = {
-		skr_vert_t{ {-.7,-.5f,0}, {0,1,0}, {0,0}, {255,0,0,255}},
-		skr_vert_t{ {  0, .5f,0}, {0,1,0}, {0,0}, {0,255,0,255}},
-		skr_vert_t{ { .7,-.5f,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
+		skr_vert_t{ {-.7f,-.5f,0}, {0,1,0}, {0,0}, {255,0,0,255}},
+		skr_vert_t{ { .0f, .5f,0}, {0,1,0}, {0,0}, {0,255,0,255}},
+		skr_vert_t{ { .7f,-.5f,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
 	uint32_t inds3[] = {
 		0,1,2, 2,1,0 };
 	app_mesh_tri = app_mesh_create(verts3, sizeof(verts3)/sizeof(skr_vert_t), false, inds3, sizeof(inds3)/sizeof(uint32_t));

@@ -606,7 +606,7 @@ void skr_draw_begin() {
 
 void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clear_color_4) {
 	gl_active_rendertarget = render_target;
-	gl_current_framebuffer = render_target == nullptr ? 0 : render_target->framebuffer;
+	gl_current_framebuffer = render_target == nullptr ? 0 : render_target->_framebuffer;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	if (render_target) {
@@ -634,12 +634,12 @@ skr_tex_t *skr_tex_target_get() {
 skr_platform_data_t skr_get_platform_data() {
 	skr_platform_data_t result = {};
 #ifdef _WIN32
-	result.gl_hdc = gl_hdc;
-	result.gl_hrc = gl_hrc;
+	result._gl_hdc = gl_hdc;
+	result._gl_hrc = gl_hrc;
 #elif __ANDROID__
-	result.egl_display = egl_display;
-	result.egl_config  = egl_config;
-	result.egl_context = egl_context;
+	result._egl_display = egl_display;
+	result._egl_config  = egl_config;
+	result._egl_context = egl_context;
 #endif
 	return result;
 }
@@ -655,11 +655,11 @@ void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) 
 skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
 	result.use  = use;
-	result.type = skr_buffer_type_to_gl(type);
+	result._type = skr_buffer_type_to_gl(type);
 
-	glGenBuffers(1, &result.buffer);
-	glBindBuffer(result.type, result.buffer);
-	glBufferData(result.type, size_bytes, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
+	glGenBuffers(1, &result._buffer);
+	glBindBuffer(result._type, result._buffer);
+	glBufferData(result._type, size_bytes, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
 
 	return result;
 }
@@ -667,7 +667,7 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 /////////////////////////////////////////// 
 
 bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
-	return buffer->buffer != 0;
+	return buffer->_buffer != 0;
 }
 
 /////////////////////////////////////////// 
@@ -678,23 +678,23 @@ void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t si
 		return;
 	}
 
-	glBindBuffer   (buffer->type, buffer->buffer);
-	glBufferSubData(buffer->type, 0, size_bytes, data);
+	glBindBuffer   (buffer->_type, buffer->_buffer);
+	glBufferSubData(buffer->_type, 0, size_bytes, data);
 }
 
 /////////////////////////////////////////// 
 
 void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t stride, uint32_t offset) {
-	if (buffer->type == GL_UNIFORM_BUFFER)
-		glBindBufferBase(buffer->type, bind.slot, buffer->buffer); 
+	if (buffer->_type == GL_UNIFORM_BUFFER)
+		glBindBufferBase(buffer->_type, bind.slot, buffer->_buffer); 
 	else
-		glBindBuffer(buffer->type, buffer->buffer);
+		glBindBuffer(buffer->_type, buffer->_buffer);
 }
 
 /////////////////////////////////////////// 
 
 void skr_buffer_destroy(skr_buffer_t *buffer) {
-	glDeleteBuffers(1, &buffer->buffer);
+	glDeleteBuffers(1, &buffer->_buffer);
 	*buffer = {};
 }
 
@@ -711,18 +711,18 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 /////////////////////////////////////////// 
 
 void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
-	mesh->vert_buffer = vert_buffer ? vert_buffer->buffer : 0;
-	if (mesh->vert_buffer != 0) {
-		if (mesh->layout != 0) {
-			glDeleteVertexArrays(1, &mesh->layout);
-			mesh->layout = 0;
+	mesh->_vert_buffer = vert_buffer ? vert_buffer->_buffer : 0;
+	if (mesh->_vert_buffer != 0) {
+		if (mesh->_layout != 0) {
+			glDeleteVertexArrays(1, &mesh->_layout);
+			mesh->_layout = 0;
 		}
 
-		glBindBuffer(GL_ARRAY_BUFFER, mesh->vert_buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, mesh->_vert_buffer);
 
 		// Create a vertex layout
-		glGenVertexArrays(1, &mesh->layout);
-		glBindVertexArray(mesh->layout);
+		glGenVertexArrays(1, &mesh->_layout);
+		glBindVertexArray(mesh->_layout);
 		// enable the vertex data for the shader
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
@@ -739,21 +739,21 @@ void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
 /////////////////////////////////////////// 
 
 void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
-	mesh->index_buffer = ind_buffer ? ind_buffer->buffer : 0;
+	mesh->_ind_buffer = ind_buffer ? ind_buffer->_buffer : 0;
 }
 
 /////////////////////////////////////////// 
 
 void skr_mesh_bind(const skr_mesh_t *mesh) {
-	glBindVertexArray(mesh->layout);
-	glBindBuffer(GL_ARRAY_BUFFER, mesh->vert_buffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
+	glBindVertexArray(mesh->_layout);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->_vert_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer);
 }
 
 /////////////////////////////////////////// 
 
 void skr_mesh_destroy(skr_mesh_t *mesh) {
-	glDeleteVertexArrays(1, &mesh->layout);
+	glDeleteVertexArrays(1, &mesh->_layout);
 	*mesh = {};
 }
 
@@ -799,19 +799,19 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 #endif
 
 	// create and compile the vertex shader
-	result.shader = glCreateShader(gl_type);
-	glShaderSource (result.shader, 1, &final_data, NULL);
-	glCompileShader(result.shader);
+	result._shader = glCreateShader(gl_type);
+	glShaderSource (result._shader, 1, &final_data, NULL);
+	glCompileShader(result._shader);
 
 	// check for errors?
 	int32_t err, length;
-	glGetShaderiv(result.shader, GL_COMPILE_STATUS, &err);
+	glGetShaderiv(result._shader, GL_COMPILE_STATUS, &err);
 	if (err == 0) {
 		char *log;
 
-		glGetShaderiv(result.shader, GL_INFO_LOG_LENGTH, &length);
+		glGetShaderiv(result._shader, GL_INFO_LOG_LENGTH, &length);
 		log = (char*)malloc(length);
-		glGetShaderInfoLog(result.shader, length, &err, log);
+		glGetShaderInfoLog(result._shader, length, &err, log);
 
 		skr_log("Unable to compile shader:\n");
 		skr_log(log);
@@ -836,32 +836,32 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 
 skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
 	skr_shader_t result = {};
-	result.meta   = meta;
-	result.vertex = v_shader.shader;
-	result.pixel  = p_shader.shader;
+	result.meta    = meta;
+	result._vertex = v_shader._shader;
+	result._pixel  = p_shader._shader;
 	skr_shader_meta_reference(result.meta);
 
-	result.program = glCreateProgram();
-	if (result.vertex) glAttachShader(result.program, result.vertex);
-	if (result.pixel)  glAttachShader(result.program, result.pixel);
-	glLinkProgram (result.program);
+	result._program = glCreateProgram();
+	if (result._vertex) glAttachShader(result._program, result._vertex);
+	if (result._pixel)  glAttachShader(result._program, result._pixel);
+	glLinkProgram (result._program);
 
 	// check for errors?
 	int32_t err, length;
-	glGetProgramiv(result.program, GL_LINK_STATUS, &err);
+	glGetProgramiv(result._program, GL_LINK_STATUS, &err);
 	if (err == 0) {
 		char *log;
 
-		glGetProgramiv(result.program, GL_INFO_LOG_LENGTH, &length);
+		glGetProgramiv(result._program, GL_INFO_LOG_LENGTH, &length);
 		log = (char*)malloc(length);
-		glGetProgramInfoLog(result.program, length, &err, log);
+		glGetProgramInfoLog(result._program, length, &err, log);
 
 		skr_log("Unable to compile shader program:");
 		skr_log(log);
 		free(log);
 
-		glDeleteProgram(result.program);
-		result.program = 0;
+		glDeleteProgram(result._program);
+		result._program = 0;
 	}
 
 	return result;
@@ -871,15 +871,15 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 
 bool skr_shader_is_valid(const skr_shader_t *shader) {
 	return shader->meta
-		&& shader->program;
+		&& shader->_program;
 }
 
 ///////////////////////////////////////////
 
 void skr_shader_destroy(skr_shader_t *shader) {
-	glDeleteProgram(shader->program);
-	glDeleteShader (shader->vertex);
-	glDeleteShader (shader->pixel);
+	glDeleteProgram(shader->_program);
+	glDeleteShader (shader->_vertex);
+	glDeleteShader (shader->_pixel);
 	*shader = {};
 }
 
@@ -892,7 +892,7 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 	result.transparency = skr_transparency_none;
 	result.cull         = skr_cull_none;
 	result.wireframe    = false;
-	result.shader       = *shader;
+	result._shader      = *shader;
 
 	return result;
 }
@@ -900,7 +900,7 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 /////////////////////////////////////////// 
 
 void skr_pipeline_bind(const skr_pipeline_t *pipeline) {
-	glUseProgram(pipeline->shader.program);
+	glUseProgram(pipeline->_shader._program);
 	
 	switch (pipeline->transparency) {
 	case skr_transparency_blend: {
@@ -1018,28 +1018,28 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
-	result.type    = type;
-	result.use     = skr_use_static;
-	result.mips    = skr_mip_none;
-	result.texture = (uint32_t)(uint64_t)native_tex;
-	result.format  = format;
+	result.type        = type;
+	result.use         = skr_use_static;
+	result.mips        = skr_mip_none;
+	result.format      = format;
 	result.width       = width;
 	result.height      = height;
 	result.array_count = array_count;
-	result.gl_target = type == skr_tex_type_cubemap 
+	result._texture    = (uint32_t)(uint64_t)native_tex;
+	result._target     = type == skr_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: array_count > 1 
 			? GL_TEXTURE_2D_ARRAY
 			: GL_TEXTURE_2D;
 
 	if (type == skr_tex_type_rendertarget) {
-		glGenFramebuffers(1, &result.framebuffer);
+		glGenFramebuffers(1, &result._framebuffer);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, result.framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, result._framebuffer);
 		if (array_count != 1) {
-			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result.texture, 0);
+			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0);
 		} else {
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result.gl_target, result.texture, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._target, result._texture, 0);
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
@@ -1051,19 +1051,19 @@ skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_
 
 skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps) {
 	skr_tex_t result = {};
-	result.type      = type;
-	result.use       = use;
-	result.format    = format;
-	result.mips      = mip_maps;
-	result.gl_target = type == skr_tex_type_cubemap 
+	result.type    = type;
+	result.use     = use;
+	result.format  = format;
+	result.mips    = mip_maps;
+	result._target = type == skr_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: GL_TEXTURE_2D;
 
-	glGenTextures(1, &result.texture);
+	glGenTextures(1, &result._texture);
 	skr_tex_settings(&result, type == skr_tex_type_cubemap ? skr_tex_address_clamp : skr_tex_address_repeat, skr_tex_sample_linear, 1);
 
 	if (type == skr_tex_type_rendertarget) {
-		glGenFramebuffers(1, &result.framebuffer);
+		glGenFramebuffers(1, &result._framebuffer);
 	}
 	
 	return result;
@@ -1072,7 +1072,7 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 /////////////////////////////////////////// 
 
 bool skr_tex_is_valid(const skr_tex_t *tex) {
-	return tex->texture != 0;
+	return tex->_texture != 0;
 }
 
 /////////////////////////////////////////// 
@@ -1082,11 +1082,11 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 		uint32_t attach = depth->format == skr_tex_fmt_depthstencil 
 			? GL_DEPTH_STENCIL_ATTACHMENT 
 			: GL_DEPTH_ATTACHMENT;
-		glBindFramebuffer(GL_FRAMEBUFFER, tex->framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
 		if (tex->array_count != 1) {
-			glFramebufferTexture(GL_FRAMEBUFFER, attach , depth->texture, 0);
+			glFramebufferTexture(GL_FRAMEBUFFER, attach , depth->_texture, 0);
 		} else {
-			glFramebufferTexture2D(GL_FRAMEBUFFER, attach, tex->gl_target, depth->texture, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, attach, tex->_target, depth->_texture, 0);
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	} else {
@@ -1097,7 +1097,7 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 /////////////////////////////////////////// 
 
 void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {
-	glBindTexture(tex->gl_target, tex->texture);
+	glBindTexture(tex->_target, tex->_texture);
 
 	uint32_t mode;
 	switch (address) {
@@ -1115,15 +1115,15 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	default: filter = GL_LINEAR; min_filter = GL_LINEAR;
 	}
 
-	glTexParameteri(tex->gl_target, GL_TEXTURE_WRAP_S,     mode  );	
-	glTexParameteri(tex->gl_target, GL_TEXTURE_WRAP_T,     mode  );
+	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);	
+	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_T, mode);
 	if (tex->type == skr_tex_type_cubemap) {
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
 	}
-	glTexParameteri(tex->gl_target, GL_TEXTURE_MIN_FILTER, min_filter);
-	glTexParameteri(tex->gl_target, GL_TEXTURE_MAG_FILTER, filter);
+	glTexParameteri(tex->_target, GL_TEXTURE_MIN_FILTER, min_filter);
+	glTexParameteri(tex->_target, GL_TEXTURE_MAG_FILTER, filter    );
 #ifdef _WIN32
-	glTexParameterf(tex->gl_target, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);
+	glTexParameterf(tex->_target, GL_TEXTURE_MAX_ANISOTROPY, sample == skr_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
 }
 
@@ -1134,9 +1134,9 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	tex->height      = height;
 	tex->array_count = data_frame_count;
 	if (tex->type != skr_tex_type_cubemap && tex->array_count > 1)
-		tex->gl_target = GL_TEXTURE_2D_ARRAY;
+		tex->_target = GL_TEXTURE_2D_ARRAY;
 
-	glBindTexture(tex->gl_target, tex->texture);
+	glBindTexture(tex->_target, tex->_texture);
 
 	uint32_t format = (uint32_t)skr_tex_fmt_to_native(tex->format);
 	uint32_t type   = skr_tex_fmt_to_gl_type         (tex->format);
@@ -1152,14 +1152,14 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
 	}
 	if (tex->mips == skr_mip_generate)
-		glGenerateMipmap(tex->gl_target);
+		glGenerateMipmap(tex->_target);
 
 	if (tex->type == skr_tex_type_rendertarget) {
-		glBindFramebuffer(GL_FRAMEBUFFER, tex->framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
 		if (tex->array_count != 1) {
-			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->texture, 0);
+			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_texture, 0);
 		} else {
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->gl_target, tex->texture, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_target, tex->_texture, 0);
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
@@ -1176,15 +1176,15 @@ void skr_tex_bind(const skr_tex_t *texture, skr_bind_t bind) {
 
 	if (texture) {
 		glActiveTexture(GL_TEXTURE0 + bind.slot);
-		glBindTexture  (texture->gl_target, texture->texture);
+		glBindTexture  (texture->_target, texture->_texture);
 	}
 }
 
 /////////////////////////////////////////// 
 
 void skr_tex_destroy(skr_tex_t *tex) {
-	glDeleteTextures    (1, &tex->texture);
-	glDeleteFramebuffers(1, &tex->framebuffer);  
+	glDeleteTextures    (1, &tex->_texture);
+	glDeleteFramebuffers(1, &tex->_framebuffer);  
 	*tex = {};
 }
 

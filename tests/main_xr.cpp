@@ -118,14 +118,14 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 
 	skr_platform_data_t platform = skr_get_platform_data();
 #if defined(SKR_OPENGL) && defined(_WIN32)
-	out_graphics->hDC   = (HDC  )platform.gl_hdc;
-	out_graphics->hGLRC = (HGLRC)platform.gl_hrc;
+	out_graphics->hDC   = (HDC  )platform._gl_hdc;
+	out_graphics->hGLRC = (HGLRC)platform._gl_hrc;
 #elif defined(SKR_OPENGL) && defined(__ANDROID__)
-	out_graphics->egl_display = platform.egl_display;
-	out_graphics->egl_surface = platform.egl_surface;
-	out_graphics->egl_context = platform.egl_context;
+	out_graphics->egl_display = platform._egl_display;
+	out_graphics->egl_surface = platform._egl_surface;
+	out_graphics->egl_context = platform._egl_context;
 #elif defined(SKR_DIRECT3D11)
-	out_graphics->device = (ID3D11Device*)platform.d3d11_device;
+	out_graphics->device = (ID3D11Device*)platform._d3d11_device;
 #endif
 
 	return true;

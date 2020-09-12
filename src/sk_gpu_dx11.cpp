@@ -126,9 +126,9 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 void skr_shutdown() {
 	if (d3d_rasterstate) { d3d_rasterstate->Release(); d3d_rasterstate = nullptr; }
 	if (d3d_depthstate ) { d3d_depthstate ->Release(); d3d_depthstate  = nullptr; }
-	if (d3d_info     ) { d3d_info     ->Release(); d3d_info      = nullptr; }
-	if (d3d_context  ) { d3d_context  ->Release(); d3d_context   = nullptr; }
-	if (d3d_device   ) { d3d_device   ->Release(); d3d_device    = nullptr; }
+	if (d3d_info       ) { d3d_info     ->Release(); d3d_info      = nullptr; }
+	if (d3d_context    ) { d3d_context  ->Release(); d3d_context   = nullptr; }
+	if (d3d_device     ) { d3d_device   ->Release(); d3d_device    = nullptr; }
 }
 
 ///////////////////////////////////////////
@@ -144,7 +144,7 @@ void skr_draw_begin() {
 
 skr_platform_data_t skr_get_platform_data() {
 	skr_platform_data_t result = {};
-	result.d3d11_device = d3d_device;
+	result._d3d11_device = d3d_device;
 
 	return result;
 }
@@ -165,13 +165,13 @@ void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clea
 	d3d_context->RSSetViewports(1, &viewport);
 
 	if (clear) {
-		d3d_context->ClearRenderTargetView(render_target->target_view, clear_color_4);
-		if (render_target->depth_view) {
+		d3d_context->ClearRenderTargetView(render_target->_target_view, clear_color_4);
+		if (render_target->_depth_view) {
 			UINT clear_flags = D3D11_CLEAR_DEPTH;
-			d3d_context->ClearDepthStencilView(render_target->depth_view, clear_flags, 1.0f, 0);
+			d3d_context->ClearDepthStencilView(render_target->_depth_view, clear_flags, 1.0f, 0);
 		}
 	}
-	d3d_context->OMSetRenderTargets(1, &render_target->target_view, render_target->depth_view);
+	d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
 }
 
 ///////////////////////////////////////////
@@ -210,14 +210,14 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 	}break;
 	default: throw "Not implemented yet!";
 	}
-	d3d_device->CreateBuffer(&buffer_desc, data==nullptr ? nullptr : &buffer_data, &result.buffer);
+	d3d_device->CreateBuffer(&buffer_desc, data==nullptr ? nullptr : &buffer_data, &result._buffer);
 	return result;
 }
 
 /////////////////////////////////////////// 
 
 bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
-	return buffer->buffer != nullptr;
+	return buffer->_buffer != nullptr;
 }
 
 /////////////////////////////////////////// 
@@ -229,22 +229,22 @@ void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t si
 	}
 
 	D3D11_MAPPED_SUBRESOURCE resource;
-	d3d_context->Map(buffer->buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+	d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
 	memcpy(resource.pData, data, size_bytes);
-	d3d_context->Unmap(buffer->buffer, 0);
+	d3d_context->Unmap(buffer->_buffer, 0);
 }
 
 /////////////////////////////////////////// 
 
 void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t stride, uint32_t offset) {
 	switch (buffer->type) {
-	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (bind.slot, 1, &buffer->buffer, &stride, &offset); break;
-	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer    (buffer->buffer, DXGI_FORMAT_R32_UINT, offset); break;
+	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (bind.slot, 1, &buffer->_buffer, &stride, &offset); break;
+	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer    (buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
 	case skr_buffer_type_constant: {
 		if (bind.stage_bits & skr_stage_vertex)
-			d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->buffer);
+			d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
 		if (bind.stage_bits & skr_stage_pixel)
-			d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->buffer);
+			d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
 	} break;
 	}
 }
@@ -252,7 +252,7 @@ void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t strid
 /////////////////////////////////////////// 
 
 void skr_buffer_destroy(skr_buffer_t *buffer) {
-	if (buffer->buffer) buffer->buffer->Release();
+	if (buffer->_buffer) buffer->_buffer->Release();
 	*buffer = {};
 }
 
@@ -260,10 +260,10 @@ void skr_buffer_destroy(skr_buffer_t *buffer) {
 
 skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer) {
 	skr_mesh_t result = {};
-	result.ind_buffer  = ind_buffer  ? ind_buffer ->buffer : nullptr;
-	result.vert_buffer = vert_buffer ? vert_buffer->buffer : nullptr;
-	if (result.ind_buffer ) result.ind_buffer ->AddRef();
-	if (result.vert_buffer) result.vert_buffer->AddRef();
+	result._ind_buffer  = ind_buffer  ? ind_buffer ->_buffer : nullptr;
+	result._vert_buffer = vert_buffer ? vert_buffer->_buffer : nullptr;
+	if (result._ind_buffer ) result._ind_buffer ->AddRef();
+	if (result._vert_buffer) result._vert_buffer->AddRef();
 
 	return result;
 }
@@ -271,17 +271,17 @@ skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *
 /////////////////////////////////////////// 
 
 void skr_mesh_set_verts(skr_mesh_t *mesh, const skr_buffer_t *vert_buffer) {
-	if (mesh->vert_buffer) mesh->vert_buffer->Release();
-	mesh->vert_buffer = vert_buffer->buffer;
-	if (mesh->vert_buffer) mesh->vert_buffer->AddRef();
+	if (mesh->_vert_buffer) mesh->_vert_buffer->Release();
+	mesh->_vert_buffer = vert_buffer->_buffer;
+	if (mesh->_vert_buffer) mesh->_vert_buffer->AddRef();
 }
 
 /////////////////////////////////////////// 
 
 void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
-	if (mesh->ind_buffer) mesh->ind_buffer->Release();
-	mesh->ind_buffer = ind_buffer->buffer;
-	if (mesh->ind_buffer) mesh->ind_buffer->AddRef();
+	if (mesh->_ind_buffer) mesh->_ind_buffer->Release();
+	mesh->_ind_buffer = ind_buffer->_buffer;
+	if (mesh->_ind_buffer) mesh->_ind_buffer->AddRef();
 }
 
 /////////////////////////////////////////// 
@@ -289,15 +289,15 @@ void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
 void skr_mesh_bind(const skr_mesh_t *mesh) {
 	UINT strides[] = { sizeof(skr_vert_t) };
 	UINT offsets[] = { 0 };
-	d3d_context->IASetVertexBuffers(0, 1, &mesh->vert_buffer, strides, offsets);
-	d3d_context->IASetIndexBuffer  (mesh->ind_buffer, DXGI_FORMAT_R32_UINT, 0);
+	d3d_context->IASetVertexBuffers(0, 1, &mesh->_vert_buffer, strides, offsets);
+	d3d_context->IASetIndexBuffer  (mesh->_ind_buffer, DXGI_FORMAT_R32_UINT, 0);
 }
 
 /////////////////////////////////////////// 
 
 void skr_mesh_destroy(skr_mesh_t *mesh) {
-	if (mesh->ind_buffer ) mesh->ind_buffer ->Release();
-	if (mesh->vert_buffer) mesh->vert_buffer->Release();
+	if (mesh->_ind_buffer ) mesh->_ind_buffer ->Release();
+	if (mesh->_vert_buffer) mesh->_vert_buffer->Release();
 	*mesh = {};
 }
 
@@ -334,8 +334,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	}
 
 	switch(type) {
-	case skr_stage_vertex: d3d_device->CreateVertexShader(buffer, buffer_size, nullptr, (ID3D11VertexShader**)&result.shader); break;
-	case skr_stage_pixel : d3d_device->CreatePixelShader (buffer, buffer_size, nullptr, (ID3D11PixelShader **)&result.shader); break;
+	case skr_stage_vertex: d3d_device->CreateVertexShader(buffer, buffer_size, nullptr, (ID3D11VertexShader**)&result._shader); break;
+	case skr_stage_pixel : d3d_device->CreatePixelShader (buffer, buffer_size, nullptr, (ID3D11PixelShader **)&result._shader); break;
 	}
 
 	if (d3d_vert_layout == nullptr && type == skr_stage_vertex) {
@@ -357,8 +357,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 
 void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 	switch(shader->type) {
-	case skr_stage_vertex: ((ID3D11VertexShader*)shader->shader)->Release(); break;
-	case skr_stage_pixel : ((ID3D11PixelShader *)shader->shader)->Release(); break;
+	case skr_stage_vertex: ((ID3D11VertexShader*)shader->_shader)->Release(); break;
+	case skr_stage_pixel : ((ID3D11PixelShader *)shader->_shader)->Release(); break;
 	}
 }
 
@@ -368,12 +368,12 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 
 skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
 	skr_shader_t result = {};
-	result.meta   = meta;
-	result.vertex = (ID3D11VertexShader*)v_shader.shader;
-	result.pixel  = (ID3D11PixelShader *)p_shader.shader;
+	result.meta    = meta;
+	result._vertex = (ID3D11VertexShader*)v_shader._shader;
+	result._pixel  = (ID3D11PixelShader *)p_shader._shader;
 	skr_shader_meta_reference(result.meta);
-	if (result.vertex) result.vertex->AddRef();
-	if (result.pixel ) result.pixel ->AddRef();
+	if (result._vertex) result._vertex->AddRef();
+	if (result._pixel ) result._pixel ->AddRef();
 
 	return result;
 }
@@ -382,15 +382,15 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 
 bool skr_shader_is_valid(const skr_shader_t *shader) {
 	return shader->meta
-		&& shader->vertex
-		&& shader->pixel;
+		&& shader->_vertex
+		&& shader->_pixel;
 }
 
 ///////////////////////////////////////////
 
 void skr_shader_destroy(skr_shader_t *shader) {
-	if (shader->vertex) shader->vertex->Release();
-	if (shader->pixel ) shader->pixel ->Release();
+	if (shader->_vertex) shader->_vertex->Release();
+	if (shader->_pixel ) shader->_pixel ->Release();
 	*shader = {};
 }
 
@@ -399,7 +399,7 @@ void skr_shader_destroy(skr_shader_t *shader) {
 /////////////////////////////////////////// 
 
 void skr_pipeline_update_blend(skr_pipeline_t *pipeline) {
-	if (pipeline->blend) pipeline->blend->Release();
+	if (pipeline->_blend) pipeline->_blend->Release();
 
 	D3D11_BLEND_DESC desc_blend = {};
 	desc_blend.AlphaToCoverageEnable  = false;
@@ -412,13 +412,13 @@ void skr_pipeline_update_blend(skr_pipeline_t *pipeline) {
 	desc_blend.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
 	desc_blend.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
 	desc_blend.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
-	d3d_device->CreateBlendState(&desc_blend, &pipeline->blend);
+	d3d_device->CreateBlendState(&desc_blend, &pipeline->_blend);
 }
 
 /////////////////////////////////////////// 
 
 void skr_pipeline_update_rasterizer(skr_pipeline_t *pipeline) {
-	if (pipeline->rasterize) pipeline->rasterize->Release();
+	if (pipeline->_rasterize) pipeline->_rasterize->Release();
 
 	D3D11_RASTERIZER_DESC desc_rasterizer = {};
 	desc_rasterizer.FillMode              = pipeline->wireframe ? D3D11_FILL_WIREFRAME : D3D11_FILL_SOLID;
@@ -428,7 +428,7 @@ void skr_pipeline_update_rasterizer(skr_pipeline_t *pipeline) {
 	case skr_cull_front: desc_rasterizer.CullMode = D3D11_CULL_FRONT; break;
 	case skr_cull_back:  desc_rasterizer.CullMode = D3D11_CULL_BACK;  break;
 	}
-	d3d_device->CreateRasterizerState(&desc_rasterizer, &pipeline->rasterize);
+	d3d_device->CreateRasterizerState(&desc_rasterizer, &pipeline->_rasterize);
 }
 
 /////////////////////////////////////////// 
@@ -438,10 +438,10 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 	result.transparency = skr_transparency_none;
 	result.cull         = skr_cull_back;
 	result.wireframe    = false;
-	result.vertex       = shader->vertex;
-	result.pixel        = shader->pixel;
-	if (result.vertex) result.vertex->AddRef();
-	if (result.pixel ) result.pixel ->AddRef();
+	result._vertex      = shader->_vertex;
+	result._pixel       = shader->_pixel;
+	if (result._vertex) result._vertex->AddRef();
+	if (result._pixel ) result._pixel ->AddRef();
 
 	skr_pipeline_update_blend     (&result);
 	skr_pipeline_update_rasterizer(&result);
@@ -451,10 +451,10 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 /////////////////////////////////////////// 
 
 void skr_pipeline_bind(const skr_pipeline_t *pipeline) {
-	d3d_context->OMSetBlendState(pipeline->blend,  nullptr, 0xFFFFFFFF);
-	d3d_context->RSSetState     (pipeline->rasterize);
-	d3d_context->VSSetShader    (pipeline->vertex, nullptr, 0);
-	d3d_context->PSSetShader    (pipeline->pixel,  nullptr, 0);
+	d3d_context->OMSetBlendState(pipeline->_blend,  nullptr, 0xFFFFFFFF);
+	d3d_context->RSSetState     (pipeline->_rasterize);
+	d3d_context->VSSetShader    (pipeline->_vertex, nullptr, 0);
+	d3d_context->PSSetShader    (pipeline->_pixel,  nullptr, 0);
 }
 
 /////////////////////////////////////////// 
@@ -501,10 +501,10 @@ bool skr_pipeline_get_wireframe(const skr_pipeline_t *pipeline) {
 ///////////////////////////////////////////
 
 void skr_pipeline_destroy(skr_pipeline_t *pipeline) {
-	if (pipeline->blend    ) pipeline->blend    ->Release();
-	if (pipeline->rasterize) pipeline->rasterize->Release();
-	if (pipeline->vertex   ) pipeline->vertex   ->Release();
-	if (pipeline->pixel    ) pipeline->pixel    ->Release();
+	if (pipeline->_blend    ) pipeline->_blend    ->Release();
+	if (pipeline->_rasterize) pipeline->_rasterize->Release();
+	if (pipeline->_vertex   ) pipeline->_vertex   ->Release();
+	if (pipeline->_pixel    ) pipeline->_pixel    ->Release();
 	*pipeline = {};
 }
 
@@ -530,7 +530,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	IDXGIAdapter  *dxgi_adapter; dxgi_device ->GetParent     (__uuidof(IDXGIAdapter),  (void **)&dxgi_adapter);
 	IDXGIFactory2 *dxgi_factory; dxgi_adapter->GetParent     (__uuidof(IDXGIFactory2), (void **)&dxgi_factory);
 
-	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result.d3d_swapchain))) {
+	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
 		skr_log("sk_gpu couldn't create swapchain!");
 		return {};
 	}
@@ -544,11 +544,11 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	}
 
 	ID3D11Texture2D *back_buffer;
-	result.d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	result.target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
-	result.depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
-	skr_tex_set_contents(&result.depth, nullptr, 1, width, height);
-	skr_tex_set_depth   (&result.target, &result.depth);
+	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
+	result._target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
+	result._depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
+	skr_tex_set_contents(&result._depth, nullptr, 1, width, height);
+	skr_tex_set_depth   (&result._target, &result._depth);
 	back_buffer->Release();
 
 	dxgi_factory->Release();
@@ -561,45 +561,45 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 /////////////////////////////////////////// 
 
 void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t height) {
-	if (swapchain->d3d_swapchain == nullptr || (width == swapchain->width && height == swapchain->height))
+	if (swapchain->_swapchain == nullptr || (width == swapchain->width && height == swapchain->height))
 		return;
 
-	skr_tex_fmt_ target_fmt = swapchain->target.format;
-	skr_tex_fmt_ depth_fmt  = swapchain->depth .format;
-	skr_tex_destroy(&swapchain->target);
-	skr_tex_destroy(&swapchain->depth);
+	skr_tex_fmt_ target_fmt = swapchain->_target.format;
+	skr_tex_fmt_ depth_fmt  = swapchain->_depth .format;
+	skr_tex_destroy(&swapchain->_target);
+	skr_tex_destroy(&swapchain->_depth);
 
 	swapchain->width  = width;
 	swapchain->height = height;
-	swapchain->d3d_swapchain->ResizeBuffers(0, (UINT)width, (UINT)height, DXGI_FORMAT_UNKNOWN, 0);
+	swapchain->_swapchain->ResizeBuffers(0, (UINT)width, (UINT)height, DXGI_FORMAT_UNKNOWN, 0);
 
 	ID3D11Texture2D *back_buffer;
-	swapchain->d3d_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	swapchain->target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
-	swapchain->depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
-	skr_tex_set_contents(&swapchain->depth, nullptr, 1, width, height);
-	skr_tex_set_depth   (&swapchain->target, &swapchain->depth);
+	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
+	swapchain->_target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
+	swapchain->_depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
+	skr_tex_set_contents(&swapchain->_depth, nullptr, 1, width, height);
+	skr_tex_set_depth   (&swapchain->_target, &swapchain->_depth);
 	back_buffer->Release();
 }
 
 /////////////////////////////////////////// 
 
 void skr_swapchain_present(skr_swapchain_t *swapchain) {
-	swapchain->d3d_swapchain->Present(1, 0);
+	swapchain->_swapchain->Present(1, 0);
 }
 
 /////////////////////////////////////////// 
 
 skr_tex_t *skr_swapchain_get_next(skr_swapchain_t *swapchain) {
-	return swapchain->target.format != 0 ? &swapchain->target : nullptr;
+	return swapchain->_target.format != 0 ? &swapchain->_target : nullptr;
 }
 
 /////////////////////////////////////////// 
 
 void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
-	skr_tex_destroy(&swapchain->target);
-	skr_tex_destroy(&swapchain->depth);
-	swapchain->d3d_swapchain->Release();
+	skr_tex_destroy(&swapchain->_target);
+	skr_tex_destroy(&swapchain->_depth);
+	swapchain->_swapchain->Release();
 	*swapchain = {};
 }
 
@@ -607,14 +607,14 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
-	result.type    = type;
-	result.use     = skr_use_static;
-	result.texture = (ID3D11Texture2D *)native_tex;
-	result.texture->AddRef();
+	result.type     = type;
+	result.use      = skr_use_static;
+	result._texture = (ID3D11Texture2D *)native_tex;
+	result._texture->AddRef();
 
 	// Get information about the image!
 	D3D11_TEXTURE2D_DESC color_desc;
-	result.texture->GetDesc(&color_desc);
+	result._texture->GetDesc(&color_desc);
 	result.width       = color_desc.Width;
 	result.height      = color_desc.Height;
 	result.array_count = color_desc.ArraySize;
@@ -642,16 +642,16 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 /////////////////////////////////////////// 
 
 bool skr_tex_is_valid(const skr_tex_t *tex) {
-	return tex->texture != nullptr;
+	return tex->_texture != nullptr;
 }
 
 /////////////////////////////////////////// 
 
 void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 	if (depth->type == skr_tex_type_depth) {
-		if (tex->depth_view) tex->depth_view->Release();
-		tex->depth_view = depth->depth_view;
-		tex->depth_view->AddRef();
+		if (tex->_depth_view) tex->_depth_view->Release();
+		tex->_depth_view = depth->_depth_view;
+		tex->_depth_view->AddRef();
 	} else {
 		skr_log("Can't bind a depth texture to a non-rendertarget");
 	}
@@ -660,8 +660,8 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 /////////////////////////////////////////// 
 
 void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {
-	if (tex->sampler)
-		tex->sampler->Release();
+	if (tex->_sampler)
+		tex->_sampler->Release();
 
 	D3D11_TEXTURE_ADDRESS_MODE mode;
 	switch (address) {
@@ -690,7 +690,7 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 
 	// D3D will already return the same sampler when provided the same settings, so we
 	// can just lean on that to prevent sampler duplicates :)
-	if (FAILED(d3d_device->CreateSamplerState(&desc_sampler, &tex->sampler)))
+	if (FAILED(d3d_device->CreateSamplerState(&desc_sampler, &tex->_sampler)))
 		skr_log("skr_tex_settings: failed to create sampler state!");
 }
 
@@ -750,7 +750,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 			res_desc.ViewDimension       = D3D11_SRV_DIMENSION_TEXTURE2D;
 		}
 
-		if (use_in_shader && FAILED(d3d_device->CreateShaderResourceView(tex->texture, &res_desc, &tex->resource))) {
+		if (use_in_shader && FAILED(d3d_device->CreateShaderResourceView(tex->_texture, &res_desc, &tex->_resource))) {
 			skr_log("Create Shader Resource View error!");
 			return false;
 		}
@@ -763,7 +763,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 		} else {
 			stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 		}
-		if (FAILED(d3d_device->CreateDepthStencilView(tex->texture, &stencil_desc, &tex->depth_view))) {
+		if (FAILED(d3d_device->CreateDepthStencilView(tex->_texture, &stencil_desc, &tex->_depth_view))) {
 			skr_log("Create Depth Stencil View error!");
 			return false;
 		}
@@ -779,7 +779,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 			target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
 		}
 
-		if (FAILED(d3d_device->CreateRenderTargetView(tex->texture, &target_desc, &tex->target_view))) {
+		if (FAILED(d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_view))) {
 			skr_log("Create Render Target View error!");
 			return false;
 		}
@@ -791,7 +791,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 
 void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	// Some warning messages
-	if (tex->use != skr_use_dynamic && tex->texture) {
+	if (tex->use != skr_use_dynamic && tex->_texture) {
 		skr_log("Only dynamic textures can be updated!");
 		return;
 	}
@@ -807,7 +807,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	uint32_t mip_levels = (tex->mips == skr_mip_generate ? (uint32_t)log2(width) + 1 : 1);
 	uint32_t px_size    = skr_tex_fmt_size(tex->format);
 
-	if (tex->texture == nullptr) {
+	if (tex->_texture == nullptr) {
 		D3D11_TEXTURE2D_DESC desc = {};
 		desc.Width            = width;
 		desc.Height           = height;
@@ -837,7 +837,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 			}
 		}
 
-		if (FAILED(d3d_device->CreateTexture2D(&desc, tex_mem, &tex->texture))) {
+		if (FAILED(d3d_device->CreateTexture2D(&desc, tex_mem, &tex->_texture))) {
 			skr_log("Create texture error!");
 		}
 
@@ -854,7 +854,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	} else {
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
-		if (FAILED(d3d_context->Map(tex->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem))) {
+		if (FAILED(d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem))) {
 			skr_log("Failed mapping a texture");
 			return;
 		}
@@ -866,11 +866,11 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 			dest_line += tex_mem.RowPitch;
 			src_line  += px_size * (uint64_t)width;
 		}
-		d3d_context->Unmap(tex->texture, 0);
+		d3d_context->Unmap(tex->_texture, 0);
 	}
 
 	// If the sampler has not been set up yet, we'll make a default one real quick.
-	if (tex->sampler == nullptr) {
+	if (tex->_sampler == nullptr) {
 		skr_tex_settings(tex, skr_tex_address_repeat, skr_tex_sample_linear, 0);
 	}
 }
@@ -880,12 +880,12 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 void skr_tex_bind(const skr_tex_t *texture, skr_bind_t bind) {
 	if (texture != nullptr) {
 		if (bind.stage_bits & skr_stage_pixel) {
-			d3d_context->PSSetSamplers       (bind.slot, 1, &texture->sampler);
-			d3d_context->PSSetShaderResources(bind.slot, 1, &texture->resource);
+			d3d_context->PSSetSamplers       (bind.slot, 1, &texture->_sampler);
+			d3d_context->PSSetShaderResources(bind.slot, 1, &texture->_resource);
 		}
 		if (bind.stage_bits & skr_stage_vertex) {
-			d3d_context->VSSetSamplers       (bind.slot, 1, &texture->sampler);
-			d3d_context->VSSetShaderResources(bind.slot, 1, &texture->resource);
+			d3d_context->VSSetSamplers       (bind.slot, 1, &texture->_sampler);
+			d3d_context->VSSetShaderResources(bind.slot, 1, &texture->_resource);
 		}
 	} else {
 		if (bind.stage_bits & skr_stage_pixel) {
@@ -900,11 +900,11 @@ void skr_tex_bind(const skr_tex_t *texture, skr_bind_t bind) {
 /////////////////////////////////////////// 
 
 void skr_tex_destroy(skr_tex_t *tex) {
-	if (tex->target_view) tex->target_view->Release();
-	if (tex->depth_view ) tex->depth_view ->Release();
-	if (tex->resource) tex->resource->Release();
-	if (tex->sampler ) tex->sampler ->Release();
-	if (tex->texture ) tex->texture ->Release();
+	if (tex->_target_view) tex->_target_view->Release();
+	if (tex->_depth_view ) tex->_depth_view ->Release();
+	if (tex->_resource   ) tex->_resource   ->Release();
+	if (tex->_sampler    ) tex->_sampler    ->Release();
+	if (tex->_texture    ) tex->_texture    ->Release();
 }
 
 /////////////////////////////////////////// 

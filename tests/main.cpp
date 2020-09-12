@@ -58,7 +58,7 @@ int main() {
 ///////////////////////////////////////////
 
 bool main_init() {
-	skr_callback_log([](const char *text) { printf("%s\n", text); });
+	skr_callback_log([](skr_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
 #ifdef __EMSCRIPTEN__
 	if (!skr_init(app_name, nullptr, nullptr, app_width, app_height)) return false;
 #else

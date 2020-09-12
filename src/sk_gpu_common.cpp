@@ -11,12 +11,12 @@
 #include <android/asset_manager.h>
 #endif
 
-void (*_skr_log)(const char *text);
-void skr_callback_log(void (*callback)(const char *text)) {
+void (*_skr_log)(skr_log_ level, const char *text);
+void skr_callback_log(void (*callback)(skr_log_ level, const char *text)) {
 	_skr_log = callback;
 }
-void skr_log(const char *text) {
-	if (_skr_log) _skr_log(text);
+void skr_log(skr_log_ level, const char *text) {
+	if (_skr_log) _skr_log(level, text);
 }
 
 ///////////////////////////////////////////
@@ -108,10 +108,10 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	size_t at = 10;
 	memcpy(&out_file->stage_count, &bytes[at], sizeof(out_file->stage_count)); at += sizeof(out_file->stage_count);
 	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
-	if (out_file->stages == nullptr) { skr_log("Out of memory"); return false; }
+	if (out_file->stages == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 
 	out_file->meta = (skr_shader_meta_t*)malloc(sizeof(skr_shader_meta_t));
-	if (out_file->meta == nullptr) { skr_log("Out of memory"); return false; }
+	if (out_file->meta == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skr_shader_meta_reference(out_file->meta);
@@ -120,7 +120,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(out_file->meta->texture_count)); at += sizeof(out_file->meta->texture_count);
 	out_file->meta->buffers  = (skr_shader_meta_buffer_t *)malloc(sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count );
 	out_file->meta->textures = (skr_shader_meta_texture_t*)malloc(sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
-	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log("Out of memory"); return false; }
+	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 	memset(out_file->meta->buffers,  0, sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count);
 	memset(out_file->meta->textures, 0, sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
 
@@ -139,7 +139,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
-		if (buffer->vars == nullptr) { skr_log("Out of memory"); return false; }
+		if (buffer->vars == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 		memset(buffer->vars, 0, sizeof(skr_shader_meta_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);
 
@@ -175,7 +175,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		stage->code = 0;
 		if (stage->code_size > 0) {
 			stage->code = malloc(stage->code_size);
-			if (stage->code == nullptr) { skr_log("Out of memory"); return false; }
+			if (stage->code == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 			memcpy(stage->code, &bytes[at], stage->code_size); at += stage->code_size;
 		}
 	}
@@ -199,7 +199,7 @@ skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, s
 		if (file->stages[i].language == language && file->stages[i].stage == stage)
 			return skr_shader_stage_create(file->stages[i].code, file->stages[i].code_size, stage);
 	}
-	skr_log("Couldn't find a shader stage in shader file!");
+	skr_log(skr_log_warning, "Couldn't find a shader stage in shader file!");
 	return {};
 }
 

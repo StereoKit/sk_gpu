@@ -109,6 +109,12 @@ typedef enum skr_cull_ {
 	skr_cull_none,
 } skr_cull_;
 
+typedef enum skr_log_ {
+	skr_log_info,
+	skr_log_warning,
+	skr_log_critical,
+} skr_log_;
+
 typedef struct skr_vert_t {
 	float   pos [3];
 	float   norm[3];
@@ -300,7 +306,7 @@ typedef struct skr_swapchain_t {
 
 int32_t             skr_init                (const char *app_name, void *hwnd, void *adapter_id);
 void                skr_shutdown            ();
-void                skr_callback_log        (void (*callback)(const char *text));
+void                skr_callback_log        (void (*callback)(skr_log_ level, const char *text));
 void                skr_callback_file_read  (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
 skr_platform_data_t skr_get_platform_data   ();
 
@@ -390,7 +396,7 @@ typedef struct skr_shader_file_t {
 
 ///////////////////////////////////////////
 
-void               skr_log (const char *text);
+void               skr_log (skr_log_ level, const char *text);
 uint64_t           skr_hash(const char *string);
 
 bool               skr_shader_file_verify      (void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size);
@@ -478,7 +484,7 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 	if (FAILED(D3D11CreateDevice(final_adapter, final_adapter == nullptr ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_UNKNOWN, 0, creation_flags, feature_levels, _countof(feature_levels), D3D11_SDK_VERSION, &d3d_device, nullptr, &d3d_context))) {
 		return -1;
 	}
-	skr_log("sk_gpu: Using Direct3D 11");
+	skr_log(skr_log_info, "Using Direct3D 11");
 
 	if (final_adapter != nullptr)
 		final_adapter->Release();
@@ -633,7 +639,7 @@ bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
 
 void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic) {
-		skr_log("Attempting to dynamically set contents of a static buffer!");
+		skr_log(skr_log_warning, "Attempting to dynamically set contents of a static buffer!");
 		return;
 	}
 
@@ -733,8 +739,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	} else {
 		ID3DBlob *errors;
 		if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_stage_pixel ? "ps" : "vs", type == skr_stage_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
-			skr_log("Error - D3DCompile failed:");
-			skr_log((char *)errors->GetBufferPointer());
+			skr_log(skr_log_warning, "D3DCompile failed:");
+			skr_log(skr_log_warning, (char *)errors->GetBufferPointer());
 		}
 		if (errors) errors->Release();
 
@@ -940,7 +946,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	IDXGIFactory2 *dxgi_factory; dxgi_adapter->GetParent     (__uuidof(IDXGIFactory2), (void **)&dxgi_factory);
 
 	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
-		skr_log("sk_gpu couldn't create swapchain!");
+		skr_log(skr_log_critical, "sk_gpu couldn't create swapchain!");
 		return {};
 	}
 
@@ -1043,7 +1049,7 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 	result.mips   = mip_maps;
 
 	if (use == skr_use_dynamic && mip_maps == skr_mip_generate)
-		skr_log("Dynamic textures don't support mip-maps!");
+		skr_log(skr_log_warning, "Dynamic textures don't support mip-maps!");
 
 	return result;
 }
@@ -1062,7 +1068,7 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 		tex->_depth_view = depth->_depth_view;
 		tex->_depth_view->AddRef();
 	} else {
-		skr_log("Can't bind a depth texture to a non-rendertarget");
+		skr_log(skr_log_warning, "Can't bind a depth texture to a non-rendertarget");
 	}
 }
 
@@ -1097,10 +1103,10 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	desc_sampler.MaxLOD         = D3D11_FLOAT32_MAX;
 	desc_sampler.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
 
-	// D3D will already return the same sampler when provided the same settings, so we
-	// can just lean on that to prevent sampler duplicates :)
+	// D3D will already return the same sampler when provided the same 
+	// settings, so we can just lean on that to prevent sampler duplicates :)
 	if (FAILED(d3d_device->CreateSamplerState(&desc_sampler, &tex->_sampler)))
-		skr_log("skr_tex_settings: failed to create sampler state!");
+		skr_log(skr_log_critical, "Failed to create sampler state!");
 }
 
 ///////////////////////////////////////////
@@ -1160,7 +1166,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 		}
 
 		if (use_in_shader && FAILED(d3d_device->CreateShaderResourceView(tex->_texture, &res_desc, &tex->_resource))) {
-			skr_log("Create Shader Resource View error!");
+			skr_log(skr_log_critical, "Create Shader Resource View error!");
 			return false;
 		}
 	} else {
@@ -1173,7 +1179,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 			stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 		}
 		if (FAILED(d3d_device->CreateDepthStencilView(tex->_texture, &stencil_desc, &tex->_depth_view))) {
-			skr_log("Create Depth Stencil View error!");
+			skr_log(skr_log_critical, "Create Depth Stencil View error!");
 			return false;
 		}
 	}
@@ -1189,7 +1195,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 		}
 
 		if (FAILED(d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_view))) {
-			skr_log("Create Render Target View error!");
+			skr_log(skr_log_critical, "Create Render Target View error!");
 			return false;
 		}
 	}
@@ -1201,11 +1207,11 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	// Some warning messages
 	if (tex->use != skr_use_dynamic && tex->_texture) {
-		skr_log("Only dynamic textures can be updated!");
+		skr_log(skr_log_warning, "Only dynamic textures can be updated!");
 		return;
 	}
 	if (tex->use == skr_use_dynamic && (tex->mips == skr_mip_generate || data_frame_count > 1)) {
-		skr_log("Dynamic textures don't support mip-maps or texture arrays!");
+		skr_log(skr_log_warning, "Dynamic textures don't support mip-maps or texture arrays!");
 		return;
 	}
 
@@ -1233,7 +1239,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
 		if (data_frames != nullptr && data_frames[0] != nullptr) {
 			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)data_frame_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
-			if (!tex_mem) { skr_log("Out of memory"); return;  }
+			if (!tex_mem) { skr_log(skr_log_critical, "Out of memory"); return;  }
 
 			for (int32_t i = 0; i < data_frame_count; i++) {
 				tex_mem[i*mip_levels] = {};
@@ -1247,7 +1253,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		}
 
 		if (FAILED(d3d_device->CreateTexture2D(&desc, tex_mem, &tex->_texture))) {
-			skr_log("Create texture error!");
+			skr_log(skr_log_critical, "Create texture error!");
 		}
 
 		if (tex_mem != nullptr) {
@@ -1264,7 +1270,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
 		if (FAILED(d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem))) {
-			skr_log("Failed mapping a texture");
+			skr_log(skr_log_critical, "Failed mapping a texture");
 			return;
 		}
 
@@ -1326,7 +1332,7 @@ void skr_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_height = h = max(1, (1 << h) >> 1);
 
 	*out_data = (T*)malloc((int64_t)w * h * sizeof(T) * 4);
-	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	if (*out_data == nullptr) { skr_log(skr_log_critical, "Out of memory"); return; }
 	memset(*out_data, 0, (int64_t)w * h * sizeof(T) * 4);
 	T *result = *out_data;
 
@@ -1357,7 +1363,7 @@ void skr_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_height = h = (1 << h) >> 1;
 
 	*out_data = (T*)malloc((int64_t)w * h * sizeof(T));
-	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	if (*out_data == nullptr) { skr_log(skr_log_critical, "Out of memory"); return; }
 	memset(*out_data, 0, (int64_t)w * h * sizeof(T));
 	T *result = *out_data;
 
@@ -1750,7 +1756,7 @@ GL_API
 #undef GLE
 
 static void gl_load_extensions( ) {
-#define GLE(ret, name, ...) name = (name##_proc *) gl_get_function(#name); if (name == nullptr) skr_log("Couldn't load gl function " #name);
+#define GLE(ret, name, ...) name = (name##_proc *) gl_get_function(#name); if (name == nullptr) skr_log(skr_log_info, "Couldn't load gl function " #name);
 	GL_API
 #undef GLE
 }
@@ -1804,20 +1810,20 @@ int32_t gl_init_win32(void *app_hwnd) {
 
 	int pixel_format = ChoosePixelFormat(dummy_dc, &format_desc);
 	if (!pixel_format) {
-		skr_log("Failed to find a suitable pixel format.");
+		skr_log(skr_log_critical, "Failed to find a suitable pixel format.");
 		return false;
 	}
 	if (!SetPixelFormat(dummy_dc, pixel_format, &format_desc)) {
-		skr_log("Failed to set the pixel format.");
+		skr_log(skr_log_critical, "Failed to set the pixel format.");
 		return false;
 	}
 	HGLRC dummy_context = wglCreateContext(dummy_dc);
 	if (!dummy_context) {
-		skr_log("Failed to create a dummy OpenGL rendering context.");
+		skr_log(skr_log_critical, "Failed to create a dummy OpenGL rendering context.");
 		return false;
 	}
 	if (!wglMakeCurrent(dummy_dc, dummy_context)) {
-		skr_log("Failed to activate dummy OpenGL rendering context.");
+		skr_log(skr_log_critical, "Failed to activate dummy OpenGL rendering context.");
 		return false;
 	}
 
@@ -1876,14 +1882,14 @@ int32_t gl_init_win32(void *app_hwnd) {
 	pixel_format = 0;
 	UINT num_formats = 0;
 	if (!wglChoosePixelFormatARB(gl_hdc, format_attribs, nullptr, 1, &pixel_format, &num_formats)) {
-		skr_log("Couldn't find pixel format!");
+		skr_log(skr_log_critical, "Couldn't find pixel format!");
 		return false;
 	}
 
 	memset(&format_desc, 0, sizeof(format_desc));
 	DescribePixelFormat(gl_hdc, pixel_format, sizeof(format_desc), &format_desc);
 	if (!SetPixelFormat(gl_hdc, pixel_format, &format_desc)) {
-		skr_log("Couldn't set pixel format!");
+		skr_log(skr_log_critical, "Couldn't set pixel format!");
 		return false;
 	}
 
@@ -1895,11 +1901,11 @@ int32_t gl_init_win32(void *app_hwnd) {
 		0 };
 	gl_hrc = wglCreateContextAttribsARB( gl_hdc, 0, attributes );
 	if (!gl_hrc) {
-		skr_log("Couldn't create GL context!");
+		skr_log(skr_log_critical, "Couldn't create GL context!");
 		return false;
 	}
 	if (!wglMakeCurrent(gl_hdc, gl_hrc)) {
-		skr_log("Couldn't activate GL context!");
+		skr_log(skr_log_critical, "Couldn't activate GL context!");
 		return false;
 	}
 #endif // _WIN32
@@ -1943,23 +1949,23 @@ int32_t gl_init_android(void *native_window) {
 	EGLint numConfigs;
 
 	egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetDisplay");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglGetDisplay");
 
 	int32_t major, minor;
 	eglInitialize     (egl_display, &major, &minor);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglInitialize");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglInitialize");
 	eglChooseConfig   (egl_display, attribs, &egl_config, 1, &numConfigs);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglChooseConfig");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglChooseConfig");
 	eglGetConfigAttrib(egl_display, egl_config, EGL_NATIVE_VISUAL_ID, &format);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetConfigAttrib");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglGetConfigAttrib");
 	
 	egl_surface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)native_window, nullptr);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateWindowSurface");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglCreateWindowSurface");
 	egl_context = eglCreateContext      (egl_display, egl_config, nullptr, context_attribs);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateContext");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglCreateContext");
 
 	if (eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_FALSE) {
-		skr_log("sk_gpu: Unable to eglMakeCurrent");
+		skr_log(skr_log_critical, "Unable to eglMakeCurrent");
 		return -1;
 	}
 
@@ -1986,20 +1992,22 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	// Load OpenGL function pointers
 	gl_load_extensions();
 
-	skr_log("sk_gpu: Using OpenGL");
-	skr_log(glGetString(GL_VERSION));
+	skr_log(skr_log_info, "Using OpenGL");
+	skr_log(skr_log_info, glGetString(GL_VERSION));
 
 #if _DEBUG
-	skr_log("sk_gpu: Debug info enabled.");
+	skr_log(skr_log_info, "Debug info enabled.");
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
-		if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
-			//skr_log(message);
-		} else {
-			skr_log(message);
-		} }, nullptr);
+		switch (severity) {
+		case GL_DEBUG_SEVERITY_NOTIFICATION: break;
+		case GL_DEBUG_SEVERITY_LOW:    skr_log(skr_log_info,     message); break;
+		case GL_DEBUG_SEVERITY_MEDIUM: skr_log(skr_log_warning,  message); break;
+		case GL_DEBUG_SEVERITY_HIGH:   skr_log(skr_log_critical, message); break;
+		}
+	}, nullptr);
 #endif // _DEBUG
 	
 	// Some default behavior
@@ -2091,8 +2099,8 @@ void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) 
 
 skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
-	result.use   = use;
-	result.type  = type;
+	result.use     = use;
+	result.type    = type;
 	result._target = skr_buffer_type_to_gl(type);
 
 	glGenBuffers(1, &result._buffer);
@@ -2112,7 +2120,7 @@ bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
 
 void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic) {
-		skr_log("Attempting to dynamically set contents of a static buffer!");
+		skr_log(skr_log_warning, "Attempting to dynamically set contents of a static buffer!");
 		return;
 	}
 
@@ -2184,8 +2192,8 @@ void skr_mesh_set_inds(skr_mesh_t *mesh, const skr_buffer_t *ind_buffer) {
 
 void skr_mesh_bind(const skr_mesh_t *mesh) {
 	glBindVertexArray(mesh->_layout);
-	glBindBuffer(GL_ARRAY_BUFFER, mesh->_vert_buffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER,         mesh->_vert_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer );
 }
 
 /////////////////////////////////////////// 
@@ -2251,8 +2259,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 		log = (char*)malloc(length);
 		glGetShaderInfoLog(result._shader, length, &err, log);
 
-		skr_log("Unable to compile shader:\n");
-		skr_log(log);
+		skr_log(skr_log_warning, "Unable to compile shader:\n");
+		skr_log(skr_log_warning, log);
 		free(log);
 	}
 	if (needs_free)
@@ -2294,8 +2302,8 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 		log = (char*)malloc(length);
 		glGetProgramInfoLog(result._program, length, &err, log);
 
-		skr_log("Unable to compile shader program:");
-		skr_log(log);
+		skr_log(skr_log_warning, "Unable to compile shader program:");
+		skr_log(skr_log_warning, log);
 		free(log);
 
 		glDeleteProgram(result._program);
@@ -2528,7 +2536,7 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	} else {
-		skr_log("Can't bind a depth texture to a non-rendertarget");
+		skr_log(skr_log_warning, "Can't bind a depth texture to a non-rendertarget");
 	}
 }
 
@@ -2581,7 +2589,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	uint32_t layout = skr_tex_fmt_to_gl_layout       (tex->format);
 	if (tex->type == skr_tex_type_cubemap) {
 		if (data_frame_count != 6) {
-			skr_log("sk_gpu: cubemaps need 6 data frames");
+			skr_log(skr_log_warning, "Cubemaps need 6 data frames");
 			return;
 		}
 		for (int32_t f = 0; f < 6; f++)
@@ -2723,12 +2731,12 @@ uint32_t skr_tex_fmt_to_gl_type(skr_tex_fmt_ format) {
 #include <android/asset_manager.h>
 #endif
 
-void (*_skr_log)(const char *text);
-void skr_callback_log(void (*callback)(const char *text)) {
+void (*_skr_log)(skr_log_ level, const char *text);
+void skr_callback_log(void (*callback)(skr_log_ level, const char *text)) {
 	_skr_log = callback;
 }
-void skr_log(const char *text) {
-	if (_skr_log) _skr_log(text);
+void skr_log(skr_log_ level, const char *text) {
+	if (_skr_log) _skr_log(level, text);
 }
 
 ///////////////////////////////////////////
@@ -2820,10 +2828,10 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	size_t at = 10;
 	memcpy(&out_file->stage_count, &bytes[at], sizeof(out_file->stage_count)); at += sizeof(out_file->stage_count);
 	out_file->stages = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
-	if (out_file->stages == nullptr) { skr_log("Out of memory"); return false; }
+	if (out_file->stages == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 
 	out_file->meta = (skr_shader_meta_t*)malloc(sizeof(skr_shader_meta_t));
-	if (out_file->meta == nullptr) { skr_log("Out of memory"); return false; }
+	if (out_file->meta == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skr_shader_meta_reference(out_file->meta);
@@ -2832,7 +2840,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(out_file->meta->texture_count)); at += sizeof(out_file->meta->texture_count);
 	out_file->meta->buffers  = (skr_shader_meta_buffer_t *)malloc(sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count );
 	out_file->meta->textures = (skr_shader_meta_texture_t*)malloc(sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
-	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log("Out of memory"); return false; }
+	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 	memset(out_file->meta->buffers,  0, sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count);
 	memset(out_file->meta->textures, 0, sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
 
@@ -2851,7 +2859,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
 		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
-		if (buffer->vars == nullptr) { skr_log("Out of memory"); return false; }
+		if (buffer->vars == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 		memset(buffer->vars, 0, sizeof(skr_shader_meta_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);
 
@@ -2887,7 +2895,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 		stage->code = 0;
 		if (stage->code_size > 0) {
 			stage->code = malloc(stage->code_size);
-			if (stage->code == nullptr) { skr_log("Out of memory"); return false; }
+			if (stage->code == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
 			memcpy(stage->code, &bytes[at], stage->code_size); at += stage->code_size;
 		}
 	}
@@ -2911,7 +2919,7 @@ skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, s
 		if (file->stages[i].language == language && file->stages[i].stage == stage)
 			return skr_shader_stage_create(file->stages[i].code, file->stages[i].code_size, stage);
 	}
-	skr_log("Couldn't find a shader stage in shader file!");
+	skr_log(skr_log_warning, "Couldn't find a shader stage in shader file!");
 	return {};
 }
 

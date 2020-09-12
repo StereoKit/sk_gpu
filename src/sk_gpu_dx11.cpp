@@ -69,7 +69,7 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 	if (FAILED(D3D11CreateDevice(final_adapter, final_adapter == nullptr ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_UNKNOWN, 0, creation_flags, feature_levels, _countof(feature_levels), D3D11_SDK_VERSION, &d3d_device, nullptr, &d3d_context))) {
 		return -1;
 	}
-	skr_log("sk_gpu: Using Direct3D 11");
+	skr_log(skr_log_info, "Using Direct3D 11");
 
 	if (final_adapter != nullptr)
 		final_adapter->Release();
@@ -224,7 +224,7 @@ bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
 
 void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic) {
-		skr_log("Attempting to dynamically set contents of a static buffer!");
+		skr_log(skr_log_warning, "Attempting to dynamically set contents of a static buffer!");
 		return;
 	}
 
@@ -324,8 +324,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	} else {
 		ID3DBlob *errors;
 		if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_stage_pixel ? "ps" : "vs", type == skr_stage_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
-			skr_log("Error - D3DCompile failed:");
-			skr_log((char *)errors->GetBufferPointer());
+			skr_log(skr_log_warning, "D3DCompile failed:");
+			skr_log(skr_log_warning, (char *)errors->GetBufferPointer());
 		}
 		if (errors) errors->Release();
 
@@ -531,7 +531,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	IDXGIFactory2 *dxgi_factory; dxgi_adapter->GetParent     (__uuidof(IDXGIFactory2), (void **)&dxgi_factory);
 
 	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
-		skr_log("sk_gpu couldn't create swapchain!");
+		skr_log(skr_log_critical, "sk_gpu couldn't create swapchain!");
 		return {};
 	}
 
@@ -634,7 +634,7 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 	result.mips   = mip_maps;
 
 	if (use == skr_use_dynamic && mip_maps == skr_mip_generate)
-		skr_log("Dynamic textures don't support mip-maps!");
+		skr_log(skr_log_warning, "Dynamic textures don't support mip-maps!");
 
 	return result;
 }
@@ -653,7 +653,7 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 		tex->_depth_view = depth->_depth_view;
 		tex->_depth_view->AddRef();
 	} else {
-		skr_log("Can't bind a depth texture to a non-rendertarget");
+		skr_log(skr_log_warning, "Can't bind a depth texture to a non-rendertarget");
 	}
 }
 
@@ -688,10 +688,10 @@ void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ 
 	desc_sampler.MaxLOD         = D3D11_FLOAT32_MAX;
 	desc_sampler.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
 
-	// D3D will already return the same sampler when provided the same settings, so we
-	// can just lean on that to prevent sampler duplicates :)
+	// D3D will already return the same sampler when provided the same 
+	// settings, so we can just lean on that to prevent sampler duplicates :)
 	if (FAILED(d3d_device->CreateSamplerState(&desc_sampler, &tex->_sampler)))
-		skr_log("skr_tex_settings: failed to create sampler state!");
+		skr_log(skr_log_critical, "Failed to create sampler state!");
 }
 
 ///////////////////////////////////////////
@@ -751,7 +751,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 		}
 
 		if (use_in_shader && FAILED(d3d_device->CreateShaderResourceView(tex->_texture, &res_desc, &tex->_resource))) {
-			skr_log("Create Shader Resource View error!");
+			skr_log(skr_log_critical, "Create Shader Resource View error!");
 			return false;
 		}
 	} else {
@@ -764,7 +764,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 			stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 		}
 		if (FAILED(d3d_device->CreateDepthStencilView(tex->_texture, &stencil_desc, &tex->_depth_view))) {
-			skr_log("Create Depth Stencil View error!");
+			skr_log(skr_log_critical, "Create Depth Stencil View error!");
 			return false;
 		}
 	}
@@ -780,7 +780,7 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 		}
 
 		if (FAILED(d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_view))) {
-			skr_log("Create Render Target View error!");
+			skr_log(skr_log_critical, "Create Render Target View error!");
 			return false;
 		}
 	}
@@ -792,11 +792,11 @@ bool skr_tex_make_view(skr_tex_t *tex, uint32_t mip_count, uint32_t array_size, 
 void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	// Some warning messages
 	if (tex->use != skr_use_dynamic && tex->_texture) {
-		skr_log("Only dynamic textures can be updated!");
+		skr_log(skr_log_warning, "Only dynamic textures can be updated!");
 		return;
 	}
 	if (tex->use == skr_use_dynamic && (tex->mips == skr_mip_generate || data_frame_count > 1)) {
-		skr_log("Dynamic textures don't support mip-maps or texture arrays!");
+		skr_log(skr_log_warning, "Dynamic textures don't support mip-maps or texture arrays!");
 		return;
 	}
 
@@ -824,7 +824,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
 		if (data_frames != nullptr && data_frames[0] != nullptr) {
 			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)data_frame_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
-			if (!tex_mem) { skr_log("Out of memory"); return;  }
+			if (!tex_mem) { skr_log(skr_log_critical, "Out of memory"); return;  }
 
 			for (int32_t i = 0; i < data_frame_count; i++) {
 				tex_mem[i*mip_levels] = {};
@@ -838,7 +838,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		}
 
 		if (FAILED(d3d_device->CreateTexture2D(&desc, tex_mem, &tex->_texture))) {
-			skr_log("Create texture error!");
+			skr_log(skr_log_critical, "Create texture error!");
 		}
 
 		if (tex_mem != nullptr) {
@@ -855,7 +855,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
 		if (FAILED(d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem))) {
-			skr_log("Failed mapping a texture");
+			skr_log(skr_log_critical, "Failed mapping a texture");
 			return;
 		}
 
@@ -917,7 +917,7 @@ void skr_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_height = h = max(1, (1 << h) >> 1);
 
 	*out_data = (T*)malloc((int64_t)w * h * sizeof(T) * 4);
-	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	if (*out_data == nullptr) { skr_log(skr_log_critical, "Out of memory"); return; }
 	memset(*out_data, 0, (int64_t)w * h * sizeof(T) * 4);
 	T *result = *out_data;
 
@@ -948,7 +948,7 @@ void skr_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 	*out_height = h = (1 << h) >> 1;
 
 	*out_data = (T*)malloc((int64_t)w * h * sizeof(T));
-	if (*out_data == nullptr) { skr_log("Out of memory"); return; }
+	if (*out_data == nullptr) { skr_log(skr_log_critical, "Out of memory"); return; }
 	memset(*out_data, 0, (int64_t)w * h * sizeof(T));
 	T *result = *out_data;
 

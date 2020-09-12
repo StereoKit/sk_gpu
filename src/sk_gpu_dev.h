@@ -109,6 +109,12 @@ typedef enum skr_cull_ {
 	skr_cull_none,
 } skr_cull_;
 
+typedef enum skr_log_ {
+	skr_log_info,
+	skr_log_warning,
+	skr_log_critical,
+} skr_log_;
+
 typedef struct skr_vert_t {
 	float   pos [3];
 	float   norm[3];
@@ -174,7 +180,7 @@ typedef struct skr_shader_meta_t {
 
 int32_t             skr_init                (const char *app_name, void *hwnd, void *adapter_id);
 void                skr_shutdown            ();
-void                skr_callback_log        (void (*callback)(const char *text));
+void                skr_callback_log        (void (*callback)(skr_log_ level, const char *text));
 void                skr_callback_file_read  (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
 skr_platform_data_t skr_get_platform_data   ();
 

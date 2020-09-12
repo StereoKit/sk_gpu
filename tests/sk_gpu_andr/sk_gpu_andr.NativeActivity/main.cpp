@@ -45,6 +45,8 @@ struct engine {
 	struct saved_state state;
 };
 
+///////////////////////////////////////////
+
 // See: http://www.50ply.com/blog/2013/01/19/loading-compressed-android-assets-with-file-pointer/
 AAssetManager *android_asset_manager;
 bool android_fopen(const char *filename, void **out_data, size_t *out_size) {
@@ -73,12 +75,25 @@ bool android_fopen(const char *filename, void **out_data, size_t *out_size) {
 	return true;
 }
 
+///////////////////////////////////////////
+
+void android_log_callback(skr_log_ level, const char *text) {
+	int priority = ANDROID_LOG_INFO;
+	switch (level) {
+	case skr_log_warning:  priority = ANDROID_LOG_WARN;  break;
+	case skr_log_critical: priority = ANDROID_LOG_ERROR; break;
+	}
+	__android_log_write(priority, "sk_gpu", text); 
+}
+
+///////////////////////////////////////////
+
 #ifndef XR
 static int engine_init_display(struct engine* engine) {
 	if (engine->initialized)
 		return 0;
 	skr_callback_file_read(android_fopen);
-	skr_callback_log([](const char *text) { __android_log_print(ANDROID_LOG_INFO, "sk_gpu", text); });
+	skr_callback_log      (android_log_callback);
 	int result = skr_init("skr_gpu.h", engine->app->window, nullptr);
 	if (!result) return result;
 
@@ -119,9 +134,7 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	
 	LOGI("Beginning initialization");
 	skr_callback_file_read(android_fopen);
-	skr_callback_log([](const char *text) { 
-		__android_log_write(ANDROID_LOG_INFO, "sk_gpu", text); 
-	});
+	skr_callback_log      (android_log_callback);
 	if (!skr_init("sk_gpu.h", eng->app->window, nullptr))
 		return false;
 

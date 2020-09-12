@@ -301,7 +301,7 @@ GL_API
 #undef GLE
 
 static void gl_load_extensions( ) {
-#define GLE(ret, name, ...) name = (name##_proc *) gl_get_function(#name); if (name == nullptr) skr_log("Couldn't load gl function " #name);
+#define GLE(ret, name, ...) name = (name##_proc *) gl_get_function(#name); if (name == nullptr) skr_log(skr_log_info, "Couldn't load gl function " #name);
 	GL_API
 #undef GLE
 }
@@ -355,20 +355,20 @@ int32_t gl_init_win32(void *app_hwnd) {
 
 	int pixel_format = ChoosePixelFormat(dummy_dc, &format_desc);
 	if (!pixel_format) {
-		skr_log("Failed to find a suitable pixel format.");
+		skr_log(skr_log_critical, "Failed to find a suitable pixel format.");
 		return false;
 	}
 	if (!SetPixelFormat(dummy_dc, pixel_format, &format_desc)) {
-		skr_log("Failed to set the pixel format.");
+		skr_log(skr_log_critical, "Failed to set the pixel format.");
 		return false;
 	}
 	HGLRC dummy_context = wglCreateContext(dummy_dc);
 	if (!dummy_context) {
-		skr_log("Failed to create a dummy OpenGL rendering context.");
+		skr_log(skr_log_critical, "Failed to create a dummy OpenGL rendering context.");
 		return false;
 	}
 	if (!wglMakeCurrent(dummy_dc, dummy_context)) {
-		skr_log("Failed to activate dummy OpenGL rendering context.");
+		skr_log(skr_log_critical, "Failed to activate dummy OpenGL rendering context.");
 		return false;
 	}
 
@@ -427,14 +427,14 @@ int32_t gl_init_win32(void *app_hwnd) {
 	pixel_format = 0;
 	UINT num_formats = 0;
 	if (!wglChoosePixelFormatARB(gl_hdc, format_attribs, nullptr, 1, &pixel_format, &num_formats)) {
-		skr_log("Couldn't find pixel format!");
+		skr_log(skr_log_critical, "Couldn't find pixel format!");
 		return false;
 	}
 
 	memset(&format_desc, 0, sizeof(format_desc));
 	DescribePixelFormat(gl_hdc, pixel_format, sizeof(format_desc), &format_desc);
 	if (!SetPixelFormat(gl_hdc, pixel_format, &format_desc)) {
-		skr_log("Couldn't set pixel format!");
+		skr_log(skr_log_critical, "Couldn't set pixel format!");
 		return false;
 	}
 
@@ -446,11 +446,11 @@ int32_t gl_init_win32(void *app_hwnd) {
 		0 };
 	gl_hrc = wglCreateContextAttribsARB( gl_hdc, 0, attributes );
 	if (!gl_hrc) {
-		skr_log("Couldn't create GL context!");
+		skr_log(skr_log_critical, "Couldn't create GL context!");
 		return false;
 	}
 	if (!wglMakeCurrent(gl_hdc, gl_hrc)) {
-		skr_log("Couldn't activate GL context!");
+		skr_log(skr_log_critical, "Couldn't activate GL context!");
 		return false;
 	}
 #endif // _WIN32
@@ -494,23 +494,23 @@ int32_t gl_init_android(void *native_window) {
 	EGLint numConfigs;
 
 	egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetDisplay");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglGetDisplay");
 
 	int32_t major, minor;
 	eglInitialize     (egl_display, &major, &minor);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglInitialize");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglInitialize");
 	eglChooseConfig   (egl_display, attribs, &egl_config, 1, &numConfigs);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglChooseConfig");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglChooseConfig");
 	eglGetConfigAttrib(egl_display, egl_config, EGL_NATIVE_VISUAL_ID, &format);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglGetConfigAttrib");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglGetConfigAttrib");
 	
 	egl_surface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)native_window, nullptr);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateWindowSurface");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglCreateWindowSurface");
 	egl_context = eglCreateContext      (egl_display, egl_config, nullptr, context_attribs);
-	if (eglGetError() != EGL_SUCCESS) skr_log("sk_gpu: err eglCreateContext");
+	if (eglGetError() != EGL_SUCCESS) skr_log(skr_log_critical, "Err eglCreateContext");
 
 	if (eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_FALSE) {
-		skr_log("sk_gpu: Unable to eglMakeCurrent");
+		skr_log(skr_log_critical, "Unable to eglMakeCurrent");
 		return -1;
 	}
 
@@ -537,20 +537,22 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	// Load OpenGL function pointers
 	gl_load_extensions();
 
-	skr_log("sk_gpu: Using OpenGL");
-	skr_log(glGetString(GL_VERSION));
+	skr_log(skr_log_info, "Using OpenGL");
+	skr_log(skr_log_info, glGetString(GL_VERSION));
 
 #if _DEBUG
-	skr_log("sk_gpu: Debug info enabled.");
+	skr_log(skr_log_info, "Debug info enabled.");
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
-		if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
-			//skr_log(message);
-		} else {
-			skr_log(message);
-		} }, nullptr);
+		switch (severity) {
+		case GL_DEBUG_SEVERITY_NOTIFICATION: break;
+		case GL_DEBUG_SEVERITY_LOW:    skr_log(skr_log_info,     message); break;
+		case GL_DEBUG_SEVERITY_MEDIUM: skr_log(skr_log_warning,  message); break;
+		case GL_DEBUG_SEVERITY_HIGH:   skr_log(skr_log_critical, message); break;
+		}
+	}, nullptr);
 #endif // _DEBUG
 	
 	// Some default behavior
@@ -663,7 +665,7 @@ bool skr_buffer_is_valid(const skr_buffer_t *buffer) {
 
 void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skr_use_dynamic) {
-		skr_log("Attempting to dynamically set contents of a static buffer!");
+		skr_log(skr_log_warning, "Attempting to dynamically set contents of a static buffer!");
 		return;
 	}
 
@@ -802,8 +804,8 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 		log = (char*)malloc(length);
 		glGetShaderInfoLog(result._shader, length, &err, log);
 
-		skr_log("Unable to compile shader:\n");
-		skr_log(log);
+		skr_log(skr_log_warning, "Unable to compile shader:\n");
+		skr_log(skr_log_warning, log);
 		free(log);
 	}
 	if (needs_free)
@@ -845,8 +847,8 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 		log = (char*)malloc(length);
 		glGetProgramInfoLog(result._program, length, &err, log);
 
-		skr_log("Unable to compile shader program:");
-		skr_log(log);
+		skr_log(skr_log_warning, "Unable to compile shader program:");
+		skr_log(skr_log_warning, log);
 		free(log);
 
 		glDeleteProgram(result._program);
@@ -1079,7 +1081,7 @@ void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	} else {
-		skr_log("Can't bind a depth texture to a non-rendertarget");
+		skr_log(skr_log_warning, "Can't bind a depth texture to a non-rendertarget");
 	}
 }
 
@@ -1132,7 +1134,7 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	uint32_t layout = skr_tex_fmt_to_gl_layout       (tex->format);
 	if (tex->type == skr_tex_type_cubemap) {
 		if (data_frame_count != 6) {
-			skr_log("sk_gpu: cubemaps need 6 data frames");
+			skr_log(skr_log_warning, "Cubemaps need 6 data frames");
 			return;
 		}
 		for (int32_t f = 0; f < 6; f++)

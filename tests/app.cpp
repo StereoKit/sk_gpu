@@ -113,7 +113,7 @@ bool app_init() {
 			inds_wave[curr++] = (x  ) + (y  ) * app_wave_size;
 		}
 	}
-	app_mesh_wave = app_mesh_create(app_wave_verts, _countof(app_wave_verts), true, inds_wave, _countof(inds_wave));
+	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skr_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t));
 
 	// Make a checkered texture
 	const int w = 128, h = 64;
@@ -135,7 +135,7 @@ bool app_init() {
 
 	// Make a plain white texture
 	uint8_t colors_wht[2*2*4];
-	for (int32_t i = 0; i < _countof(colors_wht); i++) {
+	for (int32_t i = 0; i < sizeof(colors_wht); i++) {
 		colors_wht[i] = 255;
 	}
 	void *color_wht_arr[1] = { colors };

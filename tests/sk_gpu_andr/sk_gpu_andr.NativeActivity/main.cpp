@@ -130,9 +130,9 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	out_graphics->hDC     = (HDC  )platform._gl_hdc;
 	out_graphics->hGLRC   = (HGLRC)platform._gl_hrc;
 #elif defined(SKR_OPENGL) && defined(__ANDROID__)
-	out_graphics->display = (EGLDisplay)platform.egl_display;
-	out_graphics->config  = (EGLConfig )platform.egl_config;
-	out_graphics->context = (EGLContext)platform.egl_context;
+	out_graphics->display = (EGLDisplay)platform._egl_display;
+	out_graphics->config  = (EGLConfig )platform._egl_config;
+	out_graphics->context = (EGLContext)platform._egl_context;
 #elif defined(SKR_DIRECT3D11)
 	out_graphics->device  = (ID3D11Device*)platform._d3d11_device;
 #endif
@@ -176,7 +176,7 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 	engine *eng = (engine*)user_data;
 	float clear_color[4] = { 0,0,0,1 };
 	skr_tex_t *target = &eng->swapchain.surfaces[view_id * eng->swapchain.surf_count + surf_id].render_tex;
-	skr_tex_target_bind(clear_color, true, target);
+	skr_tex_target_bind(target, true, clear_color);
 
 	hmm_quaternion head_orientation;
 	memcpy(&head_orientation, &view->pose.orientation, sizeof(XrQuaternionf));

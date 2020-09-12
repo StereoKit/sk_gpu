@@ -557,8 +557,10 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	glEnable   (GL_DEPTH_TEST);  
 	glEnable   (GL_CULL_FACE);
 	glCullFace (GL_BACK);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
+#if _WIN32
 	glEnable   (GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+#endif
 	
 	return 1;
 }
@@ -764,7 +766,7 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	// Convert the prefix if it doesn't match the GL version we're using
 	const char   *prefix_gl      = "#version 450";
 	const size_t  prefix_gl_size = strlen(prefix_gl);
-	const char   *prefix_es      = "#version 300 es";
+	const char   *prefix_es      = "#version 320 es";
 	const size_t  prefix_es_size = strlen(prefix_es);
 	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;

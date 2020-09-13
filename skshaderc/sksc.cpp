@@ -145,10 +145,10 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 	// Write out our reflection information
 	printf("|--Buffer Info--\n");
 	for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
-		skr_shader_meta_buffer_t *buff = &out_file->meta->buffers[i];
+		skr_shader_buffer_t *buff = &out_file->meta->buffers[i];
 		printf("|  %s - %u bytes\n", buff->name, buff->size);
 		for (size_t v = 0; v < buff->var_count; v++) {
-			skr_shader_meta_var_t *var = &buff->vars[v];
+			skr_shader_var_t *var = &buff->vars[v];
 			const char *type_name = "misc";
 			switch (var->type) {
 			case skr_shader_var_double: type_name = "dbl"; break;
@@ -165,13 +165,13 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 		const char *stage_name = stages[s] == skr_stage_pixel ? "Pixel" : "Vertex";
 		printf("|--%s Shader--\n", stage_name);
 		for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
-			skr_shader_meta_buffer_t *buff = &out_file->meta->buffers[i];
+			skr_shader_buffer_t *buff = &out_file->meta->buffers[i];
 			if (buff->bind.stage_bits & stages[s]) {
 				printf("|  b%u : %s\n", buff->bind.slot, buff->name);
 			}
 		}
 		for (size_t i = 0; i < out_file->meta->texture_count; i++) {
-			skr_shader_meta_texture_t *tex = &out_file->meta->textures[i];
+			skr_shader_texture_t *tex = &out_file->meta->textures[i];
 			if (tex->bind.stage_bits & stages[s]) {
 				printf("|  s%u : %s\n", tex->bind.slot, tex->name );
 			}
@@ -205,7 +205,7 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 	fwrite(&file->meta->texture_count, sizeof(file->meta->texture_count), 1, fp);
 
 	for (size_t i = 0; i < file->meta->buffer_count; i++) {
-		skr_shader_meta_buffer_t *buff = &file->meta->buffers[i];
+		skr_shader_buffer_t *buff = &file->meta->buffers[i];
 		fwrite( buff->name,      sizeof(buff->name     ), 1, fp);
 		fwrite(&buff->bind,      sizeof(buff->bind     ), 1, fp);
 		fwrite(&buff->size,      sizeof(buff->size     ), 1, fp);
@@ -219,7 +219,7 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 		}
 
 		for (uint32_t t = 0; t < buff->var_count; t++) {
-			skr_shader_meta_var_t *var = &buff->vars[t];
+			skr_shader_var_t *var = &buff->vars[t];
 			fwrite(var->name,        sizeof(var->name),       1, fp);
 			fwrite(var->extra,       sizeof(var->extra),      1, fp);
 			fwrite(&var->offset,     sizeof(var->offset),     1, fp);
@@ -230,7 +230,7 @@ void sksc_save(char *filename, const skr_shader_file_t *file) {
 	}
 
 	for (uint32_t i = 0; i < file->meta->texture_count; i++) {
-		skr_shader_meta_texture_t *tex = &file->meta->textures[i];
+		skr_shader_texture_t *tex = &file->meta->textures[i];
 		fwrite( tex->name,  sizeof(tex->name ), 1, fp); 
 		fwrite( tex->extra, sizeof(tex->extra), 1, fp); 
 		fwrite(&tex->bind,  sizeof(tex->bind ), 1, fp);
@@ -417,8 +417,8 @@ void sksc_meta_find_defaults(char *hlsl_text, skr_shader_meta_t *ref_meta) {
 				value[value_end-value_start] = '\0';
 			}
 
-			skr_shader_meta_buffer_t *buff  = &ref_meta->buffers[ref_meta->global_buffer_id];
-			int32_t                   found = 0;
+			skr_shader_buffer_t *buff  = &ref_meta->buffers[ref_meta->global_buffer_id];
+			int32_t              found = 0;
 			for (size_t i = 0; i < buff->var_count; i++) {
 				if (strcmp(buff->vars[i].name, name) == 0) {
 					found += 1;
@@ -607,11 +607,11 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_stage_ stage, skr_shad
 	IDxcBlob *reflection;
 	compile_result->GetOutput(DXC_OUT_REFLECTION,  __uuidof(IDxcBlob), (void **)(&reflection), nullptr);
 
-	array_t<skr_shader_meta_buffer_t> buffer_list = {};
+	array_t<skr_shader_buffer_t> buffer_list = {};
 	buffer_list.data     = out_meta->buffers;
 	buffer_list.capacity = out_meta->buffer_count;
 	buffer_list.count    = out_meta->buffer_count;
-	array_t<skr_shader_meta_texture_t> texture_list = {};
+	array_t<skr_shader_texture_t> texture_list = {};
 	texture_list.data     = out_meta->textures;
 	texture_list.capacity = out_meta->texture_count;
 	texture_list.count    = out_meta->texture_count;
@@ -651,7 +651,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_stage_ stage, skr_shad
 			buffer_list[id].bind.slot = bind_desc.BindPoint;
 			buffer_list[id].size      = shader_buff.Size;
 			buffer_list[id].var_count = shader_buff.Variables;
-			buffer_list[id].vars      = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer_list[i].var_count);
+			buffer_list[id].vars      = (skr_shader_var_t*)malloc(sizeof(skr_shader_var_t) * buffer_list[i].var_count);
 			*buffer_list[id].vars     = {};
 
 			for (uint32_t v = 0; v < shader_buff.Variables; v++) {
@@ -857,7 +857,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
 
-	//printf("%s\n", (char*)out_stage->code);
+	printf("%s\n", (char*)out_stage->code);
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

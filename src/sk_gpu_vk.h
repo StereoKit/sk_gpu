@@ -16,14 +16,20 @@ typedef struct skr_mesh_t {
 } skr_mesh_t;
 
 typedef struct skr_shader_stage_t {
-	skr_stage_    type;
+	skr_stage_     type;
 	VkShaderModule module;
 } skr_shader_stage_t;
 
 typedef struct skr_shader_t {
-	int64_t pipeline;
-	VkPipelineLayout pipeline_layout;
+	skr_shader_meta_t *meta;
+	VkShaderModule     _vertex;
+	VkShaderModule     _pixel;
 } skr_shader_t;
+
+typedef struct skr_pipeline_t {
+	int64_t          pipeline;
+	VkPipelineLayout pipeline_layout;
+} skr_pipeline_t;
 
 typedef struct skr_tex_t {
 	int32_t         width;

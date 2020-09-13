@@ -1007,7 +1007,7 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count) {
+skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
 	result.type        = type;
 	result.use         = skr_use_static;
@@ -1068,7 +1068,7 @@ bool skr_tex_is_valid(const skr_tex_t *tex) {
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
+void skr_tex_attach_depth(skr_tex_t *tex, skr_tex_t *depth) {
 	if (tex->type == skr_tex_type_rendertarget) {
 		uint32_t attach = depth->format == skr_tex_fmt_depthstencil 
 			? GL_DEPTH_STENCIL_ATTACHMENT 

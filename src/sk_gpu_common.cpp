@@ -67,7 +67,7 @@ bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
 	if (!skr_read_file(file, &data, &size))
 		return false;
 
-	bool result = skr_shader_file_load_mem(data, size, out_file);
+	bool result = skr_shader_file_load_memory(data, size, out_file);
 	free(data);
 
 	return result;
@@ -75,7 +75,7 @@ bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
 
 ///////////////////////////////////////////
 
-bool skr_shader_file_verify(void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size) {
+bool skr_shader_file_verify(const void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size) {
 	const char    *prefix  = "SKSHADER";
 	const uint8_t *bytes   = (uint8_t*)data;
 
@@ -98,7 +98,7 @@ bool skr_shader_file_verify(void *data, size_t size, uint16_t *out_version, char
 
 ///////////////////////////////////////////
 
-bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_file) {
+bool skr_shader_file_load_memory(const void *data, size_t size, skr_shader_file_t *out_file) {
 	uint16_t file_version = 0;
 	if (!skr_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 1) {
 		return false;
@@ -118,14 +118,14 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	memcpy( out_file->meta->name,          &bytes[at], sizeof(out_file->meta->name         )); at += sizeof(out_file->meta->name);
 	memcpy(&out_file->meta->buffer_count,  &bytes[at], sizeof(out_file->meta->buffer_count )); at += sizeof(out_file->meta->buffer_count);
 	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(out_file->meta->texture_count)); at += sizeof(out_file->meta->texture_count);
-	out_file->meta->buffers  = (skr_shader_meta_buffer_t *)malloc(sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count );
-	out_file->meta->textures = (skr_shader_meta_texture_t*)malloc(sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
+	out_file->meta->buffers  = (skr_shader_buffer_t *)malloc(sizeof(skr_shader_buffer_t ) * out_file->meta->buffer_count );
+	out_file->meta->textures = (skr_shader_texture_t*)malloc(sizeof(skr_shader_texture_t) * out_file->meta->texture_count);
 	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
-	memset(out_file->meta->buffers,  0, sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count);
-	memset(out_file->meta->textures, 0, sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
+	memset(out_file->meta->buffers,  0, sizeof(skr_shader_buffer_t ) * out_file->meta->buffer_count);
+	memset(out_file->meta->textures, 0, sizeof(skr_shader_texture_t) * out_file->meta->texture_count);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
-		skr_shader_meta_buffer_t *buffer = &out_file->meta->buffers[i];
+		skr_shader_buffer_t *buffer = &out_file->meta->buffers[i];
 		memcpy( buffer->name,      &bytes[at], sizeof(buffer->name));      at += sizeof(buffer->name);
 		memcpy(&buffer->bind,      &bytes[at], sizeof(buffer->bind));      at += sizeof(buffer->bind);
 		memcpy(&buffer->size,      &bytes[at], sizeof(buffer->size));      at += sizeof(buffer->size);
@@ -138,13 +138,13 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			buffer->defaults = malloc(buffer->size);
 			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
-		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
+		buffer->vars = (skr_shader_var_t*)malloc(sizeof(skr_shader_var_t) * buffer->var_count);
 		if (buffer->vars == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
-		memset(buffer->vars, 0, sizeof(skr_shader_meta_var_t) * buffer->var_count);
+		memset(buffer->vars, 0, sizeof(skr_shader_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);
 
 		for (uint32_t t = 0; t < buffer->var_count; t++) {
-			skr_shader_meta_var_t *var = &buffer->vars[t];
+			skr_shader_var_t *var = &buffer->vars[t];
 			memcpy( var->name,       &bytes[at], sizeof(var->name ));      at += sizeof(var->name  );
 			memcpy( var->extra,      &bytes[at], sizeof(var->extra));      at += sizeof(var->extra );
 			memcpy(&var->offset,     &bytes[at], sizeof(var->offset));     at += sizeof(var->offset);
@@ -159,7 +159,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	}
 
 	for (uint32_t i = 0; i < out_file->meta->texture_count; i++) {
-		skr_shader_meta_texture_t *tex = &out_file->meta->textures[i];
+		skr_shader_texture_t *tex = &out_file->meta->textures[i];
 		memcpy( tex->name,  &bytes[at], sizeof(tex->name )); at += sizeof(tex->name );
 		memcpy( tex->extra, &bytes[at], sizeof(tex->extra)); at += sizeof(tex->extra);
 		memcpy(&tex->bind,  &bytes[at], sizeof(tex->bind )); at += sizeof(tex->bind );
@@ -231,7 +231,7 @@ void skr_shader_meta_release(skr_shader_meta_t *meta) {
 		}
 		free(meta->buffers);
 		free(meta->textures);
-		memset(meta, 0, sizeof(skr_shader_meta_t));
+		*meta = {};
 	}
 }
 
@@ -257,9 +257,9 @@ skr_shader_t skr_shader_create_file(const char *sks_filename) {
 
 ///////////////////////////////////////////
 
-skr_shader_t skr_shader_create_mem(void *sks_data, size_t sks_data_size) {
+skr_shader_t skr_shader_create_memory(const void *sks_data, size_t sks_data_size) {
 	skr_shader_file_t file;
-	if (!skr_shader_file_load_mem(sks_data, sks_data_size, &file))
+	if (!skr_shader_file_load_memory(sks_data, sks_data_size, &file))
 		return {};
 
 	skr_shader_stage_t vs     = skr_shader_file_create_stage(&file, skr_stage_vertex);
@@ -312,7 +312,7 @@ int32_t skr_shader_get_var_index(const skr_shader_t *shader, const char *name) {
 int32_t skr_shader_get_var_index_h(const skr_shader_t *shader, uint64_t name_hash) {
 	if (shader->meta->global_buffer_id == -1) return -1;
 
-	skr_shader_meta_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
+	skr_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	for (uint32_t i = 0; i < buffer->var_count; i++) {
 		if (buffer->vars[i].name_hash == name_hash) {
 			return i;
@@ -323,9 +323,9 @@ int32_t skr_shader_get_var_index_h(const skr_shader_t *shader, uint64_t name_has
 
 ///////////////////////////////////////////
 
-const skr_shader_meta_var_t *skr_shader_get_var_info(const skr_shader_t *shader, int32_t var_id) {
+const skr_shader_var_t *skr_shader_get_var_info(const skr_shader_t *shader, int32_t var_id) {
 	if (shader->meta->global_buffer_id == -1 || var_id == -1) return nullptr;
 
-	skr_shader_meta_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
+	skr_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	return &buffer->vars[var_id];
 }

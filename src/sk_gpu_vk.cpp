@@ -12,16 +12,6 @@
 
 ///////////////////////////////////////////
 
-void (*_skr_log)(const char *text);
-void skr_callback_log(void (*callback)(const char *text)) {
-	_skr_log = callback;
-}
-void skr_log(const char *text) {
-	if (_skr_log) _skr_log(text);
-}
-
-///////////////////////////////////////////
-
 template <typename T> struct array_t {
 	T     *data;
 	size_t count;
@@ -300,7 +290,7 @@ bool vk_create_instance(const char *app_name, VkInstance *out_inst) {
 		const char*                                 pLayerPrefix,
 		const char*                                 pMessage,
 		void*                                       pUserData) {
-			skr_log(pMessage);
+			skr_log(skr_log_info, pMessage);
 			return (VkBool32)VK_FALSE;
 	};
 	VkDebugReportCallbackEXT callback;
@@ -522,7 +512,7 @@ void skr_tex_target_bind(float clear_color[4], const skr_tex_t *render_target, c
 	beginInfo.pInheritanceInfo = nullptr; // Optional
 
 	if (vkBeginCommandBuffer(render_target->rt_commandbuffer, &beginInfo) != VK_SUCCESS) {
-		skr_log("failed to begin recording command buffer!");
+		skr_log(skr_log_critical, "failed to begin recording command buffer!");
 	}
 
 	VkClearValue clear_values = {};
@@ -568,7 +558,7 @@ void vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPrope
 	buff_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	if (vkCreateBuffer(skr_device.device, &buff_info, nullptr, out_buffer) != VK_SUCCESS) {
-		skr_log("failed to create buffer!");
+		skr_log(skr_log_critical, "failed to create buffer!");
 	}
 
 	VkMemoryRequirements memRequirements;
@@ -579,7 +569,7 @@ void vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPrope
 	allocInfo.memoryTypeIndex = vk_find_mem_type(memRequirements.memoryTypeBits, properties);
 
 	if (vkAllocateMemory(skr_device.device, &allocInfo, nullptr, out_memory) != VK_SUCCESS) {
-		skr_log("failed to allocate buffer memory!");
+		skr_log(skr_log_critical, "failed to allocate buffer memory!");
 	}
 
 	vkBindBufferMemory(skr_device.device, *out_buffer, *out_memory, 0);
@@ -726,7 +716,7 @@ skr_shader_stage_t skr_shader_stage_create(const uint8_t *shader_data, size_t sh
 	shader_info.pCode    = (uint32_t*)shader_data;
 
 	if (vkCreateShaderModule(skr_device.device, &shader_info, nullptr, &result.module) != VK_SUCCESS) {
-		skr_log("Failed to create shader module!");
+		skr_log(skr_log_critical, "Failed to create shader module!");
 	}
 
 	return result;
@@ -831,7 +821,7 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 	poolInfo.maxSets         = 1;
 	VkDescriptorPool descriptorPool;
 	if (vkCreateDescriptorPool(skr_device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-		skr_log("failed to create descriptor pool!");
+		skr_log(skr_log_critical, "failed to create descriptor pool!");
 	}
 	VkDescriptorSetAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
 	allocInfo.descriptorPool     = descriptorPool;
@@ -839,7 +829,7 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 	allocInfo.pSetLayouts        = &desc_layout;
 	VkDescriptorSet desc_set;
 	if (vkAllocateDescriptorSets(skr_device.device, &allocInfo, &desc_set) != VK_SUCCESS) {
-		skr_log("failed to allocate descriptor sets!");
+		skr_log(skr_log_critical, "failed to allocate descriptor sets!");
 	}
 
 	VkPipelineLayoutCreateInfo pipe_layout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
@@ -849,7 +839,7 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 	pipe_layout.pPushConstantRanges    = nullptr; // Optional
 
 	if (vkCreatePipelineLayout(skr_device.device, &pipe_layout, nullptr, &result.pipeline_layout) != VK_SUCCESS) {
-		skr_log("failed to create pipeline layout!");
+		skr_log(skr_log_critical, "failed to create pipeline layout!");
 	}
 
 	VkViewport viewport = {};
@@ -958,7 +948,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 
 	VkResult call_result = vkCreateSwapchainKHR(skr_device.device, &swapchain_info, 0, &result.swapchain);
 	if (call_result != VK_SUCCESS)
-		skr_log("Failed to create swapchain!");
+		skr_log(skr_log_critical, "Failed to create swapchain!");
 
 	vkGetSwapchainImagesKHR(skr_device.device, result.swapchain, &result.img_count, nullptr);
 	result.imgs      = (VkImage   *)malloc(sizeof(VkImage  ) * result.img_count);
@@ -969,7 +959,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
 	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 	for (uint32_t i = 0; i < result.img_count; i++) {
-		result.textures[i] = skr_tex_from_native(&result.imgs[i], skr_tex_type_rendertarget, skr_native_to_tex_fmt(result.format.format), width, height);
+		result.textures[i] = skr_tex_create_from_existing(&result.imgs[i], skr_tex_type_rendertarget, skr_native_to_tex_fmt(result.format.format), width, height);
 		vkCreateFence(skr_device.device, &fence_info, nullptr, &result.img_fence[i]);
 	}
 
@@ -980,7 +970,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 			vkCreateSemaphore(skr_device.device, &sem_info,   nullptr, &result.sem_finished [i]) != VK_SUCCESS ||
 			vkCreateFence    (skr_device.device, &fence_info, nullptr, &result.fence_flight [i]) != VK_SUCCESS) {
 
-			skr_log("failed to create synchronization objects for a frame!");
+			skr_log(skr_log_critical, "failed to create synchronization objects for a frame!");
 		}
 	}
 
@@ -1006,7 +996,7 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 
 	vkResetFences(skr_device.device, 1, &swapchain->fence_flight[swapchain->sync_index]);
 	if (vkQueueSubmit(skr_device.queue_gfx, 1, &submitInfo, swapchain->fence_flight[swapchain->sync_index]) != VK_SUCCESS) {
-		skr_log("failed to submit draw command buffer!");
+		skr_log(skr_log_critical, "failed to submit draw command buffer!");
 	}
 
 	VkSwapchainKHR   swapChains[] = {swapchain->swapchain};
@@ -1080,7 +1070,7 @@ void skr_tex_create_views(skr_tex_t *tex) {
 	view_info.subresourceRange.layerCount     = 1;
 
 	if (vkCreateImageView(skr_device.device, &view_info, nullptr, &tex->view) != VK_SUCCESS)
-		skr_log("vkCreateImageView failed");
+		skr_log(skr_log_critical, "vkCreateImageView failed");
 
 	if (tex->type == skr_tex_type_rendertarget) {
 		VkAttachmentDescription color_attch = {};
@@ -1130,7 +1120,7 @@ void skr_tex_create_views(skr_tex_t *tex) {
 		framebuffer_info.layers          = 1;
 
 		if (vkCreateFramebuffer(skr_device.device, &framebuffer_info, nullptr, &tex->rt_framebuffer) != VK_SUCCESS) {
-			skr_log("failed to create framebuffer!");
+			skr_log(skr_log_critical, "failed to create framebuffer!");
 		}
 
 		VkCommandBufferAllocateInfo alloc_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
@@ -1139,12 +1129,12 @@ void skr_tex_create_views(skr_tex_t *tex) {
 		alloc_info.commandBufferCount = 1;
 
 		if (vkAllocateCommandBuffers(skr_device.device, &alloc_info, &tex->rt_commandbuffer) != VK_SUCCESS) {
-			skr_log("failed to allocate command buffers!");
+			skr_log(skr_log_critical, "failed to allocate command buffers!");
 		}
 	}
 }
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height) {
+skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height) {
 	skr_tex_t result = {};
 	result.type    = type;
 	result.texture = *(VkImage *)native_tex;

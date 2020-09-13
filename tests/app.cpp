@@ -144,9 +144,9 @@ bool app_init() {
 
 	app_target       = skr_tex_create(skr_tex_type_rendertarget, skr_use_static, skr_tex_fmt_rgba32_linear, skr_mip_none);
 	app_target_depth = skr_tex_create(skr_tex_type_depth,        skr_use_static, skr_tex_fmt_depth16,       skr_mip_none);
-	skr_tex_set_contents (&app_target,       nullptr, 1, 512, 512);
-	skr_tex_set_contents (&app_target_depth, nullptr, 1, 512, 512);
-	skr_tex_set_depth    (&app_target, &app_target_depth);
+	skr_tex_set_contents(&app_target,       nullptr, 1, 512, 512);
+	skr_tex_set_contents(&app_target_depth, nullptr, 1, 512, 512);
+	skr_tex_attach_depth(&app_target, &app_target_depth);
 
 	app_cubemap = skr_tex_create(skr_tex_type_cubemap, skr_use_static, skr_tex_fmt_rgba32, skr_mip_none);
 	uint8_t *cube_cols[6];

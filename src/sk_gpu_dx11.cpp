@@ -545,10 +545,10 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 
 	ID3D11Texture2D *back_buffer;
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	result._target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
+	result._target = skr_tex_create_from_existing(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	result._depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
 	skr_tex_set_contents(&result._depth, nullptr, 1, width, height);
-	skr_tex_set_depth   (&result._target, &result._depth);
+	skr_tex_attach_depth(&result._target, &result._depth);
 	back_buffer->Release();
 
 	dxgi_factory->Release();
@@ -575,10 +575,10 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 
 	ID3D11Texture2D *back_buffer;
 	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	swapchain->_target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
+	swapchain->_target = skr_tex_create_from_existing(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	swapchain->_depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
 	skr_tex_set_contents(&swapchain->_depth, nullptr, 1, width, height);
-	skr_tex_set_depth   (&swapchain->_target, &swapchain->_depth);
+	skr_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
 	back_buffer->Release();
 }
 
@@ -605,7 +605,7 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
+skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
 	result.type     = type;
 	result.use      = skr_use_static;
@@ -647,7 +647,7 @@ bool skr_tex_is_valid(const skr_tex_t *tex) {
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
+void skr_tex_attach_depth(skr_tex_t *tex, skr_tex_t *depth) {
 	if (depth->type == skr_tex_type_depth) {
 		if (tex->_depth_view) tex->_depth_view->Release();
 		tex->_depth_view = depth->_depth_view;

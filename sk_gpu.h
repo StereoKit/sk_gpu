@@ -127,7 +127,7 @@ typedef struct skr_bind_t {
 	uint16_t stage_bits;
 } skr_bind_t;
 
-typedef struct skr_shader_meta_var_t {
+typedef struct skr_shader_var_t {
 	char     name [32];
 	uint64_t name_hash;
 	char     extra[64];
@@ -135,33 +135,33 @@ typedef struct skr_shader_meta_var_t {
 	uint32_t size;
 	uint16_t type;
 	uint16_t type_count;
-} skr_shader_meta_var_t;
+} skr_shader_var_t;
 
-typedef struct skr_shader_meta_buffer_t {
-	char       name[32];
-	uint64_t   name_hash;
-	skr_bind_t bind;
-	uint32_t   size;
-	void      *defaults;
-	uint32_t               var_count;
-	skr_shader_meta_var_t *vars;
-} skr_shader_meta_buffer_t;
+typedef struct skr_shader_buffer_t {
+	char              name[32];
+	uint64_t          name_hash;
+	skr_bind_t        bind;
+	uint32_t          size;
+	void             *defaults;
+	uint32_t          var_count;
+	skr_shader_var_t *vars;
+} skr_shader_buffer_t;
 
-typedef struct skr_shader_meta_texture_t {
+typedef struct skr_shader_texture_t {
 	char       name [32];
 	uint64_t   name_hash;
 	char       extra[64];
 	skr_bind_t bind;
-} skr_shader_meta_texture_t;
+} skr_shader_texture_t;
 
 typedef struct skr_shader_meta_t {
-	char                       name[256];
-	uint32_t                   buffer_count;
-	skr_shader_meta_buffer_t  *buffers;
-	uint32_t                   texture_count;
-	skr_shader_meta_texture_t *textures;
-	int32_t                    references;
-	int32_t                    global_buffer_id;
+	char                  name[256];
+	uint32_t              buffer_count;
+	skr_shader_buffer_t  *buffers;
+	uint32_t              texture_count;
+	skr_shader_texture_t *textures;
+	int32_t               references;
+	int32_t               global_buffer_id;
 } skr_shader_meta_t;
 
 ///////////////////////////////////////////
@@ -197,9 +197,9 @@ typedef struct skr_shader_t {
 } skr_shader_t;
 
 typedef struct skr_pipeline_t {
-	skr_transparency_ transparency;
-	skr_cull_         cull;
-	bool              wireframe;
+	skr_transparency_      transparency;
+	skr_cull_              cull;
+	bool                   wireframe;
 	ID3D11VertexShader    *_vertex;
 	ID3D11PixelShader     *_pixel;
 	ID3D11BlendState      *_blend;
@@ -222,10 +222,10 @@ typedef struct skr_tex_t {
 } skr_tex_t;
 
 typedef struct skr_swapchain_t {
-	int32_t   width;
-	int32_t   height;
-	skr_tex_t _target;
-	skr_tex_t _depth;
+	int32_t          width;
+	int32_t          height;
+	skr_tex_t        _target;
+	skr_tex_t        _depth;
 	IDXGISwapChain1 *_swapchain;
 } skr_swapchain_t;
 
@@ -238,6 +238,9 @@ typedef struct skr_platform_data_t {
 #elif defined(SKR_VULKAN)
 
 #elif defined(SKR_OPENGL)
+
+
+///////////////////////////////////////////
 
 typedef struct skr_buffer_t {
 	skr_use_         use;
@@ -284,6 +287,12 @@ typedef struct skr_tex_t {
 	uint32_t      _target;
 } skr_tex_t;
 
+typedef struct skr_swapchain_t {
+	int32_t  width;
+	int32_t  height;
+	uint32_t _framebuffer;
+} skr_swapchain_t;
+
 typedef struct skr_platform_data_t {
 #if __ANDROID__
 	void *_egl_display;
@@ -294,51 +303,45 @@ typedef struct skr_platform_data_t {
 	void *_gl_hrc;
 #endif
 } skr_platform_data_t;
-
-typedef struct skr_swapchain_t {
-	int32_t   width;
-	int32_t   height;
-	uint32_t  _framebuffer;
-} skr_swapchain_t;
 #endif
 
 ///////////////////////////////////////////
 
-int32_t             skr_init                (const char *app_name, void *hwnd, void *adapter_id);
-void                skr_shutdown            ();
-void                skr_callback_log        (void (*callback)(skr_log_ level, const char *text));
-void                skr_callback_file_read  (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
-skr_platform_data_t skr_get_platform_data   ();
+int32_t             skr_init                     (const char *app_name, void *hwnd, void *adapter_id);
+void                skr_shutdown                 ();
+void                skr_callback_log             (void (*callback)(skr_log_ level, const char *text));
+void                skr_callback_file_read       (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
+skr_platform_data_t skr_get_platform_data        ();
 
-void                skr_draw_begin          ();
-void                skr_draw                (int32_t index_start, int32_t index_count, int32_t instance_count);
+void                skr_draw_begin               ();
+void                skr_draw                     (int32_t index_start, int32_t index_count, int32_t instance_count);
 
-skr_buffer_t        skr_buffer_create       (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
-bool                skr_buffer_is_valid     (const skr_buffer_t *buffer);
-void                skr_buffer_set_contents (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
-void                skr_buffer_bind         (const skr_buffer_t *buffer, skr_bind_t slot_vc, uint32_t stride_v, uint32_t offset_vi);
-void                skr_buffer_destroy      (      skr_buffer_t *buffer);
+skr_buffer_t        skr_buffer_create            (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
+bool                skr_buffer_is_valid          (const skr_buffer_t *buffer);
+void                skr_buffer_set_contents      (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
+void                skr_buffer_bind              (const skr_buffer_t *buffer, skr_bind_t slot_vc, uint32_t stride_v, uint32_t offset_vi);
+void                skr_buffer_destroy           (      skr_buffer_t *buffer);
 
-skr_mesh_t          skr_mesh_create         (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);
-void                skr_mesh_set_verts      (      skr_mesh_t *mesh, const skr_buffer_t *vert_buffer);
-void                skr_mesh_set_inds       (      skr_mesh_t *mesh, const skr_buffer_t *ind_buffer);
-void                skr_mesh_bind           (const skr_mesh_t *mesh);
-void                skr_mesh_destroy        (      skr_mesh_t *mesh);
+skr_mesh_t          skr_mesh_create              (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);
+void                skr_mesh_set_verts           (      skr_mesh_t *mesh, const skr_buffer_t *vert_buffer);
+void                skr_mesh_set_inds            (      skr_mesh_t *mesh, const skr_buffer_t *ind_buffer);
+void                skr_mesh_bind                (const skr_mesh_t *mesh);
+void                skr_mesh_destroy             (      skr_mesh_t *mesh);
 
-skr_shader_stage_t  skr_shader_stage_create (const void *shader_data, size_t shader_size, skr_stage_ type);
-void                skr_shader_stage_destroy(skr_shader_stage_t *stage);
+skr_shader_stage_t  skr_shader_stage_create      (const void *shader_data, size_t shader_size, skr_stage_ type);
+void                skr_shader_stage_destroy     (skr_shader_stage_t *stage);
 
-skr_shader_t        skr_shader_create_file    (const char *sks_filename);
-skr_shader_t        skr_shader_create_mem     (void *sks_data, size_t sks_data_size);
-skr_shader_t        skr_shader_create_manual  (skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader);
-bool                skr_shader_is_valid       (const skr_shader_t *shader);
-skr_bind_t          skr_shader_get_tex_bind   (const skr_shader_t *shader, const char *name);
-skr_bind_t          skr_shader_get_buffer_bind(const skr_shader_t *shader, const char *name);
-int32_t             skr_shader_get_var_count  (const skr_shader_t *shader);
-int32_t             skr_shader_get_var_index  (const skr_shader_t *shader, const char *name);
-int32_t             skr_shader_get_var_index_h(const skr_shader_t *shader, uint64_t name_hash);
-const skr_shader_meta_var_t *skr_shader_get_var_info (const skr_shader_t *shader, int32_t var_index);
-void                skr_shader_destroy        (      skr_shader_t *shader);
+skr_shader_t        skr_shader_create_file       (const char *sks_filename);
+skr_shader_t        skr_shader_create_memory     (const void *sks_memory, size_t sks_memory_size);
+skr_shader_t        skr_shader_create_manual     (skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader);
+bool                skr_shader_is_valid          (const skr_shader_t *shader);
+skr_bind_t          skr_shader_get_tex_bind      (const skr_shader_t *shader, const char *name);
+skr_bind_t          skr_shader_get_buffer_bind   (const skr_shader_t *shader, const char *name);
+int32_t             skr_shader_get_var_count     (const skr_shader_t *shader);
+int32_t             skr_shader_get_var_index     (const skr_shader_t *shader, const char *name);
+int32_t             skr_shader_get_var_index_h   (const skr_shader_t *shader, uint64_t name_hash);
+const skr_shader_var_t *skr_shader_get_var_info  (const skr_shader_t *shader, int32_t var_index);
+void                skr_shader_destroy           (      skr_shader_t *shader);
 
 skr_pipeline_t      skr_pipeline_create          (skr_shader_t *shader);
 void                skr_pipeline_bind            (const skr_pipeline_t *pipeline);
@@ -350,25 +353,25 @@ void                skr_pipeline_set_wireframe   (      skr_pipeline_t *pipeline
 bool                skr_pipeline_get_wireframe   (const skr_pipeline_t *pipeline);
 void                skr_pipeline_destroy         (      skr_pipeline_t *pipeline);
 
-skr_swapchain_t     skr_swapchain_create    (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);
-void                skr_swapchain_resize    (      skr_swapchain_t *swapchain, int32_t width, int32_t height);
-void                skr_swapchain_present   (      skr_swapchain_t *swapchain);
-skr_tex_t          *skr_swapchain_get_next  (      skr_swapchain_t *swapchain);
-void                skr_swapchain_destroy   (      skr_swapchain_t *swapchain);
+skr_swapchain_t     skr_swapchain_create         (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);
+void                skr_swapchain_resize         (      skr_swapchain_t *swapchain, int32_t width, int32_t height);
+void                skr_swapchain_present        (      skr_swapchain_t *swapchain);
+skr_tex_t          *skr_swapchain_get_next       (      skr_swapchain_t *swapchain);
+void                skr_swapchain_destroy        (      skr_swapchain_t *swapchain);
 
-skr_tex_t           skr_tex_from_native     (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
-skr_tex_t           skr_tex_create          (skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps);
-bool                skr_tex_is_valid        (const skr_tex_t *tex);
-void                skr_tex_set_depth       (      skr_tex_t *tex, skr_tex_t *depth);
-void                skr_tex_settings        (      skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy);
-void                skr_tex_set_contents    (      skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
-void                skr_tex_get_contents    (      skr_tex_t *tex);
-void                skr_tex_bind            (const skr_tex_t *tex, skr_bind_t bind);
-void                skr_tex_target_bind     (      skr_tex_t *render_target, bool clear, const float *clear_color_4);
-skr_tex_t          *skr_tex_target_get      ();
-void                skr_tex_destroy         (      skr_tex_t *tex);
-int64_t             skr_tex_fmt_to_native   (skr_tex_fmt_ format);
-skr_tex_fmt_        skr_tex_fmt_from_native (int64_t      format);
+skr_tex_t           skr_tex_create_from_existing (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
+skr_tex_t           skr_tex_create               (skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps);
+bool                skr_tex_is_valid             (const skr_tex_t *tex);
+void                skr_tex_attach_depth         (      skr_tex_t *tex, skr_tex_t *depth);
+void                skr_tex_settings             (      skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy);
+void                skr_tex_set_contents         (      skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
+void                skr_tex_get_contents         (      skr_tex_t *tex);
+void                skr_tex_bind                 (const skr_tex_t *tex, skr_bind_t bind);
+void                skr_tex_target_bind          (      skr_tex_t *render_target, bool clear, const float *clear_color_4);
+skr_tex_t          *skr_tex_target_get           ();
+void                skr_tex_destroy              (      skr_tex_t *tex);
+int64_t             skr_tex_fmt_to_native        (skr_tex_fmt_ format);
+skr_tex_fmt_        skr_tex_fmt_from_native      (int64_t      format);
 
 
 ///////////////////////////////////////////
@@ -396,17 +399,17 @@ typedef struct skr_shader_file_t {
 
 ///////////////////////////////////////////
 
-void               skr_log (skr_log_ level, const char *text);
-uint64_t           skr_hash(const char *string);
+void               skr_log                     (skr_log_ level, const char *text);
+uint64_t           skr_hash                    (const char *string);
 
-bool               skr_shader_file_verify      (void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size);
+bool               skr_shader_file_verify      (const void *file_memory, size_t file_size, uint16_t *out_version, char *out_name, size_t out_name_size);
+bool               skr_shader_file_load_memory (const void *file_memory, size_t file_size, skr_shader_file_t *out_file);
 bool               skr_shader_file_load        (const char *file, skr_shader_file_t *out_file);
-bool               skr_shader_file_load_mem    (void *data, size_t size, skr_shader_file_t *out_file);
 skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, skr_stage_ stage);
 void               skr_shader_file_destroy     (      skr_shader_file_t *file);
 
-void               skr_shader_meta_reference   (      skr_shader_meta_t *meta);
-void               skr_shader_meta_release     (      skr_shader_meta_t *meta);
+void               skr_shader_meta_reference   (skr_shader_meta_t *meta);
+void               skr_shader_meta_release     (skr_shader_meta_t *meta);
 
 ///////////////////////////////////////////
 // Implementations!                      //
@@ -960,10 +963,10 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 
 	ID3D11Texture2D *back_buffer;
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	result._target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
+	result._target = skr_tex_create_from_existing(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	result._depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_format, skr_mip_none);
 	skr_tex_set_contents(&result._depth, nullptr, 1, width, height);
-	skr_tex_set_depth   (&result._target, &result._depth);
+	skr_tex_attach_depth(&result._target, &result._depth);
 	back_buffer->Release();
 
 	dxgi_factory->Release();
@@ -990,10 +993,10 @@ void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t hei
 
 	ID3D11Texture2D *back_buffer;
 	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	swapchain->_target = skr_tex_from_native(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
+	swapchain->_target = skr_tex_create_from_existing(back_buffer, skr_tex_type_rendertarget, target_fmt, width, height, 1);
 	swapchain->_depth  = skr_tex_create(skr_tex_type_depth, skr_use_static, depth_fmt, skr_mip_none);
 	skr_tex_set_contents(&swapchain->_depth, nullptr, 1, width, height);
-	skr_tex_set_depth   (&swapchain->_target, &swapchain->_depth);
+	skr_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
 	back_buffer->Release();
 }
 
@@ -1020,7 +1023,7 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
+skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
 	result.type     = type;
 	result.use      = skr_use_static;
@@ -1062,7 +1065,7 @@ bool skr_tex_is_valid(const skr_tex_t *tex) {
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
+void skr_tex_attach_depth(skr_tex_t *tex, skr_tex_t *depth) {
 	if (depth->type == skr_tex_type_depth) {
 		if (tex->_depth_view) tex->_depth_view->Release();
 		tex->_depth_view = depth->_depth_view;
@@ -2462,7 +2465,7 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skr_tex_t skr_tex_from_native(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count) {
+skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count) {
 	skr_tex_t result = {};
 	result.type        = type;
 	result.use         = skr_use_static;
@@ -2523,7 +2526,7 @@ bool skr_tex_is_valid(const skr_tex_t *tex) {
 
 /////////////////////////////////////////// 
 
-void skr_tex_set_depth(skr_tex_t *tex, skr_tex_t *depth) {
+void skr_tex_attach_depth(skr_tex_t *tex, skr_tex_t *depth) {
 	if (tex->type == skr_tex_type_rendertarget) {
 		uint32_t attach = depth->format == skr_tex_fmt_depthstencil 
 			? GL_DEPTH_STENCIL_ATTACHMENT 
@@ -2787,7 +2790,7 @@ bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
 	if (!skr_read_file(file, &data, &size))
 		return false;
 
-	bool result = skr_shader_file_load_mem(data, size, out_file);
+	bool result = skr_shader_file_load_memory(data, size, out_file);
 	free(data);
 
 	return result;
@@ -2795,7 +2798,7 @@ bool skr_shader_file_load(const char *file, skr_shader_file_t *out_file) {
 
 ///////////////////////////////////////////
 
-bool skr_shader_file_verify(void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size) {
+bool skr_shader_file_verify(const void *data, size_t size, uint16_t *out_version, char *out_name, size_t out_name_size) {
 	const char    *prefix  = "SKSHADER";
 	const uint8_t *bytes   = (uint8_t*)data;
 
@@ -2818,7 +2821,7 @@ bool skr_shader_file_verify(void *data, size_t size, uint16_t *out_version, char
 
 ///////////////////////////////////////////
 
-bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_file) {
+bool skr_shader_file_load_memory(const void *data, size_t size, skr_shader_file_t *out_file) {
 	uint16_t file_version = 0;
 	if (!skr_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 1) {
 		return false;
@@ -2838,14 +2841,14 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	memcpy( out_file->meta->name,          &bytes[at], sizeof(out_file->meta->name         )); at += sizeof(out_file->meta->name);
 	memcpy(&out_file->meta->buffer_count,  &bytes[at], sizeof(out_file->meta->buffer_count )); at += sizeof(out_file->meta->buffer_count);
 	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(out_file->meta->texture_count)); at += sizeof(out_file->meta->texture_count);
-	out_file->meta->buffers  = (skr_shader_meta_buffer_t *)malloc(sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count );
-	out_file->meta->textures = (skr_shader_meta_texture_t*)malloc(sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
+	out_file->meta->buffers  = (skr_shader_buffer_t *)malloc(sizeof(skr_shader_buffer_t ) * out_file->meta->buffer_count );
+	out_file->meta->textures = (skr_shader_texture_t*)malloc(sizeof(skr_shader_texture_t) * out_file->meta->texture_count);
 	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
-	memset(out_file->meta->buffers,  0, sizeof(skr_shader_meta_buffer_t ) * out_file->meta->buffer_count);
-	memset(out_file->meta->textures, 0, sizeof(skr_shader_meta_texture_t) * out_file->meta->texture_count);
+	memset(out_file->meta->buffers,  0, sizeof(skr_shader_buffer_t ) * out_file->meta->buffer_count);
+	memset(out_file->meta->textures, 0, sizeof(skr_shader_texture_t) * out_file->meta->texture_count);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
-		skr_shader_meta_buffer_t *buffer = &out_file->meta->buffers[i];
+		skr_shader_buffer_t *buffer = &out_file->meta->buffers[i];
 		memcpy( buffer->name,      &bytes[at], sizeof(buffer->name));      at += sizeof(buffer->name);
 		memcpy(&buffer->bind,      &bytes[at], sizeof(buffer->bind));      at += sizeof(buffer->bind);
 		memcpy(&buffer->size,      &bytes[at], sizeof(buffer->size));      at += sizeof(buffer->size);
@@ -2858,13 +2861,13 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 			buffer->defaults = malloc(buffer->size);
 			memcpy(buffer->defaults, &bytes[at], default_size); at += default_size;
 		}
-		buffer->vars = (skr_shader_meta_var_t*)malloc(sizeof(skr_shader_meta_var_t) * buffer->var_count);
+		buffer->vars = (skr_shader_var_t*)malloc(sizeof(skr_shader_var_t) * buffer->var_count);
 		if (buffer->vars == nullptr) { skr_log(skr_log_critical, "Out of memory"); return false; }
-		memset(buffer->vars, 0, sizeof(skr_shader_meta_var_t) * buffer->var_count);
+		memset(buffer->vars, 0, sizeof(skr_shader_var_t) * buffer->var_count);
 		buffer->name_hash = skr_hash(buffer->name);
 
 		for (uint32_t t = 0; t < buffer->var_count; t++) {
-			skr_shader_meta_var_t *var = &buffer->vars[t];
+			skr_shader_var_t *var = &buffer->vars[t];
 			memcpy( var->name,       &bytes[at], sizeof(var->name ));      at += sizeof(var->name  );
 			memcpy( var->extra,      &bytes[at], sizeof(var->extra));      at += sizeof(var->extra );
 			memcpy(&var->offset,     &bytes[at], sizeof(var->offset));     at += sizeof(var->offset);
@@ -2879,7 +2882,7 @@ bool skr_shader_file_load_mem(void *data, size_t size, skr_shader_file_t *out_fi
 	}
 
 	for (uint32_t i = 0; i < out_file->meta->texture_count; i++) {
-		skr_shader_meta_texture_t *tex = &out_file->meta->textures[i];
+		skr_shader_texture_t *tex = &out_file->meta->textures[i];
 		memcpy( tex->name,  &bytes[at], sizeof(tex->name )); at += sizeof(tex->name );
 		memcpy( tex->extra, &bytes[at], sizeof(tex->extra)); at += sizeof(tex->extra);
 		memcpy(&tex->bind,  &bytes[at], sizeof(tex->bind )); at += sizeof(tex->bind );
@@ -2951,7 +2954,7 @@ void skr_shader_meta_release(skr_shader_meta_t *meta) {
 		}
 		free(meta->buffers);
 		free(meta->textures);
-		memset(meta, 0, sizeof(skr_shader_meta_t));
+		*meta = {};
 	}
 }
 
@@ -2977,9 +2980,9 @@ skr_shader_t skr_shader_create_file(const char *sks_filename) {
 
 ///////////////////////////////////////////
 
-skr_shader_t skr_shader_create_mem(void *sks_data, size_t sks_data_size) {
+skr_shader_t skr_shader_create_memory(const void *sks_data, size_t sks_data_size) {
 	skr_shader_file_t file;
-	if (!skr_shader_file_load_mem(sks_data, sks_data_size, &file))
+	if (!skr_shader_file_load_memory(sks_data, sks_data_size, &file))
 		return {};
 
 	skr_shader_stage_t vs     = skr_shader_file_create_stage(&file, skr_stage_vertex);
@@ -3032,7 +3035,7 @@ int32_t skr_shader_get_var_index(const skr_shader_t *shader, const char *name) {
 int32_t skr_shader_get_var_index_h(const skr_shader_t *shader, uint64_t name_hash) {
 	if (shader->meta->global_buffer_id == -1) return -1;
 
-	skr_shader_meta_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
+	skr_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	for (uint32_t i = 0; i < buffer->var_count; i++) {
 		if (buffer->vars[i].name_hash == name_hash) {
 			return i;
@@ -3043,10 +3046,10 @@ int32_t skr_shader_get_var_index_h(const skr_shader_t *shader, uint64_t name_has
 
 ///////////////////////////////////////////
 
-const skr_shader_meta_var_t *skr_shader_get_var_info(const skr_shader_t *shader, int32_t var_id) {
+const skr_shader_var_t *skr_shader_get_var_info(const skr_shader_t *shader, int32_t var_id) {
 	if (shader->meta->global_buffer_id == -1 || var_id == -1) return nullptr;
 
-	skr_shader_meta_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
+	skr_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	return &buffer->vars[var_id];
 }
 #endif // SKR_IMPL

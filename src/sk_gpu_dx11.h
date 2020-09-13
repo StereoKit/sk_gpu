@@ -28,9 +28,9 @@ typedef struct skr_shader_t {
 } skr_shader_t;
 
 typedef struct skr_pipeline_t {
-	skr_transparency_ transparency;
-	skr_cull_         cull;
-	bool              wireframe;
+	skr_transparency_      transparency;
+	skr_cull_              cull;
+	bool                   wireframe;
 	ID3D11VertexShader    *_vertex;
 	ID3D11PixelShader     *_pixel;
 	ID3D11BlendState      *_blend;
@@ -53,10 +53,10 @@ typedef struct skr_tex_t {
 } skr_tex_t;
 
 typedef struct skr_swapchain_t {
-	int32_t   width;
-	int32_t   height;
-	skr_tex_t _target;
-	skr_tex_t _depth;
+	int32_t          width;
+	int32_t          height;
+	skr_tex_t        _target;
+	skr_tex_t        _depth;
 	IDXGISwapChain1 *_swapchain;
 } skr_swapchain_t;
 

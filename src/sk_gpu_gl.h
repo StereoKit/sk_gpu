@@ -1,4 +1,7 @@
 #pragma once
+
+///////////////////////////////////////////
+
 typedef struct skr_buffer_t {
 	skr_use_         use;
 	skr_buffer_type_ type;
@@ -44,6 +47,12 @@ typedef struct skr_tex_t {
 	uint32_t      _target;
 } skr_tex_t;
 
+typedef struct skr_swapchain_t {
+	int32_t  width;
+	int32_t  height;
+	uint32_t _framebuffer;
+} skr_swapchain_t;
+
 typedef struct skr_platform_data_t {
 #if __ANDROID__
 	void *_egl_display;
@@ -54,9 +63,3 @@ typedef struct skr_platform_data_t {
 	void *_gl_hrc;
 #endif
 } skr_platform_data_t;
-
-typedef struct skr_swapchain_t {
-	int32_t   width;
-	int32_t   height;
-	uint32_t  _framebuffer;
-} skr_swapchain_t;

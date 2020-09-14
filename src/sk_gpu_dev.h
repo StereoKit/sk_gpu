@@ -6,6 +6,7 @@
 //#define SKR_OPENGL
 
 #include <stdint.h>
+#include <stddef.h>
 
 ///////////////////////////////////////////
 

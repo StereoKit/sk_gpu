@@ -6,6 +6,7 @@
 
 #include <malloc.h>
 #include <stdio.h>
+#include <string.h>
 
 ///////////////////////////////////////////
 
@@ -535,10 +536,12 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 		return result;
 
 	// Load OpenGL function pointers
+#ifndef __EMSCRIPTEN__
 	gl_load_extensions();
+#endif
 
 	skr_log(skr_log_info, "Using OpenGL");
-	skr_log(skr_log_info, glGetString(GL_VERSION));
+	skr_log(skr_log_info, (char*)glGetString(GL_VERSION));
 
 #if _DEBUG
 	skr_log(skr_log_info, "Debug info enabled.");
@@ -767,27 +770,27 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	}
 
 	// Convert the prefix if it doesn't match the GL version we're using
+#if _WIN32
 	const char   *prefix_gl      = "#version 450";
+#elif __ANDROID__
+	const char   *prefix_gl      = "#version 320 es";
+#elif __EMSCRIPTEN__
+	const char   *prefix_gl      = "#version 300 es";
+#endif
 	const size_t  prefix_gl_size = strlen(prefix_gl);
-	const char   *prefix_es      = "#version 320 es";
-	const size_t  prefix_es_size = strlen(prefix_es);
 	char         *final_data = (char*)file_chars;
 	bool          needs_free = false;
-#if __ANDROID__
-	if (shader_size >= prefix_gl_size && memcmp(prefix_gl, file_chars, prefix_gl_size) == 0) {
-		final_data = (char*)malloc(sizeof(char) * ((shader_size-prefix_gl_size)+prefix_es_size));
-		memcpy(final_data, prefix_es, prefix_es_size);
-		memcpy(&final_data[prefix_es_size], &file_chars[prefix_gl_size], shader_size - prefix_gl_size);
-		needs_free = true;
-	}
-#else
-	if (shader_size >= prefix_es_size && memcmp(prefix_es, file_chars, prefix_es_size) == 0) {
-		final_data = (char*)malloc(sizeof(char) * ((shader_size-prefix_es_size)+prefix_gl_size));
+
+	if (shader_size >= prefix_gl_size && memcmp(prefix_gl, file_chars, prefix_gl_size) != 0) {
+		const char *end = file_chars;
+		while (*end != '\n' && *end != '\r' && *end != '\0') end++;
+		size_t version_size = end - file_chars;
+
+		final_data = (char*)malloc(sizeof(char) * ((shader_size-version_size)+prefix_gl_size));
 		memcpy(final_data, prefix_gl, prefix_gl_size);
-		memcpy(&final_data[prefix_gl_size], &file_chars[prefix_es_size], shader_size - prefix_es_size);
+		memcpy(&final_data[prefix_gl_size], &file_chars[version_size], shader_size - version_size);
 		needs_free = true;
 	}
-#endif
 
 	// create and compile the vertex shader
 	result._shader = glCreateShader(gl_type);
@@ -917,7 +920,7 @@ void skr_pipeline_bind(const skr_pipeline_t *pipeline) {
 	} break;
 	}
 	
-#ifndef __ANDROID__
+#ifdef _WIN32
 	if (pipeline->wireframe) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	} else {
@@ -1028,7 +1031,11 @@ skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr
 
 		glBindFramebuffer(GL_FRAMEBUFFER, result._framebuffer);
 		if (array_count != 1) {
+#ifndef __EMSCRIPTEN__
 			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0);
+#else
+			skr_log(skr_log_critical, "sk_gpu doesn't support array textures with WebGL?");
+#endif
 		} else {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._target, result._texture, 0);
 		}
@@ -1075,7 +1082,11 @@ void skr_tex_attach_depth(skr_tex_t *tex, skr_tex_t *depth) {
 			: GL_DEPTH_ATTACHMENT;
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
 		if (tex->array_count != 1) {
+#ifndef __EMSCRIPTEN__
 			glFramebufferTexture(GL_FRAMEBUFFER, attach , depth->_texture, 0);
+#else
+			skr_log(skr_log_critical, "sk_gpu doesn't support array textures with WebGL?");
+#endif
 		} else {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, attach, tex->_target, depth->_texture, 0);
 		}
@@ -1148,7 +1159,11 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	if (tex->type == skr_tex_type_rendertarget) {
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
 		if (tex->array_count != 1) {
+#ifndef __EMSCRIPTEN__
 			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_texture, 0);
+#else
+			skr_log(skr_log_critical, "sk_gpu doesn't support array textures with WebGL?");
+#endif
 		} else {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_target, tex->_texture, 0);
 		}

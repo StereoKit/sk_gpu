@@ -60,7 +60,7 @@ int main() {
 bool main_init() {
 	skr_callback_log([](skr_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
 #ifdef __EMSCRIPTEN__
-	if (!skr_init(app_name, nullptr, nullptr, app_width, app_height)) return false;
+	if (!skr_init(app_name, nullptr, nullptr)) return false;
 #else
 	WNDCLASS wc = {}; 
 	wc.lpfnWndProc = [](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -87,8 +87,8 @@ bool main_init() {
 
 	if( !app_hwnd ) return false;
 	if (!skr_init(app_name, app_hwnd, nullptr)) return false;
-	app_swapchain = skr_swapchain_create(skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, app_width, app_height);
 #endif
+	app_swapchain = skr_swapchain_create(skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, app_width, app_height);
 
 	return app_init();
 }

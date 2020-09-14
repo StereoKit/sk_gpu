@@ -3,6 +3,9 @@
 #include "../src/sk_gpu_dev.h"
 #include "HandmadeMath.h"
 
+#include "shaders/test.hlsl.h"
+#include "shaders/cubemap.hlsl.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -161,7 +164,7 @@ bool app_init() {
 	}
 	skr_tex_set_contents(&app_cubemap, (void**)&cube_cols, 6, 2, 2);
 
-	app_sh_cube              = skr_shader_create_file("shaders/cubemap.hlsl.sks");
+	app_sh_cube              = skr_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
 	app_sh_cube_tex_bind     = skr_shader_get_tex_bind   (&app_sh_cube, "tex");
 	app_sh_cube_cubemap_bind = skr_shader_get_tex_bind   (&app_sh_cube, "cubemap");
 	app_sh_cube_inst_bind    = skr_shader_get_buffer_bind(&app_sh_cube, "TransformBuffer");
@@ -169,7 +172,7 @@ bool app_init() {
 	app_mat_cube             = skr_pipeline_create(&app_sh_cube);
 	skr_pipeline_set_cull(&app_mat_cube, skr_cull_front);
 	
-	app_sh_default           = skr_shader_create_file("shaders/test.hlsl.sks");
+	app_sh_default           = skr_shader_create_memory(sks_test_hlsl, sizeof(sks_test_hlsl));
 	app_sh_default_tex_bind  = skr_shader_get_tex_bind   (&app_sh_default, "tex");
 	app_sh_default_inst_bind = skr_shader_get_buffer_bind(&app_sh_default, "TransformBuffer");
 	app_sh_default_data_bind = skr_shader_get_buffer_bind(&app_sh_default, "SystemBuffer");

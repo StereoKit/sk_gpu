@@ -460,6 +460,7 @@ int32_t gl_init_win32(void *app_hwnd) {
 int32_t gl_init_emscripten() {
 	// Some reference code:
 	// https://github.com/emscripten-core/emscripten/blob/master/tests/glbook/Common/esUtil.c
+	// https://github.com/emscripten-core/emscripten/tree/master/tests/minimal_webgl
 #ifdef __EMSCRIPTEN__
 	EmscriptenWebGLContextAttributes attrs;
 	emscripten_webgl_init_context_attributes(&attrs);

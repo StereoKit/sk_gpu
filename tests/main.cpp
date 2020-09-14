@@ -7,6 +7,8 @@
 
 HWND app_hwnd;
 #else
+#include <emscripten.h>
+#include <emscripten/html5.h>
 #define _countof(a) (sizeof(a)/sizeof(*(a)))
 #endif
 
@@ -41,7 +43,8 @@ const char     *app_name      = "sk_gpu.h";
 
 bool main_init    ();
 void main_shutdown();
-bool main_step    ();
+void main_step    ();
+int  main_step_em (double t, void *);
 
 ///////////////////////////////////////////
 
@@ -49,9 +52,14 @@ int main() {
 	if (!main_init())
 		return -1;
 
-	while (app_run && main_step());
+#if __EMSCRIPTEN__
+	emscripten_request_animation_frame_loop(&main_step_em, 0);
+#else
+	while (app_run) main_step();
 
 	main_shutdown();
+#endif
+
 	return 1;
 }
 
@@ -102,7 +110,14 @@ void main_shutdown() {
 
 ///////////////////////////////////////////
 
-bool main_step() {
+int main_step_em(double t, void *) {
+	main_step();
+	return 1;
+}
+
+///////////////////////////////////////////
+
+void main_step() {
 #ifndef __EMSCRIPTEN__
 	MSG msg = {};
 	if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
@@ -128,7 +143,6 @@ bool main_step() {
 	app_render(view, proj);
 
 	skr_swapchain_present(&app_swapchain);
-	return true;
 }
 
 ///////////////////////////////////////////

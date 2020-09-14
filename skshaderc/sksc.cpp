@@ -61,14 +61,14 @@ template <typename T> struct array_t {
 void                     sksc_meta_find_defaults    (char *hlsl_text, skr_shader_meta_t *ref_meta);
 bool                     sksc_meta_check_dup_buffers(const skr_shader_meta_t *ref_meta);
 
-DWORD                    sksc_d3d11_build_flags   (const sksc_settings_t *settings);
-bool                     sksc_d3d11_compile_shader(char *filename, char *hlsl_text, sksc_settings_t *settings, skr_stage_ type, skr_shader_file_stage_t *out_stage);
+DWORD                    sksc_d3d11_build_flags     (const sksc_settings_t *settings);
+bool                     sksc_d3d11_compile_shader  (char *filename, char *hlsl_text, sksc_settings_t *settings, skr_stage_ type, skr_shader_file_stage_t *out_stage);
 
-array_t<const wchar_t *> sksc_dxc_build_flags   (sksc_settings_t settings, skr_stage_ type, skr_shader_lang_ lang);
-void                     sksc_dxc_shader_meta   (IDxcResult *compile_result, skr_stage_ stage, skr_shader_meta_t *out_meta);
-bool                     sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skr_stage_ type, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, skr_shader_meta_t *out_meta);
+array_t<const wchar_t *> sksc_dxc_build_flags       (sksc_settings_t settings, skr_stage_ type, skr_shader_lang_ lang);
+void                     sksc_dxc_shader_meta       (IDxcResult *compile_result, skr_stage_ stage, skr_shader_meta_t *out_meta);
+bool                     sksc_dxc_compile_shader    (DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skr_stage_ type, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, skr_shader_meta_t *out_meta);
 
-void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta);
+void                     sksc_spvc_compile_stage    (const skr_shader_file_stage_t *src_stage, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta);
 
 ///////////////////////////////////////////
 
@@ -112,8 +112,8 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 	}
 
 	*out_file = {};
-	 out_file->stage_count = 6;
-	 out_file->stages      = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * 6);
+	 out_file->stage_count = 8;
+	 out_file->stages      = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
 	 out_file->meta        = (skr_shader_meta_t      *)malloc(sizeof(skr_shader_meta_t));
 	*out_file->stages      = {};
 	*out_file->meta        = {};
@@ -137,8 +137,11 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 	free(d3d12_hlsl_ps.code);
 	free(d3d12_hlsl_vs.code);
 
-	sksc_spvc_compile_stage(&out_file->stages[2], &out_file->stages[4], out_file->meta);
-	sksc_spvc_compile_stage(&out_file->stages[3], &out_file->stages[5], out_file->meta);
+	sksc_spvc_compile_stage(&out_file->stages[2], skr_shader_lang_glsl, &out_file->stages[4], out_file->meta);
+	sksc_spvc_compile_stage(&out_file->stages[3], skr_shader_lang_glsl, &out_file->stages[5], out_file->meta);
+
+	sksc_spvc_compile_stage(&out_file->stages[2], skr_shader_lang_glsl_web, &out_file->stages[6], out_file->meta);
+	sksc_spvc_compile_stage(&out_file->stages[3], skr_shader_lang_glsl_web, &out_file->stages[7], out_file->meta);
 
 	sksc_meta_find_defaults(hlsl_text, out_file->meta);
 
@@ -763,7 +766,7 @@ array_t<const wchar_t *> sksc_dxc_build_flags(sksc_settings_t settings, skr_stag
 
 ///////////////////////////////////////////
 
-void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta) {
+void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta) {
 	spvc_context context = nullptr;
 	spvc_context_create            (&context);
 	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
@@ -808,8 +811,13 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	// Modify options.
 	spvc_compiler_options options = nullptr;
 	spvc_compiler_create_compiler_options(compiler_glsl, &options);
-	spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 320);
-	spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+	if (lang == skr_shader_lang_glsl_web) {
+		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 300);
+		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+	} else if (lang == skr_shader_lang_glsl) {
+		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 320);
+		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+	}
 	//spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
 	//spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
@@ -852,7 +860,7 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	spvc_compiler_compile(compiler_glsl, &result);
 
 	out_stage->stage     = src_stage->stage;
-	out_stage->language  = skr_shader_lang_glsl;
+	out_stage->language  = lang;
 	out_stage->code_size = (uint32_t)strlen(result) + 1;
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);

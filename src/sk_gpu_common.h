@@ -7,6 +7,7 @@ typedef enum skr_shader_lang_ {
 	skr_shader_lang_hlsl,
 	skr_shader_lang_spirv,
 	skr_shader_lang_glsl,
+	skr_shader_lang_glsl_web,
 } skr_shader_lang_;
 
 typedef struct skr_shader_file_stage_t {

@@ -383,6 +383,7 @@ typedef enum skr_shader_lang_ {
 	skr_shader_lang_hlsl,
 	skr_shader_lang_spirv,
 	skr_shader_lang_glsl,
+	skr_shader_lang_glsl_web,
 } skr_shader_lang_;
 
 typedef struct skr_shader_file_stage_t {
@@ -1516,9 +1517,8 @@ HGLRC gl_hrc;
 #define WGL_CONTEXT_MINOR_VERSION_ARB     0x2092
 #define WGL_CONTEXT_FLAGS_ARB             0x2094
 #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB  0x00000001
-#define GL_FRAMEBUFFER_SRGB               0x8DB9
-#define GL_VIEWPORT                       0x0BA2
 
+#define GL_BLEND 0x0BE2
 #define GL_ZERO 0
 #define GL_ONE  1
 #define GL_SRC_COLOR                0x0300
@@ -1534,6 +1534,9 @@ HGLRC gl_hrc;
 #define GL_CONSTANT_ALPHA           0x8003
 #define GL_ONE_MINUS_CONSTANT_ALPHA 0x8004
 
+#define GL_INVALID_INDEX 0xFFFFFFFFu
+#define GL_FRAMEBUFFER_SRGB 0x8DB9
+#define GL_VIEWPORT         0x0BA2
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_COLOR_BUFFER_BIT 0x00004000
 #define GL_ARRAY_BUFFER 0x8892
@@ -1542,8 +1545,6 @@ HGLRC gl_hrc;
 #define GL_STATIC_DRAW 0x88E4
 #define GL_DYNAMIC_DRAW 0x88E8
 #define GL_TRIANGLES 0x0004
-#define GL_DEBUG_OUTPUT 0x92E0
-#define GL_DEBUG_OUTPUT_SYNCHRONOUS 0x8242
 #define GL_VERSION 0x1F02
 #define GL_CULL_FACE 0x0B44
 #define GL_BACK 0x0405
@@ -1592,13 +1593,10 @@ HGLRC gl_hrc;
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
 
-#define GL_BLEND 0x0BE2
-
 #define GL_RED 0x1903
 #define GL_RGBA 0x1908
 #define GL_DEPTH_COMPONENT 0x1902
 #define GL_DEPTH_STENCIL 0x84F9
-
 #define GL_R8_SNORM 0x8F94
 #define GL_RG8_SNORM 0x8F95
 #define GL_RGB8_SNORM 0x8F96
@@ -1648,7 +1646,6 @@ HGLRC gl_hrc;
 #define GL_DEPTH_COMPONENT16 0x81A5
 #define GL_DEPTH_COMPONENT32F 0x8CAC
 #define GL_DEPTH24_STENCIL8 0x88F0
-
 #define GL_BYTE 0x1400
 #define GL_UNSIGNED_BYTE 0x1401
 #define GL_SHORT 0x1402
@@ -1664,12 +1661,12 @@ HGLRC gl_hrc;
 #define GL_LINK_STATUS 0x8B82
 #define GL_INFO_LOG_LENGTH 0x8B84
 
+#define GL_DEBUG_OUTPUT                0x92E0
+#define GL_DEBUG_OUTPUT_SYNCHRONOUS    0x8242
 #define GL_DEBUG_SEVERITY_NOTIFICATION 0x826B
-#define GL_DEBUG_SEVERITY_HIGH 0x9146
-#define GL_DEBUG_SEVERITY_MEDIUM 0x9147
-#define GL_DEBUG_SEVERITY_LOW 0x9148
-
-//#endif
+#define GL_DEBUG_SEVERITY_HIGH         0x9146
+#define GL_DEBUG_SEVERITY_MEDIUM       0x9147
+#define GL_DEBUG_SEVERITY_LOW          0x9148
 
 #if defined(_WIN32) || defined(__ANDROID__)
 
@@ -1714,6 +1711,7 @@ typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, 
     GLE(void,     glAttachShader,            uint32_t program, uint32_t shader) \
     GLE(void,     glDetachShader,            uint32_t program, uint32_t shader) \
     GLE(void,     glUseProgram,              uint32_t program) \
+    GLE(uint32_t, glGetUniformBlockIndex,    uint32_t program, const char *uniformBlockName) \
     GLE(void,     glDeleteProgram,           uint32_t program) \
     GLE(void,     glGenVertexArrays,         int32_t n, uint32_t *arrays) \
     GLE(void,     glBindVertexArray,         uint32_t array) \
@@ -1920,15 +1918,22 @@ int32_t gl_init_win32(void *app_hwnd) {
 ///////////////////////////////////////////
 
 int32_t gl_init_emscripten() {
+	// Some reference code:
+	// https://github.com/emscripten-core/emscripten/blob/master/tests/glbook/Common/esUtil.c
 #ifdef __EMSCRIPTEN__
 	EmscriptenWebGLContextAttributes attrs;
 	emscripten_webgl_init_context_attributes(&attrs);
-	attrs.alpha = true;
-	attrs.depth = true;
+	attrs.alpha                     = false;
+	attrs.depth                     = true;
 	attrs.enableExtensionsByDefault = true;
-	attrs.majorVersion = 2;
+	attrs.majorVersion              = 2;
 	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context("canvas", &attrs);
 	emscripten_webgl_make_context_current(ctx);
+
+	int32_t viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	gl_width  = viewport[2];
+	gl_height = viewport[3];
 #endif // __EMSCRIPTEN__
 	return 1;
 }
@@ -2002,7 +2007,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	skr_log(skr_log_info, "Using OpenGL");
 	skr_log(skr_log_info, (char*)glGetString(GL_VERSION));
 
-#if _DEBUG
+#if _DEBUG && !defined(__EMSCRIPTEN__)
 	skr_log(skr_log_info, "Debug info enabled.");
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
@@ -2063,10 +2068,14 @@ void skr_tex_target_bind(skr_tex_t *render_target, bool clear, const float *clea
 	glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	if (render_target) {
 		glViewport(0, 0, render_target->width, render_target->height);
+#ifndef __EMSCRIPTEN__
 		glDisable(GL_FRAMEBUFFER_SRGB); 
+#endif
 	} else {
 		glViewport(0, 0, gl_width, gl_height);
+#ifndef __EMSCRIPTEN__
 		glEnable(GL_FRAMEBUFFER_SRGB); 
+#endif
 	}
 
 	if (clear) {
@@ -2315,6 +2324,27 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 
 		glDeleteProgram(result._program);
 		result._program = 0;
+	} else {
+#if __EMSCRIPTEN__
+		for (size_t i = 0; i < meta->buffer_count; i++) {
+			char t_name[64];
+			sprintf(t_name, "type_%s", meta->buffers[i].name);
+			uint32_t slot = glGetUniformBlockIndex(result._program, t_name);
+			glUniformBlockBinding(result._program, slot, slot);
+
+			if (slot == GL_INVALID_INDEX) {
+				skr_log(skr_log_warning, "Couldn't find uinform block index for:");
+				skr_log(skr_log_warning, meta->buffers[i].name);
+			} else {
+				meta->buffers[i].bind.slot = (uint16_t)slot;
+			}
+		}
+		glUseProgram(result._program);
+		for (size_t i = 0; i < meta->texture_count; i++) {
+			uint32_t loc = glGetUniformLocation(result._program, meta->textures[i].name);
+			glUniform1i(loc , meta->textures[i].bind.slot);
+		}
+#endif
 	}
 
 	return result;
@@ -2517,6 +2547,8 @@ skr_tex_t skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, 
 		: GL_TEXTURE_2D;
 
 	glGenTextures(1, &result._texture);
+	if (result._texture == 0) 
+		skr_log(skr_log_critical, "Couldn't create a texture!");
 	skr_tex_settings(&result, type == skr_tex_type_cubemap ? skr_tex_address_clamp : skr_tex_address_repeat, skr_tex_sample_linear, 1);
 
 	if (type == skr_tex_type_rendertarget) {
@@ -2612,6 +2644,8 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	} else {
 		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
 	}
+	if (glGetError())
+		skr_log(skr_log_warning, "Error setting texture contents?");
 	if (tex->mips == skr_mip_generate)
 		glGenerateMipmap(tex->_target);
 
@@ -2929,7 +2963,11 @@ skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, s
 #if defined(SKR_DIRECT3D11) || defined(SKR_DIRECT3D12)
 	language = skr_shader_lang_hlsl;
 #elif defined(SKR_OPENGL)
-	language = skr_shader_lang_glsl;
+	#ifdef __EMSCRIPTEN__
+		language = skr_shader_lang_glsl_web;
+	#else
+		language = skr_shader_lang_glsl;
+	#endif
 #elif defined(SKR_VULKAN)
 	language = skr_shader_lang_spirv;
 #endif

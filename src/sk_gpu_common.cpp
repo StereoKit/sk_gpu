@@ -190,7 +190,11 @@ skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, s
 #if defined(SKR_DIRECT3D11) || defined(SKR_DIRECT3D12)
 	language = skr_shader_lang_hlsl;
 #elif defined(SKR_OPENGL)
-	language = skr_shader_lang_glsl;
+	#ifdef __EMSCRIPTEN__
+		language = skr_shader_lang_glsl_web;
+	#else
+		language = skr_shader_lang_glsl;
+	#endif
 #elif defined(SKR_VULKAN)
 	language = skr_shader_lang_spirv;
 #endif

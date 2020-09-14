@@ -1,3 +1,4 @@
+//--name = Cubemap
 //--tex = white 
 
 cbuffer SystemBuffer : register(b0) {

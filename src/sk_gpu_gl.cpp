@@ -470,11 +470,6 @@ int32_t gl_init_emscripten() {
 	attrs.majorVersion              = 2;
 	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context("canvas", &attrs);
 	emscripten_webgl_make_context_current(ctx);
-
-	int32_t viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	gl_width  = viewport[2];
-	gl_height = viewport[3];
 #endif // __EMSCRIPTEN__
 	return 1;
 }
@@ -562,6 +557,11 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 		}
 	}, nullptr);
 #endif // _DEBUG
+
+	int32_t viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	gl_width  = viewport[2];
+	gl_height = viewport[3];
 	
 	// Some default behavior
 	glEnable   (GL_DEPTH_TEST);  

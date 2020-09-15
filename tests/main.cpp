@@ -138,7 +138,7 @@ void main_step() {
 		HMM_Vec3(sinf(frame / 100.0f) * 5, 3, cosf(frame / 100.0f) * 5),
 		HMM_Vec3(0, 0, 0),
 		HMM_Vec3(0, 1, 0));
-	hmm_mat4 proj = HMM_Perspective(90, app_width / (float)app_height, 0.01f, 1000);
+	hmm_mat4 proj = HMM_Perspective(90, app_swapchain.width / (float)app_swapchain.height, 0.01f, 1000);
 
 	app_render(view, proj);
 

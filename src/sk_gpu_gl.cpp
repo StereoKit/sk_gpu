@@ -1007,6 +1007,64 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	result.width  = viewport[2];
 	result.height = viewport[3];
 
+#if defined(__EMSCRIPTEN__) && defined(SKR_MANUAL_SRGB)
+	const char *vs = R"_(#version 300 es
+layout(location = 0) in vec4 in_var_SV_POSITION;
+layout(location = 1) in vec3 in_var_NORMAL;
+layout(location = 2) in vec2 in_var_TEXCOORD0;
+layout(location = 3) in vec4 in_var_COLOR;
+
+out vec2 fs_var_TEXCOORD0;
+
+void main() {
+    gl_Position = in_var_SV_POSITION;
+    fs_var_TEXCOORD0 = in_var_TEXCOORD0;
+})_";
+	const char *ps = R"_(#version 300 es
+precision mediump float;
+precision highp int;
+
+uniform highp sampler2D tex;
+
+in highp vec2 fs_var_TEXCOORD0;
+layout(location = 0) out highp vec4 out_var_SV_TARGET;
+
+void main() {
+	vec4 color = texture(tex, fs_var_TEXCOORD0);
+    out_var_SV_TARGET = vec4(pow(color.xyz, vec3(1.0 / 2.2)), color.w);
+})_";
+
+	skr_shader_meta_t *meta = (skr_shader_meta_t *)malloc(sizeof(skr_shader_meta_t));
+	*meta = {};
+	meta->texture_count = 1;
+	meta->textures = (skr_shader_texture_t*)malloc(sizeof(skr_shader_texture_t));
+	meta->textures[0].bind = { 0, skr_stage_pixel };
+	strcpy(meta->textures[0].name, "tex");
+	meta->textures[0].name_hash = skr_hash(meta->textures[0].name);
+
+	skr_shader_stage_t v_stage = skr_shader_stage_create(vs, strlen(vs), skr_stage_vertex);
+	skr_shader_stage_t p_stage = skr_shader_stage_create(ps, strlen(ps), skr_stage_pixel);
+	result._convert_shader = skr_shader_create_manual(meta, v_stage, p_stage);
+	result._convert_pipe   = skr_pipeline_create(&result._convert_shader);
+
+	result._surface = skr_tex_create(skr_tex_type_rendertarget, skr_use_dynamic, format, skr_mip_none);
+	skr_tex_set_contents(&result._surface, nullptr, 1, gl_width, gl_height);
+
+	result._surface_depth = skr_tex_create(skr_tex_type_depth, skr_use_dynamic, depth_format, skr_mip_none);
+	skr_tex_set_contents(&result._surface_depth, nullptr, 1, gl_width, gl_height);
+	skr_tex_attach_depth(&result._surface, &result._surface_depth);
+
+	skr_vert_t quad_verts[] = { 
+		{ {-1, 1,0}, {0,0,1}, {0,1}, {255,255,255,255} },
+		{ { 1, 1,0}, {0,0,1}, {1,1}, {255,255,255,255} },
+		{ { 1,-1,0}, {0,0,1}, {1,0}, {255,255,255,255} },
+		{ {-1,-1,0}, {0,0,1}, {0,0}, {255,255,255,255} } };
+	uint32_t quad_inds[] = { 2,1,0, 3,2,0 };
+	result._quad_vbuff = skr_buffer_create(quad_verts, sizeof(quad_verts), skr_buffer_type_vertex, skr_use_static);
+	result._quad_ibuff = skr_buffer_create(quad_inds,  sizeof(quad_inds ), skr_buffer_type_index,  skr_use_static);
+	result._quad_mesh  = skr_mesh_create(&result._quad_vbuff, &result._quad_ibuff);
+#endif
+	
 	return result;
 }
 
@@ -1024,13 +1082,24 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 	SwapBuffers(gl_hdc);
 #elif __ANDROID__
 	eglSwapBuffers(egl_display, egl_surface);
+#elif defined(__EMSCRIPTEN__) && defined(SKR_MANUAL_SRGB)
+	float clear[4] = { 0,0,0,1 };
+	skr_tex_target_bind(nullptr, true, clear);
+	skr_tex_bind      (&swapchain->_surface, {0, skr_stage_pixel});
+	skr_mesh_bind     (&swapchain->_quad_mesh);
+	skr_pipeline_bind (&swapchain->_convert_pipe);
+	skr_draw          (0, 6, 1);
 #endif
 }
 
 /////////////////////////////////////////// 
 
 skr_tex_t *skr_swapchain_get_next(skr_swapchain_t *swapchain) {
+#if defined(__EMSCRIPTEN__) && defined(SKR_MANUAL_SRGB)
+	return &swapchain->_surface;
+#else
 	return nullptr;
+#endif
 }
 
 /////////////////////////////////////////// 

@@ -1,5 +1,7 @@
 #pragma once
 
+#define SKR_MANUAL_SRGB
+
 ///////////////////////////////////////////
 
 typedef struct skr_buffer_t {
@@ -50,7 +52,16 @@ typedef struct skr_tex_t {
 typedef struct skr_swapchain_t {
 	int32_t  width;
 	int32_t  height;
-	uint32_t _framebuffer;
+
+#if defined(__EMSCRIPTEN__) && defined(SKR_MANUAL_SRGB)
+	skr_tex_t      _surface;
+	skr_tex_t      _surface_depth;
+	skr_shader_t   _convert_shader;
+	skr_pipeline_t _convert_pipe;
+	skr_buffer_t   _quad_vbuff;
+	skr_buffer_t   _quad_ibuff;
+	skr_mesh_t     _quad_mesh;
+#endif
 } skr_swapchain_t;
 
 typedef struct skr_platform_data_t {

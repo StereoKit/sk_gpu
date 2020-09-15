@@ -1047,7 +1047,7 @@ void main() {
 	result._convert_shader = skr_shader_create_manual(meta, v_stage, p_stage);
 	result._convert_pipe   = skr_pipeline_create(&result._convert_shader);
 
-	result._surface = skr_tex_create(skr_tex_type_rendertarget, skr_use_dynamic, format, skr_mip_none);
+	result._surface = skr_tex_create(skr_tex_type_rendertarget, skr_use_dynamic, skr_tex_fmt_rgba32, skr_mip_none);
 	skr_tex_set_contents(&result._surface, nullptr, 1, gl_width, gl_height);
 
 	result._surface_depth = skr_tex_create(skr_tex_type_depth, skr_use_dynamic, depth_format, skr_mip_none);

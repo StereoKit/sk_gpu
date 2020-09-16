@@ -1,5 +1,5 @@
-#ifdef SKR_OPENGL
 #include "sk_gpu_dev.h"
+#ifdef SKR_OPENGL
 ///////////////////////////////////////////
 // OpenGL Implementation                 //
 ///////////////////////////////////////////
@@ -25,8 +25,9 @@ EGLConfig  egl_config;
 #elif _WIN32
 #pragma comment(lib, "opengl32.lib")
 
-#define EMSCRIPTEN_KEEPALIVE
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 
 HWND  gl_hwnd;
@@ -1071,6 +1072,8 @@ void main() {
 /////////////////////////////////////////// 
 
 void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t height) {
+	swapchain->width  = width;
+	swapchain->height = height;
 	gl_width  = width;
 	gl_height = height;
 }

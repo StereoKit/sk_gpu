@@ -2,8 +2,8 @@
 // https://www.braynzarsoft.net/viewtutorial/q16390-04-direct3d-12-drawing
 // https://www.3dgep.com/learning-directx-12-1/#Direct3D
 
-#ifdef SKR_DIRECT3D12
 #include "sk_gpu_dev.h"
+#ifdef SKR_DIRECT3D12
 ///////////////////////////////////////////
 // Direct3D12 Implementation             //
 ///////////////////////////////////////////

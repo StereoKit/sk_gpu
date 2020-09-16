@@ -1,9 +1,20 @@
 #pragma once
 
-//#define SKR_VULKAN
-//#define SKR_DIRECT3D12
-//#define SKR_DIRECT3D11
-//#define SKR_OPENGL
+// You can force sk_gpu to use a specific API, but if you don't, it'll pick
+// an API appropriate for the platform it's being compiled for!
+//
+//#define SKR_FORCE_DIRECT3D11
+//#define SKR_FORCE_OPENGL
+
+#if   defined( SKR_FORCE_DIRECT3D11 )
+#define SKR_DIRECT3D11
+#elif defined( SKR_FORCE_OPENGL )
+#define SKR_OPENGL
+#elif defined( _WIN32 )
+#define SKR_DIRECT3D11
+#else
+#define SKR_OPENGL
+#endif
 
 #include <stdint.h>
 #include <stddef.h>

@@ -1,9 +1,20 @@
 #pragma once
 
-//#define SKR_VULKAN
-//#define SKR_DIRECT3D12
-//#define SKR_DIRECT3D11
-//#define SKR_OPENGL
+// You can force sk_gpu to use a specific API, but if you don't, it'll pick
+// an API appropriate for the platform it's being compiled for!
+//
+//#define SKR_FORCE_DIRECT3D11
+//#define SKR_FORCE_OPENGL
+
+#if   defined( SKR_FORCE_DIRECT3D11 )
+#define SKR_DIRECT3D11
+#elif defined( SKR_FORCE_OPENGL )
+#define SKR_OPENGL
+#elif defined( _WIN32 )
+#define SKR_DIRECT3D11
+#else
+#define SKR_OPENGL
+#endif
 
 #include <stdint.h>
 #include <stddef.h>
@@ -240,7 +251,6 @@ typedef struct skr_platform_data_t {
 
 #elif defined(SKR_OPENGL)
 
-
 #define SKR_MANUAL_SRGB
 
 ///////////////////////////////////////////
@@ -429,8 +439,8 @@ void               skr_shader_meta_release     (skr_shader_meta_t *meta);
 ///////////////////////////////////////////
 
 #ifdef SKR_IMPL
-#ifdef SKR_DIRECT3D11
 
+#ifdef SKR_DIRECT3D11
 ///////////////////////////////////////////
 // Direct3D11 Implementation             //
 ///////////////////////////////////////////
@@ -1469,8 +1479,8 @@ const char *skr_semantic_to_d3d(skr_el_semantic_ semantic) {
 }
 
 #endif
-#ifdef SKR_OPENGL
 
+#ifdef SKR_OPENGL
 ///////////////////////////////////////////
 // OpenGL Implementation                 //
 ///////////////////////////////////////////
@@ -1496,8 +1506,9 @@ EGLConfig  egl_config;
 #elif _WIN32
 #pragma comment(lib, "opengl32.lib")
 
-#define EMSCRIPTEN_KEEPALIVE
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 
 HWND  gl_hwnd;
@@ -2542,6 +2553,8 @@ void main() {
 /////////////////////////////////////////// 
 
 void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t height) {
+	swapchain->width  = width;
+	swapchain->height = height;
 	gl_width  = width;
 	gl_height = height;
 }

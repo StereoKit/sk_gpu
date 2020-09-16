@@ -1,3 +1,17 @@
+/*Licensed under MIT or Public Domain. See bottom of file for details.
+	Author - Nick Klingensmith - @koujaku - https://twitter.com/koujaku
+	Repository - https://github.com/maluoi/sk_gpu
+
+sk_gpu.h
+
+	Docs are not yet here as the project is still somewhat in flight, but check
+	out some of the example projects in the repository for reference! They're 
+	pretty clean as is :)
+
+	Note: this is currently an amalgamated file, so it's best to modify the 
+	individual files in the repository if making modifications.
+*/
+
 #pragma once
 
 // You can force sk_gpu to use a specific API, but if you don't, it'll pick

@@ -202,7 +202,7 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 	hmm_mat4 proj_mat;
 	openxr_projection(view->fov, 0.01f, 100.0f, &proj_mat.Elements[0][0]);
 
-	app_render(view_mat, proj_mat);
+	app_render(0, view_mat, proj_mat);
 }
 
 ///////////////////////////////////////////

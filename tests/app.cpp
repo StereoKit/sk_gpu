@@ -185,16 +185,14 @@ bool app_init() {
 
 ///////////////////////////////////////////
 
-void app_test_dyn_update() {
-	static int frame = 0;
-	frame++;
+void app_test_dyn_update(double time) {
 
 	for (int32_t y = 0; y < app_wave_size; y++) {
 		for (int32_t x = 0; x < app_wave_size; x++) {
 			int32_t i  = x + y * app_wave_size;
 			float   xp = x/(float)(app_wave_size-1);
 			float   yp = y/(float)(app_wave_size-1);
-			float   t  = ((xp + yp)*8 + (frame*0.05f)) * 0.7f;
+			float   t  = ((xp + yp)*8 + (time*0.005f)) * 0.7f;
 			app_wave_verts[i].pos[0] = x/(float)app_wave_size-0.5f;
 			app_wave_verts[i].pos[1] = sinf(t)*0.1f;
 			app_wave_verts[i].pos[2] = y/(float)app_wave_size-0.5f;
@@ -261,7 +259,7 @@ void app_test_cubemap() {
 
 ///////////////////////////////////////////
 
-void app_test_rendertarget() {
+void app_test_rendertarget(double t) {
 	skr_tex_t *old_target = skr_tex_target_get();
 
 	float color[4] = { 1,1,1,1 };
@@ -277,10 +275,7 @@ void app_test_rendertarget() {
 	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
 	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0, 0);
 
-	static int frame = 0;
-	frame++;
-
-	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) *HMM_Rotate(frame * 0.8f, hmm_vec3{ {0,1,0} }));
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) *HMM_Rotate(t * 0.05f, hmm_vec3{ {0,1,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst_t));
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
@@ -327,16 +322,16 @@ void app_test_instancing() {
 
 ///////////////////////////////////////////
 
-void app_render(hmm_mat4 view, hmm_mat4 proj) {
+void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
 	
-	app_test_rendertarget();
+	app_test_rendertarget(t);
 
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
 	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
 
-	app_test_dyn_update();
+	app_test_dyn_update(t);
 	app_test_colors();
 	app_test_instancing();
 	app_test_cubemap();

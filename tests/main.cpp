@@ -43,8 +43,7 @@ const char     *app_name      = "sk_gpu.h";
 
 bool main_init    ();
 void main_shutdown();
-void main_step    ();
-int  main_step_em (double t, void *);
+int  main_step    (double t, void *);
 
 ///////////////////////////////////////////
 
@@ -53,9 +52,10 @@ int main() {
 		return -1;
 
 #if __EMSCRIPTEN__
-	emscripten_request_animation_frame_loop(&main_step_em, 0);
+	emscripten_request_animation_frame_loop(&main_step, 0);
 #else
-	while (app_run) main_step();
+	double t = 0;
+	while (app_run) { main_step(t, nullptr); t += 16; }
 
 	main_shutdown();
 #endif
@@ -110,14 +110,7 @@ void main_shutdown() {
 
 ///////////////////////////////////////////
 
-int main_step_em(double t, void *) {
-	main_step();
-	return 1;
-}
-
-///////////////////////////////////////////
-
-void main_step() {
+int main_step(double t, void *) {
 #ifndef __EMSCRIPTEN__
 	MSG msg = {};
 	if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
@@ -131,18 +124,16 @@ void main_step() {
 	skr_tex_t *target = skr_swapchain_get_next(&app_swapchain);
 	skr_tex_target_bind(target, true, clear_color);
 
-	static int32_t frame = 0;
-	frame++;
-
 	hmm_mat4 view = HMM_LookAt(
-		HMM_Vec3(sinf(frame / 100.0f) * 5, 3, cosf(frame / 100.0f) * 5),
+		HMM_Vec3(sinf(t*0.001) * 5, 3, cosf(t*0.001) * 5),
 		HMM_Vec3(0, 0, 0),
 		HMM_Vec3(0, 1, 0));
 	hmm_mat4 proj = HMM_Perspective(90, app_swapchain.width / (float)app_swapchain.height, 0.01f, 1000);
 
-	app_render(view, proj);
+	app_render(t, view, proj);
 
 	skr_swapchain_present(&app_swapchain);
+	return 1;
 }
 
 ///////////////////////////////////////////

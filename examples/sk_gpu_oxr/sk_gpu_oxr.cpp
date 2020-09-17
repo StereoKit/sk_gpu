@@ -1,11 +1,6 @@
-/*
 // When using single file header like normal, do this
-//#define SKR_OPENGL
-//#define SKR_IMPL
-//#include "sk_gpu.h"
-
-// For easier development
-#include "../src/sk_gpu_dev.h"
+#define SKR_IMPL
+#include "../../sk_gpu.h"
 
 // Also see here for OpenXR GL reference:
 // https://github.com/jherico/OpenXR-Samples/blob/master/src/examples/sdl2_gl_single_file_example.cpp
@@ -16,15 +11,15 @@
 #include <windows.h>
 
 #define XR_APP_IMPL
-#include "xr_app.h"
-#include "app.h"
+#include "../common/xr_app.h"
+#include "../common/app.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #define HANDMADE_MATH_IMPLEMENTATION
-#include "HandmadeMath.h"
+#include "../common/HandmadeMath.h"
 
 ///////////////////////////////////////////
 
@@ -43,7 +38,7 @@ struct app_swapchain_t {
 
 app_swapchain_t app_swapchain = {};
 const char     *app_name      = "sk_gpu.h";
-xr_settings_t  xr_functions  = {};
+xr_settings_t   xr_functions  = {};
 
 ///////////////////////////////////////////
 
@@ -112,13 +107,13 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 #ifdef SKR_DIRECT3D11
 	luid = (void *)&requirements->adapterLuid;
 #endif
-	skr_callback_log([](const char *text) { printf("%s\n", text); });
+	skr_callback_log([](skr_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
 	if (!skr_init(app_name, nullptr, luid))
 		return false;
 
 	skr_platform_data_t platform = skr_get_platform_data();
 #if defined(SKR_OPENGL) && defined(_WIN32)
-	out_graphics->hDC   = (HDC  )platform._gl_hdc;
+	out_graphics->hDC   = (HDC  )platform_gl_hdc;
 	out_graphics->hGLRC = (HGLRC)platform._gl_hrc;
 #elif defined(SKR_OPENGL) && defined(__ANDROID__)
 	out_graphics->egl_display = platform._egl_display;
@@ -140,9 +135,9 @@ bool main_init_swapchain(void *user_data, int32_t view_count, int32_t surface_co
 	skr_tex_fmt_ skr_format = skr_tex_fmt_from_native(fmt);
 
 	for (int32_t i = 0; i < view_count*surface_count; i++) {
-		app_swapchain.surfaces[i].render_tex = skr_tex_create_from_existing(textures[i], skr_tex_type_rendertarget, skr_format, width, height);
+		app_swapchain.surfaces[i].render_tex = skr_tex_create_from_existing(textures[i], skr_tex_type_rendertarget, skr_format, width, height, surface_count);
 		app_swapchain.surfaces[i].depth_tex  = skr_tex_create(skr_tex_type_depth, skr_use_static, skr_tex_fmt_depth32, skr_mip_none);
-		skr_tex_set_contents(&app_swapchain.surfaces[i].depth_tex, nullptr, 1, width, height);
+		skr_tex_set_contents (&app_swapchain.surfaces[i].depth_tex, nullptr, 1, width, height);
 		skr_tex_attach_depth(&app_swapchain.surfaces[i].render_tex, &app_swapchain.surfaces[i].depth_tex);
 	}
 	return true;
@@ -164,7 +159,7 @@ void main_destroy_swapchain(void *user_data) {
 void main_render(void *user_data, const XrCompositionLayerProjectionView *view, int32_t view_id, int32_t surf_id) {
 	float clear_color[4] = { 0,0,0,1 };
 	skr_tex_t *target = &app_swapchain.surfaces[view_id * app_swapchain.surf_count + surf_id].render_tex;
-	skr_tex_target_bind(clear_color, true, target);
+	skr_tex_target_bind(target, true, clear_color);
 
 	hmm_quaternion head_orientation;
 	memcpy(&head_orientation, &view->pose.orientation, sizeof(XrQuaternionf));
@@ -177,8 +172,7 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 	hmm_mat4 proj_mat;
 	openxr_projection(view->fov, 0.01f, 100.0f, &proj_mat.Elements[0][0]);
 
-	app_render(view_mat, proj_mat);
+	app_render(0, view_mat, proj_mat);
 }
 
 ///////////////////////////////////////////
-*/

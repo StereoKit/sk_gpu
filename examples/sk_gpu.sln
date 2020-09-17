@@ -3,13 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30002.166
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sk_gpu", "sk_gpu.vcxproj", "{61EA2187-5AEA-467E-8E7C-08952782CEDC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sk_gpu", "sk_gpu_flat\sk_gpu.vcxproj", "{61EA2187-5AEA-467E-8E7C-08952782CEDC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sk_gpu_andr", "sk_gpu_andr", "{3A2122E7-D098-4FB0-A6CE-ECD92F460951}"
 EndProject
 Project("{39E2626F-3545-4960-A6E8-258AD8476CE5}") = "sk_gpu_andr.Packaging", "sk_gpu_andr\sk_gpu_andr.Packaging\sk_gpu_andr.Packaging.androidproj", "{FDFFA7FA-ACE5-4113-830A-4D0FC802C22B}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sk_gpu_andr.NativeActivity", "sk_gpu_andr\sk_gpu_andr.NativeActivity\sk_gpu_andr.NativeActivity.vcxproj", "{A534FAA2-4331-4F93-88EF-1EE19DF73496}"
+	ProjectSection(ProjectDependencies) = postProject
+		{61EA2187-5AEA-467E-8E7C-08952782CEDC} = {61EA2187-5AEA-467E-8E7C-08952782CEDC}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sk_gpu_oxr", "sk_gpu_oxr\sk_gpu_oxr.vcxproj", "{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -75,6 +80,18 @@ Global
 		{A534FAA2-4331-4F93-88EF-1EE19DF73496}.Release|x64.Build.0 = Release|x64
 		{A534FAA2-4331-4F93-88EF-1EE19DF73496}.Release|x86.ActiveCfg = Release|x86
 		{A534FAA2-4331-4F93-88EF-1EE19DF73496}.Release|x86.Build.0 = Release|x86
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Debug|ARM.ActiveCfg = Debug|Win32
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Debug|x64.ActiveCfg = Debug|x64
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Debug|x64.Build.0 = Debug|x64
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Debug|x86.ActiveCfg = Debug|Win32
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Debug|x86.Build.0 = Debug|Win32
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Release|ARM.ActiveCfg = Release|Win32
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Release|ARM64.ActiveCfg = Release|Win32
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Release|x64.ActiveCfg = Release|x64
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Release|x64.Build.0 = Release|x64
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Release|x86.ActiveCfg = Release|Win32
+		{CDAF3B16-ED81-47CC-B634-7A843C7B1AA3}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

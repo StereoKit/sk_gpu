@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="..\common\app.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\sk_gpu_common.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\sk_gpu_dx11.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\sk_gpu_dx12.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\sk_gpu_gl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\sk_gpu_vk.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\common\app.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\HandmadeMath.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\d3dx12.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\sk_gpu_common.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\sk_gpu_dev.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\sk_gpu_dx11.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\sk_gpu_dx12.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\sk_gpu_gl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\sk_gpu_vk.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\test.hlsl.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cubemap.hlsl.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\xr_app.h">
+      <Filter>common</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{69f1b716-342a-48ef-a7fb-991f867b21f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common">
+      <UniqueIdentifier>{a86a3bf5-0008-4f6e-9c4d-795b09666d50}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\common\cubemap.hlsl">
+      <Filter>common</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\common\test.hlsl">
+      <Filter>common</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

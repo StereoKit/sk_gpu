@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="$(OpenXRLoaderBinaryRoot)\bin\openxr_loader.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="sk_gpu_oxr.cpp" />
+    <ClCompile Include="..\common\app.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="common">
+      <UniqueIdentifier>{5cad5d0e-bc00-44f0-b9b6-e2a800505891}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\common\app.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cubemap.hlsl.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\HandmadeMath.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\test.hlsl.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\xr_app.h">
+      <Filter>common</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

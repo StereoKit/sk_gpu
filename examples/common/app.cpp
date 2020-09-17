@@ -1,10 +1,10 @@
 #include "app.h"
 
-#include "../src/sk_gpu_dev.h"
+#include "../../src/sk_gpu_dev.h"
 #include "HandmadeMath.h"
 
-#include "shaders/test.hlsl.h"
-#include "shaders/cubemap.hlsl.h"
+#include "test.hlsl.h"
+#include "cubemap.hlsl.h"
 
 #include <stdlib.h>
 #include <string.h>

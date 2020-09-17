@@ -18,18 +18,18 @@ HWND app_hwnd;
 //#include "../sk_gpu.h"
 
 // For easier development
-#include "../src/sk_gpu_dev.h"
+#include "../../src/sk_gpu_dev.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "app.h"
+#include "../common/app.h"
 #ifndef __EMSCRIPTEN__
 #define HANDMADE_MATH_NO_SSE
 #endif
 #define HANDMADE_MATH_IMPLEMENTATION
-#include "HandmadeMath.h"
+#include "../common/HandmadeMath.h"
 
 ///////////////////////////////////////////
 

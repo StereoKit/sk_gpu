@@ -5,10 +5,10 @@
 #include <malloc.h>
 
 #define XR_APP_IMPL
-#include "../../xr_app.h"
-#include "../../app.h"
+#include "../../common/xr_app.h"
+#include "../../common/app.h"
 #define HANDMADE_MATH_IMPLEMENTATION
-#include "../../HandmadeMath.h"
+#include "../../common/HandmadeMath.h"
 
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "sk_gpu.h", __VA_ARGS__))
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "sk_gpu.h", __VA_ARGS__))
@@ -80,6 +80,7 @@ bool android_fopen(const char *filename, void **out_data, size_t *out_size) {
 void android_log_callback(skr_log_ level, const char *text) {
 	int priority = ANDROID_LOG_INFO;
 	switch (level) {
+	case skr_log_info:     priority = ANDROID_LOG_INFO;  break;
 	case skr_log_warning:  priority = ANDROID_LOG_WARN;  break;
 	case skr_log_critical: priority = ANDROID_LOG_ERROR; break;
 	}

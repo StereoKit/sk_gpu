@@ -870,7 +870,7 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 #if __EMSCRIPTEN__
 		for (size_t i = 0; i < meta->buffer_count; i++) {
 			char t_name[64];
-			sprintf(t_name, "type_%s", meta->buffers[i].name);
+			snprintf(t_name, 64, "type_%s", meta->buffers[i].name);
 			uint32_t slot = glGetUniformBlockIndex(result._program, t_name);
 			glUniformBlockBinding(result._program, slot, slot);
 

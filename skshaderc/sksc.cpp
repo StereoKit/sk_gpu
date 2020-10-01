@@ -822,8 +822,13 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	//spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
 	if (src_stage->stage == skr_stage_vertex) {
+
 		spvc_compiler_add_header_line(compiler_glsl, "#ifdef GL_AMD_vertex_shader_layer");
 		spvc_compiler_add_header_line(compiler_glsl, "#extension GL_AMD_vertex_shader_layer : enable");
+		spvc_compiler_add_header_line(compiler_glsl, "#elif defined(GL_NV_viewport_array2)");
+		spvc_compiler_add_header_line(compiler_glsl, "#extension GL_NV_viewport_array2 : enable");
+		spvc_compiler_add_header_line(compiler_glsl, "#else");
+		spvc_compiler_add_header_line(compiler_glsl, "#define gl_Layer int __gl_Layer");
 		spvc_compiler_add_header_line(compiler_glsl, "#endif");
 	}
 

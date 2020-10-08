@@ -860,7 +860,9 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 		log = (char*)malloc(length);
 		glGetProgramInfoLog(result._program, length, &err, log);
 
-		skr_log(skr_log_warning, "Unable to compile shader program:");
+		char text[128];
+		snprintf(text, sizeof(text), "Unable to link %s:", meta->name);
+		skr_log(skr_log_warning, text);
 		skr_log(skr_log_warning, log);
 		free(log);
 

@@ -1,4 +1,4 @@
-#define XR
+//#define XR
 
 #include "../../../src/sk_gpu_dev.h"
 
@@ -101,7 +101,7 @@ static int engine_init_display(struct engine* engine) {
 	engine->initialized = true;
 	engine->swapchain   = skr_swapchain_create(skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, 1280, 720);
 
-	return app_init() ? 0 : -1;
+	return app_init() ? 1 : 0;
 }
 
 static void engine_draw_frame(struct engine* engine) {
@@ -110,9 +110,8 @@ static void engine_draw_frame(struct engine* engine) {
 
 	skr_draw_begin();
 	float clear_color[4] = { 0,1,0,1 };
-	const skr_tex_t *target, *depth;
-	skr_swapchain_get_next(&engine->swapchain, &target, &depth);
-	skr_tex_target_bind(clear_color, target, depth);
+	skr_tex_t *target = skr_swapchain_get_next(&engine->swapchain);
+	skr_tex_target_bind(target, true, clear_color);
 
 	static int32_t frame = 0;
 	frame++;
@@ -121,9 +120,9 @@ static void engine_draw_frame(struct engine* engine) {
 		HMM_Vec3(sinf(frame / 30.0f) * 5, 3, cosf(frame / 30.0f) * 5),
 		HMM_Vec3(0, 0, 0),
 		HMM_Vec3(0, 1, 0));
-	hmm_mat4 proj = HMM_Perspective(90, 720 / (float)1280.0f, 0.01f, 1000);
+	hmm_mat4 proj = HMM_Perspective(90, engine->swapchain.width / (float)engine->swapchain.height, 0.01f, 1000);
 
-	app_render(view, proj);
+	app_render(frame * 0.016f, view, proj);
 
 	skr_swapchain_present(&engine->swapchain);
 }
@@ -261,7 +260,9 @@ static void engine_term_display(struct engine* engine) {
 
 	LOGI("Shutting down...");
 	app_shutdown();
+#if XR
 	openxr_shutdown();
+#endif
 	skr_shutdown();
 	LOGI("Done! Bye :)");
 	engine->initialized = false;
@@ -281,6 +282,7 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 		engine->app->savedStateSize = sizeof(struct saved_state);
 		break;
 	case APP_CMD_INIT_WINDOW:
+		LOGI("cmd: init");
 		// The window is being shown, get it ready.
 		if (engine->app->window != NULL) {
 			if (engine_init_display(engine))
@@ -289,9 +291,9 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 				app->destroyRequested = 1;
 		}
 		break;
-	case APP_CMD_TERM_WINDOW:  engine_term_display(engine); break;
-	case APP_CMD_GAINED_FOCUS: break;
-	case APP_CMD_LOST_FOCUS:   break;
+	case APP_CMD_TERM_WINDOW:  LOGI("cmd: term"); engine_term_display(engine); break;
+	case APP_CMD_GAINED_FOCUS: LOGI("cmd: focused"); break;
+	case APP_CMD_LOST_FOCUS:   LOGI("cmd: unfocused"); break;
 	}
 }
 
@@ -317,14 +319,9 @@ void android_main(struct android_app* state) {
 		// Read all pending events.
 		int events;
 		struct android_poll_source* source;
-
 		while (ALooper_pollAll(engine.animating ? 0 : -1, NULL, &events, (void**)&source) >= 0) {
-
-			if (source != NULL) source->process(state, source);
-			
-			if (state->destroyRequested != 0) {
-				run = false;
-			}
+			if (source                  != NULL) source->process(state, source);
+			if (state->destroyRequested != 0   ) run = false;
 		}
 
 		if (engine.animating) {

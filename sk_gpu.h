@@ -310,6 +310,7 @@ typedef struct skr_tex_t {
 	int32_t       width;
 	int32_t       height;
 	int32_t       array_count;
+	int32_t       array_start;
 	skr_use_      use;
 	skr_tex_type_ type;
 	skr_tex_fmt_  format;
@@ -2724,10 +2725,11 @@ skr_tex_t skr_tex_create_from_layer(void *native_tex, skr_tex_type_ type, skr_te
 	result.width       = width;
 	result.height      = height;
 	result.array_count = 1;
+	result.array_start = array_layer;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._target     = type == skr_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP
-		: GL_TEXTURE_2D;
+		: GL_TEXTURE_2D_ARRAY;
 
 	if (type == skr_tex_type_rendertarget) {
 		glGenFramebuffers(1, &result._framebuffer);
@@ -2775,12 +2777,16 @@ void skr_tex_attach_depth(skr_tex_t *tex, skr_tex_t *depth) {
 			? GL_DEPTH_STENCIL_ATTACHMENT 
 			: GL_DEPTH_ATTACHMENT;
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
-		if (tex->array_count != 1) {
+		if (tex->_target == GL_TEXTURE_2D_ARRAY) {
+			if (tex->array_count == 1) {
+				glFramebufferTextureLayer(GL_FRAMEBUFFER, attach, depth->_texture, 0, tex->array_start);
+			} else {
 #ifndef __EMSCRIPTEN__
-			glFramebufferTexture(GL_FRAMEBUFFER, attach , depth->_texture, 0);
+				glFramebufferTexture(GL_FRAMEBUFFER, attach, depth->_texture, 0);
 #else
-			skr_log(skr_log_critical, "sk_gpu doesn't support array textures with WebGL?");
+				skr_log(skr_log_critical, "sk_gpu doesn't support array textures with WebGL?");
 #endif
+			}
 		} else {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, attach, tex->_target, depth->_texture, 0);
 		}

@@ -39,6 +39,7 @@ typedef struct skr_tex_t {
 	int32_t       width;
 	int32_t       height;
 	int32_t       array_count;
+	int32_t       array_start;
 	skr_use_      use;
 	skr_tex_type_ type;
 	skr_tex_fmt_  format;

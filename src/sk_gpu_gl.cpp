@@ -201,6 +201,8 @@ HGLRC gl_hrc;
 #define GL_COMPILE_STATUS 0x8B81
 #define GL_LINK_STATUS 0x8B82
 #define GL_INFO_LOG_LENGTH 0x8B84
+#define GL_NUM_EXTENSIONS 0x821D
+#define GL_EXTENSIONS 0x1F03
 
 #define GL_DEBUG_OUTPUT                0x92E0
 #define GL_DEBUG_OUTPUT_SYNCHRONOUS    0x8242
@@ -293,7 +295,8 @@ GLE(void,     glViewport,                int32_t x, int32_t y, int32_t width, in
 GLE(void,     glCullFace,                uint32_t mode) \
 GLE(void,     glBlendFunc,               uint32_t sfactor, uint32_t dfactor) \
 GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
-GLE(const char *, glGetString,           uint32_t name)
+GLE(const char *, glGetString,           uint32_t name) \
+GLE(const char *, glGetStringi,          uint32_t name, uint32_t index)
 
 #define GLE(ret, name, ...) typedef ret GLDECL name##_proc(__VA_ARGS__); static name##_proc * name;
 GL_API
@@ -645,6 +648,26 @@ skr_platform_data_t skr_get_platform_data() {
 	result._egl_context = egl_context;
 #endif
 	return result;
+}
+
+///////////////////////////////////////////
+
+bool skr_capability(skr_cap_ capability) {
+	bool (*check_ext)(const char *name) = [](const char *name) {
+		int32_t ct;
+		glGetIntegerv(GL_NUM_EXTENSIONS, &ct);
+		for (int32_t i = 0; i < ct; i++) {
+			if (strcmp(name, glGetStringi(GL_EXTENSIONS, i)) == 0)
+				return true;
+		}
+		return false;
+	};
+
+	switch (capability) {
+	case skr_cap_tex_layer_select: return check_ext("GL_AMD_vertex_shader_layer");
+	case skr_cap_wireframe:        return glPolygonMode != nullptr;
+	default: return false;
+	}
 }
 
 ///////////////////////////////////////////
@@ -1146,6 +1169,32 @@ skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
 	
+	return result;
+}
+
+/////////////////////////////////////////// 
+
+skr_tex_t skr_tex_create_from_layer(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_layer) {
+	skr_tex_t result = {};
+	result.type        = type;
+	result.use         = skr_use_static;
+	result.mips        = skr_mip_none;
+	result.format      = format;
+	result.width       = width;
+	result.height      = height;
+	result.array_count = 1;
+	result._texture    = (uint32_t)(uint64_t)native_tex;
+	result._target     = type == skr_tex_type_cubemap 
+		? GL_TEXTURE_CUBE_MAP
+		: GL_TEXTURE_2D;
+
+	if (type == skr_tex_type_rendertarget) {
+		glGenFramebuffers(1, &result._framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, result._framebuffer);
+		glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0, array_layer);
+		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
+	}
+
 	return result;
 }
 

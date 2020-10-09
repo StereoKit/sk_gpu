@@ -141,6 +141,11 @@ typedef enum skr_log_ {
 	skr_log_critical,
 } skr_log_;
 
+typedef enum skr_cap_ {
+	skr_cap_tex_layer_select = 1,
+	skr_cap_wireframe,
+};
+
 typedef struct skr_vert_t {
 	float   pos [3];
 	float   norm[3];
@@ -209,6 +214,7 @@ void                skr_shutdown                 ();
 void                skr_callback_log             (void (*callback)(skr_log_ level, const char *text));
 void                skr_callback_file_read       (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
 skr_platform_data_t skr_get_platform_data        ();
+bool                skr_capability               (skr_cap_ capability);
 
 void                skr_draw_begin               ();
 void                skr_draw                     (int32_t index_start, int32_t index_count, int32_t instance_count);
@@ -257,6 +263,7 @@ skr_tex_t          *skr_swapchain_get_next       (      skr_swapchain_t *swapcha
 void                skr_swapchain_destroy        (      skr_swapchain_t *swapchain);
 
 skr_tex_t           skr_tex_create_from_existing (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
+skr_tex_t           skr_tex_create_from_layer    (void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height, int32_t array_layer);
 skr_tex_t           skr_tex_create               (skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps);
 bool                skr_tex_is_valid             (const skr_tex_t *tex);
 void                skr_tex_attach_depth         (      skr_tex_t *tex, skr_tex_t *depth);

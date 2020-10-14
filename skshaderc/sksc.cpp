@@ -145,13 +145,15 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 			source         ->Release();
 			return false;
 		}
-		stages.add({});
-		if (!sksc_spvc_compile_stage(&stages[spirv_stage], skr_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
-			include_handler->Release();
-			source         ->Release();
-			return false;
-		}
 
+		if (compile_stages[i] != skr_stage_compute) {
+			stages.add({});
+			if (!sksc_spvc_compile_stage(&stages[spirv_stage], skr_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
+				include_handler->Release();
+				source         ->Release();
+				return false;
+			}
+		}
 		free(d3d12_hlsl_stage.code);
 	}
 	

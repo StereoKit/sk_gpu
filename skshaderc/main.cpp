@@ -46,13 +46,13 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 	get_folder(argv[argc-1], result.folder, sizeof(result.folder));
 
 	for (int32_t i=1; i<argc; i++) {
-		if      (strcmp(argv[i], "-h") == 0) result.output_header = true;
-		else if (strcmp(argv[i], "-e") == 0) result.replace_ext   = true;
-		else if (strcmp(argv[i], "-r") == 0) result.row_major     = true;
+		if      (strcmp(argv[i], "-h" ) == 0) result.output_header = true;
+		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = true;
+		else if (strcmp(argv[i], "-r" ) == 0) result.row_major     = true;
 		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-m") == 0 && i<argc-1)  { strncpy(result.shader_model,  argv[i+1], sizeof(result.shader_model )); i++; }
+		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shader_model,  argv[i+1], sizeof(result.shader_model )); i++; }
 	}
 
 	if (result.shader_model[0] == 0)

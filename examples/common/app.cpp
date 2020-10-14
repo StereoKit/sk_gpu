@@ -28,19 +28,20 @@ struct app_shader_inst_t {
 
 ///////////////////////////////////////////
 
-app_shader_data_t app_shader_data = {};
-app_shader_inst_t app_shader_inst[100] = {};
-app_mesh_t        app_mesh_cube    = {};
-app_mesh_t        app_mesh_pyramid = {};
-app_mesh_t        app_mesh_tri     = {};
-app_mesh_t        app_mesh_wave    = {};
+app_shader_data_t app_shader_data        = {};
+app_shader_inst_t app_shader_inst[100]   = {};
+app_mesh_t        app_mesh_cube          = {};
+app_mesh_t        app_mesh_pyramid       = {};
+app_mesh_t        app_mesh_tri           = {};
+app_mesh_t        app_mesh_wave          = {};
+app_mesh_t        app_mesh_model         = {};
 skr_buffer_t      app_shader_data_buffer = {};
 skr_buffer_t      app_shader_inst_buffer = {};
-skr_tex_t         app_tex       = {};
-skr_tex_t         app_tex_white = {};
-skr_tex_t         app_target = {};
-skr_tex_t         app_target_depth = {};
-skr_tex_t         app_cubemap = {};
+skr_tex_t         app_tex                = {};
+skr_tex_t         app_tex_white          = {};
+skr_tex_t         app_target             = {};
+skr_tex_t         app_target_depth       = {};
+skr_tex_t         app_cubemap            = {};
 
 skr_shader_t      app_sh_default           = {};
 skr_bind_t        app_sh_default_tex_bind  = {};
@@ -54,6 +55,8 @@ skr_bind_t        app_sh_cube_cubemap_bind = {};
 skr_bind_t        app_sh_cube_inst_bind    = {};
 skr_bind_t        app_sh_cube_data_bind    = {};
 
+skr_buffer_t app_compute_buffer = {};
+
 const int32_t app_wave_size = 32;
 skr_vert_t    app_wave_verts[app_wave_size * app_wave_size];
 
@@ -65,6 +68,7 @@ void       app_mesh_destroy(app_mesh_t *mesh);
 ///////////////////////////////////////////
 
 bool app_init() {
+	app_compute_buffer = skr_buffer_create(app_wave_verts, app_wave_size * app_wave_size, sizeof(skr_vert_t), skr_buffer_type_compute, skr_use_dynamic);
 
 	// Make a cube
 	skr_vert_t verts[] = {
@@ -178,8 +182,8 @@ bool app_init() {
 	app_sh_default_data_bind = skr_shader_get_buffer_bind(&app_sh_default, "SystemBuffer");
 	app_mat_default          = skr_pipeline_create(&app_sh_default);
 	
-	app_shader_data_buffer = skr_buffer_create(&app_shader_data, sizeof(app_shader_data_t),       skr_buffer_type_constant, skr_use_dynamic);
-	app_shader_inst_buffer = skr_buffer_create(&app_shader_inst, sizeof(app_shader_inst_t) * 100, skr_buffer_type_constant, skr_use_dynamic);
+	app_shader_data_buffer = skr_buffer_create(&app_shader_data, 1,   sizeof(app_shader_data_t), skr_buffer_type_constant, skr_use_dynamic);
+	app_shader_inst_buffer = skr_buffer_create(&app_shader_inst, 100, sizeof(app_shader_inst_t), skr_buffer_type_constant, skr_use_dynamic);
 	return true;
 }
 
@@ -314,10 +318,10 @@ void app_test_instancing() {
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
 	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
 
-	skr_mesh_bind    (&app_mesh_pyramid.mesh);
+	skr_mesh_bind    (&app_mesh_model.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_target, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh_pyramid.ind_count, 100);
+	skr_draw         (0, app_mesh_model.ind_count, 100);
 }
 
 ///////////////////////////////////////////
@@ -359,8 +363,8 @@ void app_shutdown() {
 
 app_mesh_t app_mesh_create(const skr_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count) {
 	app_mesh_t result = {};
-	result.vert_buffer = skr_buffer_create(verts, vert_count * sizeof(skr_vert_t), skr_buffer_type_vertex, vert_dyn ? skr_use_dynamic : skr_use_static);
-	result.ind_buffer  = skr_buffer_create(inds,  ind_count  * sizeof(uint32_t),   skr_buffer_type_index,  skr_use_static);
+	result.vert_buffer = skr_buffer_create(verts, vert_count, sizeof(skr_vert_t), skr_buffer_type_vertex, vert_dyn ? skr_use_dynamic : skr_use_static);
+	result.ind_buffer  = skr_buffer_create(inds,  ind_count,  sizeof(uint32_t),   skr_buffer_type_index,  skr_use_static);
 	result.mesh        = skr_mesh_create(&result.vert_buffer, &result.ind_buffer);
 	result.ind_count   = ind_count;
 	return result;

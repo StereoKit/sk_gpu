@@ -126,9 +126,9 @@ int32_t skr_init(const char *app_name, void *hwnd, void *adapter_id) {
 void skr_shutdown() {
 	if (d3d_rasterstate) { d3d_rasterstate->Release(); d3d_rasterstate = nullptr; }
 	if (d3d_depthstate ) { d3d_depthstate ->Release(); d3d_depthstate  = nullptr; }
-	if (d3d_info       ) { d3d_info     ->Release(); d3d_info      = nullptr; }
-	if (d3d_context    ) { d3d_context  ->Release(); d3d_context   = nullptr; }
-	if (d3d_device     ) { d3d_device   ->Release(); d3d_device    = nullptr; }
+	if (d3d_info       ) { d3d_info       ->Release(); d3d_info        = nullptr; }
+	if (d3d_context    ) { d3d_context    ->Release(); d3d_context     = nullptr; }
+	if (d3d_device     ) { d3d_device     ->Release(); d3d_device      = nullptr; }
 }
 
 ///////////////////////////////////////////
@@ -202,26 +202,32 @@ void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) 
 
 ///////////////////////////////////////////
 
-skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
+skr_buffer_t skr_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
 	result.use  = use;
 	result.type = type;
 
 	D3D11_SUBRESOURCE_DATA buffer_data = { data };
 	D3D11_BUFFER_DESC      buffer_desc = {};
-	buffer_desc.ByteWidth = size_bytes;
-	switch (type) {
-	case skr_buffer_type_vertex:   buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;   break;
-	case skr_buffer_type_index:    buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;    break;
-	case skr_buffer_type_constant: buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; break;
-	default: throw "Not implemented yet!";
-	}
+	buffer_desc.ByteWidth           = size_count * size_stride;
+	buffer_desc.StructureByteStride = size_stride;
 	switch (use) {
 	case skr_use_static:  buffer_desc.Usage = D3D11_USAGE_DEFAULT; break;
 	case skr_use_dynamic: {
 		buffer_desc.Usage          = D3D11_USAGE_DYNAMIC;
 		buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	}break;
+	default: throw "Not implemented yet!";
+	}
+	switch (type) {
+	case skr_buffer_type_vertex:   buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;   break;
+	case skr_buffer_type_index:    buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;    break;
+	case skr_buffer_type_constant: buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; break;
+	case skr_buffer_type_compute:  {
+		buffer_desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE; 
+		buffer_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED; 
+		buffer_desc.Usage     = D3D11_USAGE_DEFAULT;
+	} break;
 	default: throw "Not implemented yet!";
 	}
 	d3d_device->CreateBuffer(&buffer_desc, data==nullptr ? nullptr : &buffer_data, &result._buffer);
@@ -337,7 +343,12 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 		buffer_size = shader_size;
 	} else {
 		ID3DBlob *errors;
-		if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, type == skr_stage_pixel ? "ps" : "vs", type == skr_stage_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
+		const char *entrypoint = "", *target = "";
+		switch (type) {
+			case skr_stage_vertex:  entrypoint = "vs"; target = "vs_5_0"; break;
+			case skr_stage_pixel:   entrypoint = "ps"; target = "ps_5_0"; break;
+			case skr_stage_compute: entrypoint = "cs"; target = "cs_5_0"; break; }
+		if (FAILED(D3DCompile(file_data, shader_size, nullptr, nullptr, nullptr, entrypoint, target, flags, 0, &compiled, &errors))) {
 			skr_log(skr_log_warning, "D3DCompile failed:");
 			skr_log(skr_log_warning, (char *)errors->GetBufferPointer());
 		}
@@ -348,8 +359,9 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 	}
 
 	switch(type) {
-	case skr_stage_vertex: d3d_device->CreateVertexShader(buffer, buffer_size, nullptr, (ID3D11VertexShader**)&result._shader); break;
-	case skr_stage_pixel : d3d_device->CreatePixelShader (buffer, buffer_size, nullptr, (ID3D11PixelShader **)&result._shader); break;
+	case skr_stage_vertex  : d3d_device->CreateVertexShader (buffer, buffer_size, nullptr, (ID3D11VertexShader **)&result._shader); break;
+	case skr_stage_pixel   : d3d_device->CreatePixelShader  (buffer, buffer_size, nullptr, (ID3D11PixelShader  **)&result._shader); break;
+	case skr_stage_compute : d3d_device->CreateComputeShader(buffer, buffer_size, nullptr, (ID3D11ComputeShader**)&result._shader); break;
 	}
 
 	if (d3d_vert_layout == nullptr && type == skr_stage_vertex) {
@@ -371,8 +383,9 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 
 void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 	switch(shader->type) {
-	case skr_stage_vertex: ((ID3D11VertexShader*)shader->_shader)->Release(); break;
-	case skr_stage_pixel : ((ID3D11PixelShader *)shader->_shader)->Release(); break;
+	case skr_stage_vertex  : ((ID3D11VertexShader *)shader->_shader)->Release(); break;
+	case skr_stage_pixel   : ((ID3D11PixelShader  *)shader->_shader)->Release(); break;
+	case skr_stage_compute : ((ID3D11ComputeShader*)shader->_shader)->Release(); break;
 	}
 }
 

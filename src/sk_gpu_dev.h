@@ -39,6 +39,7 @@ typedef enum skr_buffer_type_ {
 	skr_buffer_type_vertex,
 	skr_buffer_type_index,
 	skr_buffer_type_constant,
+	skr_buffer_type_compute,
 } skr_buffer_type_;
 
 typedef enum skr_tex_type_ {
@@ -220,7 +221,7 @@ bool                skr_capability               (skr_cap_ capability);
 void                skr_draw_begin               ();
 void                skr_draw                     (int32_t index_start, int32_t index_count, int32_t instance_count);
 
-skr_buffer_t        skr_buffer_create            (const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use);
+skr_buffer_t        skr_buffer_create            (const void *data, uint32_t size_count, uint32_t size_stride, skr_buffer_type_ type, skr_use_ use);
 bool                skr_buffer_is_valid          (const skr_buffer_t *buffer);
 void                skr_buffer_set_contents      (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
 void                skr_buffer_bind              (const skr_buffer_t *buffer, skr_bind_t slot_vc, uint32_t stride_v, uint32_t offset_vi);

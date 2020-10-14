@@ -58,17 +58,17 @@ template <typename T> struct array_t {
 
 ///////////////////////////////////////////
 
-void                     sksc_meta_find_defaults    (char *hlsl_text, skr_shader_meta_t *ref_meta);
-bool                     sksc_meta_check_dup_buffers(const skr_shader_meta_t *ref_meta);
+void                  sksc_meta_find_defaults    (char *hlsl_text, skr_shader_meta_t *ref_meta);
+bool                  sksc_meta_check_dup_buffers(const skr_shader_meta_t *ref_meta);
 
-DWORD                    sksc_d3d11_build_flags     (const sksc_settings_t *settings);
-bool                     sksc_d3d11_compile_shader  (char *filename, char *hlsl_text, sksc_settings_t *settings, skr_stage_ type, skr_shader_file_stage_t *out_stage);
+DWORD                 sksc_d3d11_build_flags     (const sksc_settings_t *settings);
+bool                  sksc_d3d11_compile_shader  (char *filename, char *hlsl_text, sksc_settings_t *settings, skr_stage_ type, skr_shader_file_stage_t *out_stage);
 
-array_t<const wchar_t *> sksc_dxc_build_flags       (sksc_settings_t settings, skr_stage_ type, skr_shader_lang_ lang);
-void                     sksc_dxc_shader_meta       (IDxcResult *compile_result, skr_stage_ stage, skr_shader_meta_t *out_meta);
-bool                     sksc_dxc_compile_shader    (DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skr_stage_ type, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, skr_shader_meta_t *out_meta);
+array_t<const char *> sksc_dxc_build_flags       (sksc_settings_t settings, skr_stage_ type, skr_shader_lang_ lang);
+void                  sksc_dxc_shader_meta       (IDxcResult *compile_result, skr_stage_ stage, skr_shader_meta_t *out_meta);
+bool                  sksc_dxc_compile_shader    (DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skr_stage_ type, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, skr_shader_meta_t *out_meta);
 
-void                     sksc_spvc_compile_stage    (const skr_shader_file_stage_t *src_stage, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta);
+bool                  sksc_spvc_compile_stage    (const skr_shader_file_stage_t *src_stage, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta);
 
 ///////////////////////////////////////////
 
@@ -112,38 +112,56 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 	}
 
 	*out_file = {};
-	 out_file->stage_count = 8;
-	 out_file->stages      = (skr_shader_file_stage_t*)malloc(sizeof(skr_shader_file_stage_t) * out_file->stage_count);
-	 out_file->meta        = (skr_shader_meta_t      *)malloc(sizeof(skr_shader_meta_t));
-	*out_file->stages      = {};
-	*out_file->meta        = {};
+	 out_file->meta = (skr_shader_meta_t*)malloc(sizeof(skr_shader_meta_t));
+	*out_file->meta = {};
 
-	skr_shader_file_stage_t d3d12_hlsl_ps = {}, d3d12_hlsl_vs = {};
+	array_t<skr_shader_file_stage_t> stages = {};
 
-	if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_stage_vertex, skr_shader_lang_hlsl,  &d3d12_hlsl_vs, out_file->meta) ||
-		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_stage_pixel,  skr_shader_lang_hlsl,  &d3d12_hlsl_ps, out_file->meta) ||
-		!sksc_d3d11_compile_shader(filename, hlsl_text, settings, skr_stage_vertex, &out_file->stages[0]) ||
-		!sksc_d3d11_compile_shader(filename, hlsl_text, settings, skr_stage_pixel,  &out_file->stages[1]) ||
-		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_stage_vertex, skr_shader_lang_spirv, &out_file->stages[2], nullptr)  ||
-		!sksc_dxc_compile_shader(&source_buff, include_handler, settings, skr_stage_pixel,  skr_shader_lang_spirv, &out_file->stages[3], nullptr)) {
-		include_handler->Release();
-		source         ->Release();
-		return false;
+	skr_stage_ compile_stages[3] = { skr_stage_vertex, skr_stage_pixel, skr_stage_compute };
+	char      *entrypoints   [3] = { settings->vs_entrypoint, settings->ps_entrypoint, settings->cs_entrypoint };
+	for (size_t i = 0; i < sizeof(compile_stages)/sizeof(compile_stages[0]); i++) {
+		if (entrypoints[i][0] == 0)
+			continue;
+
+		skr_shader_file_stage_t d3d12_hlsl_stage = {};
+		stages.add({});
+		if (!sksc_dxc_compile_shader  (&source_buff, include_handler, settings, compile_stages[i], skr_shader_lang_hlsl, &d3d12_hlsl_stage, out_file->meta) ||
+			!sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
+			include_handler->Release();
+			source         ->Release();
+			return false;
+		}
+
+		size_t spirv_stage = stages.add({});
+		if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, compile_stages[i], skr_shader_lang_spirv, &stages.last(), nullptr)) {
+			include_handler->Release();
+			source         ->Release();
+			return false;
+		}
+
+		stages.add({});
+		if (!sksc_spvc_compile_stage(&stages[spirv_stage], skr_shader_lang_glsl, &stages.last(), out_file->meta)) {
+			include_handler->Release();
+			source         ->Release();
+			return false;
+		}
+		stages.add({});
+		if (!sksc_spvc_compile_stage(&stages[spirv_stage], skr_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
+			include_handler->Release();
+			source         ->Release();
+			return false;
+		}
+
+		free(d3d12_hlsl_stage.code);
 	}
 	
 	// cleanup
 	include_handler->Release();
 	source         ->Release();
-	free(d3d12_hlsl_ps.code);
-	free(d3d12_hlsl_vs.code);
-
-	sksc_spvc_compile_stage(&out_file->stages[2], skr_shader_lang_glsl, &out_file->stages[4], out_file->meta);
-	sksc_spvc_compile_stage(&out_file->stages[3], skr_shader_lang_glsl, &out_file->stages[5], out_file->meta);
-
-	sksc_spvc_compile_stage(&out_file->stages[2], skr_shader_lang_glsl_web, &out_file->stages[6], out_file->meta);
-	sksc_spvc_compile_stage(&out_file->stages[3], skr_shader_lang_glsl_web, &out_file->stages[7], out_file->meta);
 
 	sksc_meta_find_defaults(hlsl_text, out_file->meta);
+	out_file->stage_count = stages.count;
+	out_file->stages      = stages.data;
 
 	// Write out our reflection information
 	printf("|--Buffer Info--\n");
@@ -160,22 +178,27 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 			case skr_shader_var_uint:   type_name = "uint"; break;
 			case skr_shader_var_uint8:  type_name = "uint8"; break;
 			}
-			printf("|    %-15s: +%-4u [%u] - %s%u\n", var->name, var->offset, var->size, type_name, var->type_count);
+			printf("|    %-15s: +%-4u [%5u] - %s%u\n", var->name, var->offset, var->size, type_name, var->type_count);
 		}
 	}
-	skr_stage_ stages[2] = { skr_stage_vertex, skr_stage_pixel };
-	for (size_t s = 0; s < sizeof(stages)/sizeof(skr_stage_); s++) {
-		const char *stage_name = stages[s] == skr_stage_pixel ? "Pixel" : "Vertex";
+
+	for (size_t s = 0; s < sizeof(compile_stages)/sizeof(compile_stages[0]); s++) {
+		const char *stage_name = "";
+		switch (compile_stages[s]) {
+		case skr_stage_vertex:  stage_name = "Vertex";  break;
+		case skr_stage_pixel:   stage_name = "Pixel";   break;
+		case skr_stage_compute: stage_name = "Compute"; break;
+		}
 		printf("|--%s Shader--\n", stage_name);
 		for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
 			skr_shader_buffer_t *buff = &out_file->meta->buffers[i];
-			if (buff->bind.stage_bits & stages[s]) {
+			if (buff->bind.stage_bits & compile_stages[s]) {
 				printf("|  b%u : %s\n", buff->bind.slot, buff->name);
 			}
 		}
 		for (size_t i = 0; i < out_file->meta->texture_count; i++) {
 			skr_shader_texture_t *tex = &out_file->meta->textures[i];
-			if (tex->bind.stage_bits & stages[s]) {
+			if (tex->bind.stage_bits & compile_stages[s]) {
 				printf("|  s%u : %s\n", tex->bind.slot, tex->name );
 			}
 		}
@@ -187,6 +210,7 @@ bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, sk
 	}
 
 	printf("|________________\n\n");
+
 	return true;
 }
 
@@ -535,11 +559,21 @@ DWORD sksc_d3d11_build_flags(const sksc_settings_t *settings) {
 bool sksc_d3d11_compile_shader(char *filename, char *hlsl_text, sksc_settings_t *settings, skr_stage_ type, skr_shader_file_stage_t *out_stage) {
 	DWORD flags = sksc_d3d11_build_flags(settings);
 
-	char entry[128];
-	wcstombs_s(nullptr, entry, type == skr_stage_pixel ? settings->ps_entrypoint : settings->vs_entrypoint, sizeof(entry));
+	const char *entrypoint = nullptr;
+	char target[64];
+	switch (type) {
+	case skr_stage_vertex:  entrypoint = settings->vs_entrypoint; break;
+	case skr_stage_pixel:   entrypoint = settings->ps_entrypoint; break;
+	case skr_stage_compute: entrypoint = settings->cs_entrypoint; break;
+	}
+	switch (type) {
+	case skr_stage_vertex:  snprintf(target, sizeof(target), "vs_%s", settings->shader_model); break;
+	case skr_stage_pixel:   snprintf(target, sizeof(target), "ps_%s", settings->shader_model); break;
+	case skr_stage_compute: snprintf(target, sizeof(target), "cs_%s", settings->shader_model); break;
+	}
 
 	ID3DBlob *errors, *compiled = nullptr;
-	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entry, type == skr_stage_pixel ? "ps_5_0" : "vs_5_0", flags, 0, &compiled, &errors))) {
+	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entrypoint, target, flags, 0, &compiled, &errors))) {
 		printf("| Error - D3DCompile failed:\n");
 		printf((char *)errors->GetBufferPointer());
 		if (errors) errors->Release();
@@ -564,13 +598,20 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 	IDxcBlobUtf8 *errors;
 	bool result = false;
 
-	array_t<const wchar_t *> flags = sksc_dxc_build_flags(*settings, type, lang);
-	if (FAILED(sksc_compiler->Compile(source_buff, flags.data, (uint32_t)flags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
+	array_t<const char *> flags  = sksc_dxc_build_flags(*settings, type, lang);
+	array_t<wchar_t    *> wflags = {};
+	for (size_t i = 0; i < flags.count; i++) {
+		size_t   len = strlen(flags[i]);
+		wchar_t *f   = (wchar_t*)malloc(sizeof(wchar_t) * (len+1));
+		mbstowcs_s(nullptr, f, len+1, flags[i], len);
+		wflags.add(f);
+	}
+	if (FAILED(sksc_compiler->Compile(source_buff, (LPCWSTR*)wflags.data, (uint32_t)wflags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
 		printf("| Compile failed!\n|________________\n");
 		return false;
 	}
 
-	const char *lang_name = lang == skr_shader_lang_hlsl  ? "HLSL"  : "SPIRV";
+	const char *lang_name = lang == skr_shader_lang_hlsl ? "HLSL"  : "SPIRV";
 	const char *type_name = type == skr_stage_pixel      ? "Pixel" : "Vertex";
 	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
 	if (errors && errors->GetStringLength() > 0) {
@@ -599,6 +640,9 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 	errors        ->Release();
 	compile_result->Release();
 	flags.free();
+	for (size_t i = 0; i < wflags.count; i++)
+		free(wflags[i]);
+	wflags.free();
 
 	return result;
 }
@@ -715,50 +759,52 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skr_stage_ stage, skr_shad
 
 ///////////////////////////////////////////
 
-array_t<const wchar_t *> sksc_dxc_build_flags(sksc_settings_t settings, skr_stage_ type, skr_shader_lang_ lang) {
+array_t<const char *> sksc_dxc_build_flags(sksc_settings_t settings, skr_stage_ type, skr_shader_lang_ lang) {
 	// https://simoncoenen.com/blog/programming/graphics/DxcCompiling.html
 
-	array_t<const wchar_t *> result = {};
+	array_t<const char *> result = {};
 	if (lang == skr_shader_lang_spirv) {
-		result.add(L"-spirv");
-		result.add(L"-fspv-reflect");
+		result.add("-spirv");
+		result.add("-fspv-reflect");
 	}
 	result.add(settings.row_major 
-		? DXC_ARG_PACK_MATRIX_ROW_MAJOR 
-		: DXC_ARG_PACK_MATRIX_COLUMN_MAJOR);
+		? "-Zpr"   // DXC_ARG_PACK_MATRIX_ROW_MAJOR 
+		: "-Zpc"); // DXC_ARG_PACK_MATRIX_COLUMN_MAJOR);
 
 	// Debug vs. Release
 	if (settings.debug) {
-		result.add(DXC_ARG_DEBUG);
-		result.add(L"-Qembed_debug");
-		result.add(L"-Od");
+		result.add("-Zi"); // DXC_ARG_DEBUG
+		result.add("-Qembed_debug");
+		result.add("-Od");
 	} else {
-		result.add(L"-Qstrip_debug");
-		result.add(L"-Qstrip_reflect");
+		result.add("-Qstrip_debug");
+		result.add("-Qstrip_reflect");
 		switch (settings.optimize) {
-		case 0: result.add(L"O0"); break;
-		case 1: result.add(L"O1"); break;
-		case 2: result.add(L"O2"); break;
-		case 3: result.add(L"O3"); break;
+		case 0: result.add("-O0"); break;
+		case 1: result.add("-O1"); break;
+		case 2: result.add("-O2"); break;
+		case 3: result.add("-O3"); break;
 		}
 	}
 
 	// Entrypoint
-	result.add(L"-E"); 
+	result.add("-E"); 
 	switch (type) {
-	case skr_stage_pixel:  result.add(settings.ps_entrypoint); break;
-	case skr_stage_vertex: result.add(settings.vs_entrypoint); break;
+	case skr_stage_pixel:   result.add(settings.ps_entrypoint); break;
+	case skr_stage_vertex:  result.add(settings.vs_entrypoint); break;
+	case skr_stage_compute: result.add(settings.cs_entrypoint); break;
 	}
 
 	// Target
-	result.add(L"-T");
+	result.add("-T");
 	switch (type) {
-	case skr_stage_pixel:  wsprintf(settings.shader_model_str, L"ps_%s", settings.shader_model); result.add(settings.shader_model_str); break;
-	case skr_stage_vertex: wsprintf(settings.shader_model_str, L"vs_%s", settings.shader_model); result.add(settings.shader_model_str); break;
+	case skr_stage_vertex:  snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "vs_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
+	case skr_stage_pixel:   snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "ps_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
+	case skr_stage_compute: snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "cs_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
 	}
 
 	// Include folder
-	result.add(L"-I");
+	result.add("-I");
 	result.add(settings.folder);
 
 	return result;
@@ -766,7 +812,7 @@ array_t<const wchar_t *> sksc_dxc_build_flags(sksc_settings_t settings, skr_stag
 
 ///////////////////////////////////////////
 
-void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta) {
+bool sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shader_lang_ lang, skr_shader_file_stage_t *out_stage, const skr_shader_meta_t *meta) {
 	spvc_context context = nullptr;
 	spvc_context_create            (&context);
 	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
@@ -862,7 +908,10 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	}
 
 	const char *result = nullptr;
-	spvc_compiler_compile(compiler_glsl, &result);
+	if (spvc_compiler_compile(compiler_glsl, &result) != SPVC_SUCCESS) {
+		spvc_context_destroy(context);
+		return false;
+	}
 
 	out_stage->stage     = src_stage->stage;
 	out_stage->language  = lang;
@@ -870,8 +919,9 @@ void sksc_spvc_compile_stage(const skr_shader_file_stage_t *src_stage, skr_shade
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
 
-	printf("%s\n", (char*)out_stage->code);
+	//printf("%s\n", (char*)out_stage->code);
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);
+	return true;
 }

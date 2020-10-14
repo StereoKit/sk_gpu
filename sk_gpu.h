@@ -110,8 +110,9 @@ typedef enum skr_el_semantic_ {
 } skr_el_semantic_;
 
 typedef enum skr_stage_ {
-	skr_stage_vertex = 1 << 0,
-	skr_stage_pixel  = 1 << 1,
+	skr_stage_vertex  = 1 << 0,
+	skr_stage_pixel   = 1 << 1,
+	skr_stage_compute = 1 << 2,
 } skr_stage_;
 
 typedef enum skr_shader_var_ {
@@ -144,7 +145,7 @@ typedef enum skr_log_ {
 typedef enum skr_cap_ {
 	skr_cap_tex_layer_select = 1,
 	skr_cap_wireframe,
-};
+} skr_cap_;
 
 typedef struct skr_vert_t {
 	float   pos [3];

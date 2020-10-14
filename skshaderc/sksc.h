@@ -14,11 +14,12 @@ typedef struct sksc_settings_t {
 	bool row_major;
 	bool output_header;
 	int  optimize;
-	wchar_t folder[512];
-	const wchar_t *vs_entrypoint;
-	const wchar_t *ps_entrypoint;
-	const wchar_t *shader_model;
-	wchar_t shader_model_str[16];
+	char folder[512];
+	char vs_entrypoint[64];
+	char ps_entrypoint[64];
+	char cs_entrypoint[64];
+	char shader_model[64];
+	char shader_model_str[16];
 } sksc_settings_t;
 
 ///////////////////////////////////////////

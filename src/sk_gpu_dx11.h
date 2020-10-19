@@ -8,6 +8,7 @@
 typedef struct skr_buffer_t {
 	skr_use_         use;
 	skr_buffer_type_ type;
+	uint32_t         stride;
 	ID3D11Buffer    *_buffer;
 } skr_buffer_t;
 
@@ -33,13 +34,16 @@ typedef struct skr_compute_t {
 } skr_compute_t;
 
 typedef struct skr_pipeline_t {
-	skr_transparency_      transparency;
-	skr_cull_              cull;
-	bool                   wireframe;
-	ID3D11VertexShader    *_vertex;
-	ID3D11PixelShader     *_pixel;
-	ID3D11BlendState      *_blend;
-	ID3D11RasterizerState *_rasterize;
+	skr_transparency_        transparency;
+	skr_cull_                cull;
+	bool                     wireframe;
+	bool                     depth_write;
+	skr_depth_test_          depth_test;
+	ID3D11VertexShader      *_vertex;
+	ID3D11PixelShader       *_pixel;
+	ID3D11BlendState        *_blend;
+	ID3D11RasterizerState   *_rasterize;
+	ID3D11DepthStencilState *_depth;
 } skr_pipeline_t;
 
 typedef struct skr_tex_t {

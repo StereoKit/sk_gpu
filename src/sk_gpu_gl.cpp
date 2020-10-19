@@ -75,6 +75,15 @@ HGLRC gl_hrc;
 #define GL_CONSTANT_ALPHA           0x8003
 #define GL_ONE_MINUS_CONSTANT_ALPHA 0x8004
 
+#define GL_NEVER                    0x0200 
+#define GL_LESS                     0x0201
+#define GL_EQUAL                    0x0202
+#define GL_LEQUAL                   0x0203
+#define GL_GREATER                  0x0204
+#define GL_NOTEQUAL                 0x0205
+#define GL_GEQUAL                   0x0206
+#define GL_ALWAYS                   0x0207
+
 #define GL_INVALID_INDEX 0xFFFFFFFFu
 #define GL_FRAMEBUFFER_SRGB 0x8DB9
 #define GL_VIEWPORT         0x0BA2
@@ -240,6 +249,8 @@ GLE(void,     glClear,                   uint32_t mask) \
 GLE(void,     glEnable,                  uint32_t cap) \
 GLE(void,     glDisable,                 uint32_t cap) \
 GLE(void,     glPolygonMode,             uint32_t face, uint32_t mode) \
+GLE(void,     glDepthMask,               uint8_t flag) \
+GLE(void,     glDepthFunc,               uint32_t func) \
 GLE(uint32_t, glGetError,                ) \
 GLE(void,     glGetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
 GLE(uint32_t, glCreateShader,            uint32_t type) \
@@ -261,6 +272,7 @@ GLE(void,     glBindVertexArray,         uint32_t array) \
 GLE(void,     glBufferData,              uint32_t target, int32_t size, const void *data, uint32_t usage) \
 GLE(void,     glGenBuffers,              int32_t n, uint32_t *buffers) \
 GLE(void,     glBindBuffer,              uint32_t target, uint32_t buffer) \
+GLE(void,     glBindVertexBuffer,        uint32_t bindingindex, uint32_t buffer, size_t offset, uint32_t stride) \
 GLE(void,     glDeleteBuffers,           int32_t n, const uint32_t *buffers) \
 GLE(void,     glGenTextures,             int32_t n, uint32_t *textures) \
 GLE(void,     glGenFramebuffers,         int32_t n, uint32_t *ids) \
@@ -287,6 +299,7 @@ GLE(void,     glEnableVertexAttribArray, uint32_t index) \
 GLE(void,     glVertexAttribPointer,     uint32_t index, int32_t size, uint32_t type, uint8_t normalized, int32_t stride, const void *pointer) \
 GLE(void,     glUniform1i,               int32_t location, int32_t v0) \
 GLE(void,     glDrawElementsInstanced,   uint32_t mode, int32_t count, uint32_t type, const void *indices, int32_t primcount) \
+GLE(void,     glDrawElementsInstancedBaseVertex,   uint32_t mode, int32_t count, uint32_t type, const void *indices, int32_t instancecount, int32_t basevertex) \
 GLE(void,     glDrawElements,            uint32_t mode, int32_t count, uint32_t type, const void *indices) \
 GLE(void,     glDebugMessageCallback,    GLDEBUGPROC callback, const void *userParam) \
 GLE(void,     glBindBufferBase,          uint32_t target, uint32_t index, uint32_t buffer) \
@@ -672,21 +685,22 @@ bool skr_capability(skr_cap_ capability) {
 
 ///////////////////////////////////////////
 
-void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) {
-	glDrawElementsInstanced(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count);
+void skr_draw(int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count) {
+	glDrawElementsInstancedBaseVertex(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count, index_base);
 }
 
 ///////////////////////////////////////////
 
-skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
+skr_buffer_t skr_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
 	result.use     = use;
 	result.type    = type;
+	result.stride  = size_stride;
 	result._target = skr_buffer_type_to_gl(type);
 
 	glGenBuffers(1, &result._buffer);
 	glBindBuffer(result._target, result._buffer);
-	glBufferData(result._target, size_bytes, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
+	glBufferData(result._target, size_count * size_stride, data, use == skr_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
 
 	return result;
 }
@@ -711,9 +725,11 @@ void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t si
 
 /////////////////////////////////////////// 
 
-void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t stride, uint32_t offset) {
+void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t offset) {
 	if (buffer->type == skr_buffer_type_constant)
-		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer); 
+		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
+	else if (buffer->type == skr_buffer_type_vertex)
+		glBindVertexBuffer(bind.slot, buffer->_buffer, offset,buffer->stride);
 	else
 		glBindBuffer(buffer->_target, buffer->_buffer);
 }
@@ -942,6 +958,8 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 	result.transparency = skr_transparency_none;
 	result.cull         = skr_cull_none;
 	result.wireframe    = false;
+	result.depth_test   = skr_depth_test_less;
+	result.depth_write  = true;
 	result._shader      = *shader;
 
 	return result;
@@ -975,6 +993,21 @@ void skr_pipeline_bind(const skr_pipeline_t *pipeline) {
 		glDisable(GL_CULL_FACE);
 	} break;
 	}
+
+	if (pipeline->depth_write || pipeline->depth_test != skr_depth_test_always)
+		glEnable(GL_DEPTH_TEST);
+	else glDisable(GL_DEPTH_TEST);
+
+	glDepthMask(pipeline->depth_write);
+	switch (pipeline->depth_test) {
+	case skr_depth_test_always:        glDepthFunc(GL_ALWAYS);   break;
+	case skr_depth_test_equal:         glDepthFunc(GL_EQUAL);    break;
+	case skr_depth_test_greater:       glDepthFunc(GL_GREATER);  break;
+	case skr_depth_test_greater_or_eq: glDepthFunc(GL_GEQUAL);   break;
+	case skr_depth_test_less:          glDepthFunc(GL_LESS);     break;
+	case skr_depth_test_less_or_eq:    glDepthFunc(GL_LEQUAL);   break;
+	case skr_depth_test_never:         glDepthFunc(GL_NEVER);    break;
+	case skr_depth_test_not_equal:     glDepthFunc(GL_NOTEQUAL); break; }
 	
 #ifdef _WIN32
 	if (pipeline->wireframe) {
@@ -992,13 +1025,29 @@ void skr_pipeline_set_transparency(skr_pipeline_t *pipeline, skr_transparency_ t
 }
 
 /////////////////////////////////////////// 
+
 void skr_pipeline_set_cull(skr_pipeline_t *pipeline, skr_cull_ cull) {
 	pipeline->cull = cull;
 }
+
 /////////////////////////////////////////// 
+
 void skr_pipeline_set_wireframe(skr_pipeline_t *pipeline, bool wireframe) {
 	pipeline->wireframe = wireframe;
 }
+
+/////////////////////////////////////////// 
+
+void skr_pipeline_set_depth_write(skr_pipeline_t *pipeline, bool write) {
+	pipeline->depth_write = write;
+}
+
+/////////////////////////////////////////// 
+
+void skr_pipeline_set_depth_test (skr_pipeline_t *pipeline, skr_depth_test_ test) {
+	pipeline->depth_test = test;
+}
+
 /////////////////////////////////////////// 
 
 skr_transparency_ skr_pipeline_get_transparency(const skr_pipeline_t *pipeline) {
@@ -1015,6 +1064,18 @@ skr_cull_ skr_pipeline_get_cull(const skr_pipeline_t *pipeline) {
 
 bool skr_pipeline_get_wireframe(const skr_pipeline_t *pipeline) {
 	return pipeline->wireframe;
+}
+
+/////////////////////////////////////////// 
+
+bool skr_pipeline_get_depth_write(const skr_pipeline_t *pipeline) {
+	return pipeline->depth_write;
+}
+
+/////////////////////////////////////////// 
+
+skr_depth_test_ skr_pipeline_get_depth_test(const skr_pipeline_t *pipeline) {
+	return pipeline->depth_test;
 }
 
 ///////////////////////////////////////////

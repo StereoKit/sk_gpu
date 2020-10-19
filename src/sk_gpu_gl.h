@@ -6,6 +6,7 @@
 typedef struct skr_buffer_t {
 	skr_use_         use;
 	skr_buffer_type_ type;
+	uint32_t         stride;
 	uint32_t         _target;
 	uint32_t         _buffer;
 } skr_buffer_t;
@@ -32,6 +33,8 @@ typedef struct skr_pipeline_t {
 	skr_transparency_ transparency;
 	skr_cull_         cull;
 	bool              wireframe;
+	bool              depth_write;
+	skr_depth_test_   depth_test;
 	skr_shader_t      _shader;
 } skr_pipeline_t;
 

@@ -137,6 +137,17 @@ typedef enum skr_cull_ {
 	skr_cull_none,
 } skr_cull_;
 
+typedef enum skr_depth_test_ {
+	skr_depth_test_less = 0,
+	skr_depth_test_less_or_eq,
+	skr_depth_test_greater,
+	skr_depth_test_greater_or_eq,
+	skr_depth_test_equal,
+	skr_depth_test_not_equal,
+	skr_depth_test_always,
+	skr_depth_test_never,
+} skr_depth_test_;
+
 typedef enum skr_log_ {
 	skr_log_info,
 	skr_log_warning,
@@ -219,12 +230,13 @@ skr_platform_data_t skr_get_platform_data        ();
 bool                skr_capability               (skr_cap_ capability);
 
 void                skr_draw_begin               ();
-void                skr_draw                     (int32_t index_start, int32_t index_count, int32_t instance_count);
+void                skr_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
 
 skr_buffer_t        skr_buffer_create            (const void *data, uint32_t size_count, uint32_t size_stride, skr_buffer_type_ type, skr_use_ use);
 bool                skr_buffer_is_valid          (const skr_buffer_t *buffer);
 void                skr_buffer_set_contents      (      skr_buffer_t *buffer, const void *data, uint32_t size_bytes);
-void                skr_buffer_bind              (const skr_buffer_t *buffer, skr_bind_t slot_vc, uint32_t stride_v, uint32_t offset_vi);
+void                skr_buffer_get_contents      (const skr_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
+void                skr_buffer_bind              (const skr_buffer_t *buffer, skr_bind_t slot_vc, uint32_t offset_vi);
 void                skr_buffer_destroy           (      skr_buffer_t *buffer);
 
 skr_mesh_t          skr_mesh_create              (const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer);
@@ -256,6 +268,10 @@ void                skr_pipeline_set_cull        (      skr_pipeline_t *pipeline
 skr_cull_           skr_pipeline_get_cull        (const skr_pipeline_t *pipeline);
 void                skr_pipeline_set_wireframe   (      skr_pipeline_t *pipeline, bool wireframe);
 bool                skr_pipeline_get_wireframe   (const skr_pipeline_t *pipeline);
+void                skr_pipeline_set_depth_write (      skr_pipeline_t *pipeline, bool write);
+bool                skr_pipeline_get_depth_write (const skr_pipeline_t *pipeline);
+void                skr_pipeline_set_depth_test  (      skr_pipeline_t *pipeline, skr_depth_test_ test);
+skr_depth_test_     skr_pipeline_get_depth_test  (const skr_pipeline_t *pipeline);
 void                skr_pipeline_destroy         (      skr_pipeline_t *pipeline);
 
 skr_swapchain_t     skr_swapchain_create         (skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height);

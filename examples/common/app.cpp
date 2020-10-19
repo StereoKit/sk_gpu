@@ -175,6 +175,7 @@ bool app_init() {
 	app_sh_cube_data_bind    = skr_shader_get_buffer_bind(&app_sh_cube, "SystemBuffer");
 	app_mat_cube             = skr_pipeline_create(&app_sh_cube);
 	skr_pipeline_set_cull(&app_mat_cube, skr_cull_front);
+	skr_pipeline_set_depth_write(&app_mat_cube, false);
 	
 	app_sh_default           = skr_shader_create_memory(sks_test_hlsl, sizeof(sks_test_hlsl));
 	app_sh_default_tex_bind  = skr_shader_get_tex_bind   (&app_sh_default, "tex");
@@ -221,12 +222,12 @@ void app_test_dyn_update(double time) {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,-2,0} }) * HMM_Scale(hmm_vec3{ {6,6,6} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
 
 	skr_mesh_bind    (&app_mesh_wave.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_target, app_sh_default_tex_bind);
-	skr_draw(0, app_mesh_wave.ind_count, 1);
+	skr_draw(0, 0, app_mesh_wave.ind_count, 1);
 }
 
 ///////////////////////////////////////////
@@ -238,12 +239,12 @@ void app_test_colors() {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
 
 	skr_mesh_bind    (&app_mesh_tri.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
-	skr_draw(0, app_mesh_tri.ind_count, 1);
+	skr_draw(0, 0, app_mesh_tri.ind_count, 1);
 }
 
 ///////////////////////////////////////////
@@ -252,13 +253,13 @@ void app_test_cubemap() {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {6,6,6} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind, 0, 0);
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind, 0);
 
 	skr_mesh_bind    (&app_mesh_cube.mesh);
 	skr_pipeline_bind(&app_mat_cube);
 	skr_tex_bind     (&app_tex,     app_sh_cube_tex_bind);
 	skr_tex_bind     (&app_cubemap, app_sh_cube_cubemap_bind);
-	skr_draw(0, app_mesh_cube.ind_count, 1);
+	skr_draw(0, 0, app_mesh_cube.ind_count, 1);
 }
 
 ///////////////////////////////////////////
@@ -277,17 +278,17 @@ void app_test_rendertarget(double t) {
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
-	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0, 0);
+	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) *HMM_Rotate(t * 0.05f, hmm_vec3{ {0,1,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst_t));
-	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0, 0);
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
 
 	skr_mesh_bind    (&app_mesh_tri.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh_tri.ind_count, 1);
+	skr_draw         (0, 0, app_mesh_tri.ind_count, 1);
 
 	skr_tex_target_bind(old_target, false, color);
 }
@@ -302,12 +303,12 @@ void app_test_instancing() {
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
-	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
 
 	skr_mesh_bind    (&app_mesh_cube.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_tex, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh_cube.ind_count, 100);
+	skr_draw         (0, 0, app_mesh_cube.ind_count, 100);
 
 	// Set transforms for another 100 instances
 	for (int32_t i = 0; i < 100; i++) {
@@ -316,12 +317,12 @@ void app_test_instancing() {
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skr_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
-	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, sizeof(app_shader_inst_t), 0);
+	skr_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
 
 	skr_mesh_bind    (&app_mesh_model.mesh);
 	skr_pipeline_bind(&app_mat_default);
 	skr_tex_bind     (&app_target, app_sh_default_tex_bind);
-	skr_draw         (0, app_mesh_model.ind_count, 100);
+	skr_draw         (0, 0, app_mesh_model.ind_count, 100);
 }
 
 ///////////////////////////////////////////
@@ -333,12 +334,13 @@ void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
 	skr_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
-	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, sizeof(app_shader_data_t), 0);
+	skr_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
-	app_test_dyn_update(t);
+	
 	app_test_colors();
 	app_test_instancing();
 	app_test_cubemap();
+	app_test_dyn_update(t);
 }
 
 ///////////////////////////////////////////

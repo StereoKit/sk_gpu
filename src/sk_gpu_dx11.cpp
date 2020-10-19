@@ -460,11 +460,48 @@ void skr_pipeline_update_rasterizer(skr_pipeline_t *pipeline) {
 
 /////////////////////////////////////////// 
 
+void skr_pipeline_update_depth(skr_pipeline_t *pipeline) {
+	if (pipeline->_depth) pipeline->_depth->Release();
+
+	D3D11_COMPARISON_FUNC comparison = D3D11_COMPARISON_LESS;
+	switch (pipeline->depth_test) {
+	case skr_depth_test_always:        comparison = D3D11_COMPARISON_ALWAYS;        break;
+	case skr_depth_test_equal:         comparison = D3D11_COMPARISON_EQUAL;         break;
+	case skr_depth_test_greater:       comparison = D3D11_COMPARISON_GREATER;       break;
+	case skr_depth_test_greater_or_eq: comparison = D3D11_COMPARISON_GREATER_EQUAL; break;
+	case skr_depth_test_less:          comparison = D3D11_COMPARISON_LESS;          break;
+	case skr_depth_test_less_or_eq:    comparison = D3D11_COMPARISON_LESS_EQUAL;    break;
+	case skr_depth_test_never:         comparison = D3D11_COMPARISON_NEVER;         break;
+	case skr_depth_test_not_equal:     comparison = D3D11_COMPARISON_NOT_EQUAL;     break;
+	}
+
+	D3D11_DEPTH_STENCIL_DESC desc_depthstate = {};
+	desc_depthstate.DepthEnable    = pipeline->depth_write != false || pipeline->depth_test != skr_depth_test_always;
+	desc_depthstate.DepthWriteMask = pipeline->depth_write ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
+	desc_depthstate.DepthFunc      = comparison;
+	desc_depthstate.StencilEnable    = false;
+	desc_depthstate.StencilReadMask  = 0xFF;
+	desc_depthstate.StencilWriteMask = 0xFF;
+	desc_depthstate.FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+	desc_depthstate.FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
+	desc_depthstate.BackFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
+	desc_depthstate.BackFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+	desc_depthstate.BackFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
+	d3d_device->CreateDepthStencilState(&desc_depthstate, &pipeline->_depth);
+}
+
+/////////////////////////////////////////// 
+
 skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 	skr_pipeline_t result = {};
 	result.transparency = skr_transparency_none;
 	result.cull         = skr_cull_back;
 	result.wireframe    = false;
+	result.depth_write  = true;
+	result.depth_test   = skr_depth_test_less;
 	result._vertex      = shader->_vertex;
 	result._pixel       = shader->_pixel;
 	if (result._vertex) result._vertex->AddRef();
@@ -472,16 +509,18 @@ skr_pipeline_t skr_pipeline_create(skr_shader_t *shader) {
 
 	skr_pipeline_update_blend     (&result);
 	skr_pipeline_update_rasterizer(&result);
+	skr_pipeline_update_depth     (&result);
 	return result;
 }
 
 /////////////////////////////////////////// 
 
 void skr_pipeline_bind(const skr_pipeline_t *pipeline) {
-	d3d_context->OMSetBlendState(pipeline->_blend,  nullptr, 0xFFFFFFFF);
-	d3d_context->RSSetState     (pipeline->_rasterize);
-	d3d_context->VSSetShader    (pipeline->_vertex, nullptr, 0);
-	d3d_context->PSSetShader    (pipeline->_pixel,  nullptr, 0);
+	d3d_context->OMSetBlendState       (pipeline->_blend,  nullptr, 0xFFFFFFFF);
+	d3d_context->OMSetDepthStencilState(pipeline->_depth,  0);
+	d3d_context->RSSetState            (pipeline->_rasterize);
+	d3d_context->VSSetShader           (pipeline->_vertex, nullptr, 0);
+	d3d_context->PSSetShader           (pipeline->_pixel,  nullptr, 0);
 }
 
 /////////////////////////////////////////// 
@@ -493,20 +532,42 @@ void skr_pipeline_set_transparency(skr_pipeline_t *pipeline, skr_transparency_ t
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
+
 void skr_pipeline_set_cull(skr_pipeline_t *pipeline, skr_cull_ cull) {
 	if (pipeline->cull != cull) {
 		pipeline->cull  = cull;
 		skr_pipeline_update_rasterizer(pipeline);
 	}
 }
+
 /////////////////////////////////////////// 
+
+void skr_pipeline_set_depth_write(skr_pipeline_t *pipeline, bool write) {
+	if (pipeline->depth_write != write) {
+		pipeline->depth_write = write;
+		skr_pipeline_update_depth(pipeline);
+	}
+}
+
+/////////////////////////////////////////// 
+
+void skr_pipeline_set_depth_test (skr_pipeline_t *pipeline, skr_depth_test_ test) {
+	if (pipeline->depth_test != test) {
+		pipeline->depth_test = test;
+		skr_pipeline_update_depth(pipeline);
+	}
+}
+
+/////////////////////////////////////////// 
+
 void skr_pipeline_set_wireframe(skr_pipeline_t *pipeline, bool wireframe) {
 	if (pipeline->wireframe != wireframe) {
 		pipeline->wireframe  = wireframe;
 		skr_pipeline_update_rasterizer(pipeline);
 	}
 }
+
 /////////////////////////////////////////// 
 
 skr_transparency_ skr_pipeline_get_transparency(const skr_pipeline_t *pipeline) {
@@ -525,11 +586,24 @@ bool skr_pipeline_get_wireframe(const skr_pipeline_t *pipeline) {
 	return pipeline->wireframe;
 }
 
+/////////////////////////////////////////// 
+
+bool skr_pipeline_get_depth_write(const skr_pipeline_t *pipeline) {
+	return pipeline->depth_write;
+}
+
+/////////////////////////////////////////// 
+
+skr_depth_test_ skr_pipeline_get_depth_test(const skr_pipeline_t *pipeline) {
+	return pipeline->depth_test;
+}
+
 ///////////////////////////////////////////
 
 void skr_pipeline_destroy(skr_pipeline_t *pipeline) {
 	if (pipeline->_blend    ) pipeline->_blend    ->Release();
 	if (pipeline->_rasterize) pipeline->_rasterize->Release();
+	if (pipeline->_depth    ) pipeline->_depth    ->Release();
 	if (pipeline->_vertex   ) pipeline->_vertex   ->Release();
 	if (pipeline->_pixel    ) pipeline->_pixel    ->Release();
 	*pipeline = {};

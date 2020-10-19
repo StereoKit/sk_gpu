@@ -196,16 +196,17 @@ skr_tex_t *skr_tex_target_get() {
 
 ///////////////////////////////////////////
 
-void skr_draw(int32_t index_start, int32_t index_count, int32_t instance_count) {
-	d3d_context->DrawIndexedInstanced(index_count, instance_count, index_start, 0, 0);
+void skr_draw(int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count) {
+	d3d_context->DrawIndexedInstanced(index_count, instance_count, index_start, index_base, 0);
 }
 
 ///////////////////////////////////////////
 
 skr_buffer_t skr_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skr_buffer_type_ type, skr_use_ use) {
 	skr_buffer_t result = {};
-	result.use  = use;
-	result.type = type;
+	result.use    = use;
+	result.type   = type;
+	result.stride = size_stride;
 
 	D3D11_SUBRESOURCE_DATA buffer_data = { data };
 	D3D11_BUFFER_DESC      buffer_desc = {};
@@ -249,17 +250,33 @@ void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t si
 	}
 
 	D3D11_MAPPED_SUBRESOURCE resource;
-	d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	memcpy(resource.pData, data, size_bytes);
-	d3d_context->Unmap(buffer->_buffer, 0);
+	if (SUCCEEDED(d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource))) {
+		memcpy(resource.pData, data, size_bytes);
+		d3d_context->Unmap(buffer->_buffer, 0);
+	} else {
+		skr_log(skr_log_critical, "Failed to set contents of buffer, may not be using a writeable buffer type?");
+	}
 }
 
 /////////////////////////////////////////// 
 
-void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t stride, uint32_t offset) {
+void skr_buffer_get_contents(const skr_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size) {
+	D3D11_MAPPED_SUBRESOURCE resource;
+	if (SUCCEEDED(d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_READ, 0, &resource))) {
+		memcpy(ref_buffer, resource.pData, min(resource.DepthPitch * resource.DepthPitch, buffer_size));
+		d3d_context->Unmap(buffer->_buffer, 0);
+	} else {
+		memset(ref_buffer, 0, buffer_size);
+		skr_log(skr_log_critical, "Failed to get contents of buffer, may not be using a readable buffer type?");
+	}
+}
+
+/////////////////////////////////////////// 
+
+void skr_buffer_bind(const skr_buffer_t *buffer, skr_bind_t bind, uint32_t offset) {
 	switch (buffer->type) {
-	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers  (bind.slot, 1, &buffer->_buffer, &stride, &offset); break;
-	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer    (buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
+	case skr_buffer_type_vertex:   d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, &offset); break;
+	case skr_buffer_type_index:    d3d_context->IASetIndexBuffer  (buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
 	case skr_buffer_type_constant: {
 		if (bind.stage_bits & skr_stage_vertex)
 			d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
@@ -370,8 +387,7 @@ skr_shader_stage_t skr_shader_stage_create(const void *file_data, size_t shader_
 			{"SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"NORMAL",      0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-			{"COLOR" ,      0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-			{"SV_RenderTargetArrayIndex" ,  0, DXGI_FORMAT_R8_UINT,  0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0} };
+			{"COLOR" ,      0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0} };
 		d3d_device->CreateInputLayout(vert_desc, (UINT)_countof(vert_desc), buffer, buffer_size, &d3d_vert_layout);
 	}
 	if (compiled) compiled->Release();
@@ -393,14 +409,16 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 // skr_shader_t                          //
 ///////////////////////////////////////////
 
-skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
+skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader, skr_shader_stage_t c_shader) {
 	skr_shader_t result = {};
 	result.meta    = meta;
-	result._vertex = (ID3D11VertexShader*)v_shader._shader;
-	result._pixel  = (ID3D11PixelShader *)p_shader._shader;
+	if (v_shader._shader) result._vertex  = (ID3D11VertexShader *)v_shader._shader;
+	if (p_shader._shader) result._pixel   = (ID3D11PixelShader  *)p_shader._shader;
+	if (c_shader._shader) result._compute = (ID3D11ComputeShader*)c_shader._shader;
 	skr_shader_meta_reference(result.meta);
-	if (result._vertex) result._vertex->AddRef();
-	if (result._pixel ) result._pixel ->AddRef();
+	if (result._vertex ) result._vertex ->AddRef();
+	if (result._pixel  ) result._pixel  ->AddRef();
+	if (result._compute) result._compute->AddRef();
 
 	return result;
 }
@@ -409,15 +427,15 @@ skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_
 
 bool skr_shader_is_valid(const skr_shader_t *shader) {
 	return shader->meta
-		&& shader->_vertex
-		&& shader->_pixel;
+		&& (shader->_vertex && shader->_pixel) || shader->_compute;
 }
 
 ///////////////////////////////////////////
 
 void skr_shader_destroy(skr_shader_t *shader) {
-	if (shader->_vertex) shader->_vertex->Release();
-	if (shader->_pixel ) shader->_pixel ->Release();
+	if (shader->_vertex ) shader->_vertex ->Release();
+	if (shader->_pixel  ) shader->_pixel  ->Release();
+	if (shader->_compute) shader->_compute->Release();
 	*shader = {};
 }
 

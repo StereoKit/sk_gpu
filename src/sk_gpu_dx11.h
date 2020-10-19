@@ -23,15 +23,11 @@ typedef struct skr_shader_stage_t {
 } skr_shader_stage_t;
 
 typedef struct skr_shader_t {
-	skr_shader_meta_t  *meta;
-	ID3D11VertexShader *_vertex;
-	ID3D11PixelShader  *_pixel;
-} skr_shader_t;
-
-typedef struct skr_compute_t {
 	skr_shader_meta_t   *meta;
+	ID3D11VertexShader  *_vertex;
+	ID3D11PixelShader   *_pixel;
 	ID3D11ComputeShader *_compute;
-} skr_compute_t;
+} skr_shader_t;
 
 typedef struct skr_pipeline_t {
 	skr_transparency_        transparency;

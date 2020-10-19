@@ -203,7 +203,6 @@ skr_shader_stage_t skr_shader_file_create_stage(const skr_shader_file_t *file, s
 		if (file->stages[i].language == language && file->stages[i].stage == stage)
 			return skr_shader_stage_create(file->stages[i].code, file->stages[i].code_size, stage);
 	}
-	skr_log(skr_log_warning, "Couldn't find a shader stage in shader file!");
 	return {};
 }
 
@@ -250,10 +249,12 @@ skr_shader_t skr_shader_create_file(const char *sks_filename) {
 
 	skr_shader_stage_t vs     = skr_shader_file_create_stage(&file, skr_stage_vertex);
 	skr_shader_stage_t ps     = skr_shader_file_create_stage(&file, skr_stage_pixel);
-	skr_shader_t       result = skr_shader_create_manual(file.meta, vs, ps );
+	skr_shader_stage_t cs     = skr_shader_file_create_stage(&file, skr_stage_compute);
+	skr_shader_t       result = skr_shader_create_manual( file.meta, vs, ps, cs );
 
 	skr_shader_stage_destroy(&vs);
 	skr_shader_stage_destroy(&ps);
+	skr_shader_stage_destroy(&cs);
 	skr_shader_file_destroy (&file);
 
 	return result;
@@ -268,10 +269,12 @@ skr_shader_t skr_shader_create_memory(const void *sks_data, size_t sks_data_size
 
 	skr_shader_stage_t vs     = skr_shader_file_create_stage(&file, skr_stage_vertex);
 	skr_shader_stage_t ps     = skr_shader_file_create_stage(&file, skr_stage_pixel);
-	skr_shader_t       result = skr_shader_create_manual( file.meta, vs, ps );
+	skr_shader_stage_t cs     = skr_shader_file_create_stage(&file, skr_stage_compute);
+	skr_shader_t       result = skr_shader_create_manual( file.meta, vs, ps, cs );
 
 	skr_shader_stage_destroy(&vs);
 	skr_shader_stage_destroy(&ps);
+	skr_shader_stage_destroy(&cs);
 	skr_shader_file_destroy (&file);
 
 	return result;

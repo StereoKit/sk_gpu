@@ -877,7 +877,7 @@ void skr_shader_stage_destroy(skr_shader_stage_t *shader) {
 // skr_shader_t                          //
 ///////////////////////////////////////////
 
-skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader) {
+skr_shader_t skr_shader_create_manual(skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader, skr_shader_stage_t c_shader) {
 	skr_shader_t result = {};
 	result.meta    = meta;
 	result._vertex = v_shader._shader;

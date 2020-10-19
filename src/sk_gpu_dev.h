@@ -250,7 +250,7 @@ void                skr_shader_stage_destroy     (skr_shader_stage_t *stage);
 
 skr_shader_t        skr_shader_create_file       (const char *sks_filename);
 skr_shader_t        skr_shader_create_memory     (const void *sks_memory, size_t sks_memory_size);
-skr_shader_t        skr_shader_create_manual     (skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader);
+skr_shader_t        skr_shader_create_manual     (skr_shader_meta_t *meta, skr_shader_stage_t v_shader, skr_shader_stage_t p_shader, skr_shader_stage_t c_shader);
 bool                skr_shader_is_valid          (const skr_shader_t *shader);
 skr_bind_t          skr_shader_get_tex_bind      (const skr_shader_t *shader, const char *name);
 skr_bind_t          skr_shader_get_buffer_bind   (const skr_shader_t *shader, const char *name);

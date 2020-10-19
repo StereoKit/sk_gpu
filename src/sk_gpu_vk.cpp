@@ -1,5 +1,5 @@
 #include "sk_gpu_dev.h"
-#ifdef SKR_VULKAN
+#ifdef SKG_VULKAN
 ///////////////////////////////////////////
 // Vulkan Implementation                 //
 ///////////////////////////////////////////
@@ -47,7 +47,7 @@ uint64_t hash_fnv64_data(const void *data, size_t data_size, uint64_t start_hash
 
 //////////////////////////////////////
 
-struct skr_device_t {
+struct skg_device_t {
 	VkSurfaceKHR     surface;
 	VkPhysicalDevice phys_device;
 	VkDevice         device;
@@ -65,7 +65,7 @@ struct vk_swapchain_t {
 	VkExtent2D         extents;
 };
 
-skr_device_t skr_device = {};
+skg_device_t skg_device = {};
 
 //////////////////////////////////////
 // Pipeline & Renderpass Info       //
@@ -134,14 +134,14 @@ void _vk_pipelines_addpass(int64_t pass) {
 	for (size_t i = 0; i < vk_pipeline_cache.count; i++) {
 		while (vk_pipeline_cache[i].pipelines.count < pass) vk_pipeline_cache[i].pipelines.add({});
 		vk_pipeline_cache[i].info.create.renderPass = vk_renderpass_cache[pass].renderpass;
-		vkCreateGraphicsPipelines(skr_device.device, VK_NULL_HANDLE, 1, &vk_pipeline_cache[i].info.create, nullptr, &vk_pipeline_cache[i].pipelines[pass]);
+		vkCreateGraphicsPipelines(skg_device.device, VK_NULL_HANDLE, 1, &vk_pipeline_cache[i].info.create, nullptr, &vk_pipeline_cache[i].pipelines[pass]);
 	}
 }
 void _vk_pipelines_rempass(int64_t pass) {
 	for (size_t i = 0; i < vk_pipeline_cache.count; i++) {
 		if (vk_pipeline_cache[i].pipelines.count < pass) continue;
 		vk_pipeline_cache[i].info.create.renderPass = vk_renderpass_cache[pass].renderpass;
-		vkDestroyPipeline(skr_device.device, vk_pipeline_cache[i].pipelines[pass], nullptr);
+		vkDestroyPipeline(skg_device.device, vk_pipeline_cache[i].pipelines[pass], nullptr);
 	}
 }
 
@@ -158,7 +158,7 @@ int64_t vk_pipeline_ref(vk_pipeline_info_t &info) {
 		for (size_t i = 0; i < vk_renderpass_cache.count; i++) {
 			VkPipeline pipeline = {};
 			vk_pipeline_cache[index].info.create.renderPass = vk_renderpass_cache[i].renderpass;
-			vkCreateGraphicsPipelines(skr_device.device, VK_NULL_HANDLE, 1, &vk_pipeline_cache[index].info.create, nullptr, &pipeline);
+			vkCreateGraphicsPipelines(skg_device.device, VK_NULL_HANDLE, 1, &vk_pipeline_cache[index].info.create, nullptr, &pipeline);
 			vk_pipeline_cache[index].pipelines.add(pipeline);
 		}
 	}
@@ -169,7 +169,7 @@ void vk_pipeline_release(int64_t id) {
 	vk_pipeline_cache[id].ref_count -= 1;
 	if (vk_pipeline_cache[id].ref_count == 0) {
 		for (size_t i = 0; i < vk_pipeline_cache[id].pipelines.count; i++) {
-			vkDestroyPipeline(skr_device.device, vk_pipeline_cache[id].pipelines[i], nullptr);
+			vkDestroyPipeline(skg_device.device, vk_pipeline_cache[id].pipelines[i], nullptr);
 		}
 		vk_pipeline_cache[id].pipelines.free();
 	}
@@ -206,7 +206,7 @@ int64_t vk_renderpass_ref(VkRenderPassCreateInfo &info) {
 		vk_renderpass_cache[index].hash = hash;
 	}
 	if (vk_renderpass_cache[index].ref_count == 0) {
-		vkCreateRenderPass(skr_device.device, &info, nullptr, &vk_renderpass_cache[index].renderpass);
+		vkCreateRenderPass(skg_device.device, &info, nullptr, &vk_renderpass_cache[index].renderpass);
 		_vk_pipelines_addpass(index);
 	}
 	vk_renderpass_cache[index].ref_count += 1;
@@ -216,7 +216,7 @@ void vk_renderpass_release(int64_t id) {
 	vk_renderpass_cache[id].ref_count -= 1;
 	if (vk_renderpass_cache[id].ref_count == 0) {
 		_vk_pipelines_rempass(id);
-		vkDestroyRenderPass(skr_device.device, vk_renderpass_cache[id].renderpass, nullptr);
+		vkDestroyRenderPass(skg_device.device, vk_renderpass_cache[id].renderpass, nullptr);
 	}
 }
 
@@ -229,21 +229,21 @@ VkCommandPool vk_cmd_pool           = VK_NULL_HANDLE;
 VkCommandPool vk_cmd_pool_transient = VK_NULL_HANDLE;
 
 // Vertex layout info
-VkVertexInputBindingDescription      skr_vert_bind    = { 0, sizeof(skr_vert_t), VK_VERTEX_INPUT_RATE_VERTEX };
-VkVertexInputAttributeDescription    skr_vert_attrs[] = {
-	{ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(skr_vert_t, pos)  },
-	{ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(skr_vert_t, norm) },
-	{ 2, 0, VK_FORMAT_R32G32_SFLOAT,    offsetof(skr_vert_t, uv)   },
-	{ 3, 0, VK_FORMAT_R8G8B8A8_UNORM,   offsetof(skr_vert_t, col)  }, };
-VkPipelineVertexInputStateCreateInfo skr_vertex_layout = { 
+VkVertexInputBindingDescription      skg_vert_bind    = { 0, sizeof(skg_vert_t), VK_VERTEX_INPUT_RATE_VERTEX };
+VkVertexInputAttributeDescription    skg_vert_attrs[] = {
+	{ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(skg_vert_t, pos)  },
+	{ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(skg_vert_t, norm) },
+	{ 2, 0, VK_FORMAT_R32G32_SFLOAT,    offsetof(skg_vert_t, uv)   },
+	{ 3, 0, VK_FORMAT_R8G8B8A8_UNORM,   offsetof(skg_vert_t, col)  }, };
+VkPipelineVertexInputStateCreateInfo skg_vertex_layout = { 
 	VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, nullptr, 0,
-	1,                       &skr_vert_bind,
-	_countof(skr_vert_attrs), skr_vert_attrs };
+	1,                       &skg_vert_bind,
+	_countof(skg_vert_attrs), skg_vert_attrs };
 
-const skr_tex_t *skr_active_rendertarget = nullptr;
+const skg_tex_t *skg_active_rendertarget = nullptr;
 VkPipeline *vk_active_pipeline = nullptr;
 
-skr_tex_fmt_ skr_native_to_tex_fmt(VkFormat format);
+skg_tex_fmt_ skg_native_to_tex_fmt(VkFormat format);
 
 ///////////////////////////////////////////
 
@@ -290,7 +290,7 @@ bool vk_create_instance(const char *app_name, VkInstance *out_inst) {
 		const char*                                 pLayerPrefix,
 		const char*                                 pMessage,
 		void*                                       pUserData) {
-			skr_log(skr_log_info, pMessage);
+			skg_log(skg_log_info, pMessage);
 			return (VkBool32)VK_FALSE;
 	};
 	VkDebugReportCallbackEXT callback;
@@ -303,7 +303,7 @@ bool vk_create_instance(const char *app_name, VkInstance *out_inst) {
 
 ///////////////////////////////////////////
 
-bool vk_create_device(VkInstance inst, void *app_hwnd, skr_device_t *out_device) {
+bool vk_create_device(VkInstance inst, void *app_hwnd, skg_device_t *out_device) {
 	*out_device = {};
 
 	// Create win32 surface
@@ -410,7 +410,7 @@ bool vk_create_device(VkInstance inst, void *app_hwnd, skr_device_t *out_device)
 
 ///////////////////////////////////////////
 
-VkSurfaceFormatKHR vk_get_preferred_fmt(skr_device_t &device) {
+VkSurfaceFormatKHR vk_get_preferred_fmt(skg_device_t &device) {
 	VkSurfaceFormatKHR result;
 	uint32_t format_count = 1;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device.phys_device, device.surface, &format_count, nullptr);
@@ -424,7 +424,7 @@ VkSurfaceFormatKHR vk_get_preferred_fmt(skr_device_t &device) {
 
 ///////////////////////////////////////////
 
-VkPresentModeKHR vk_get_presentation_mode(skr_device_t &device) {
+VkPresentModeKHR vk_get_presentation_mode(skg_device_t &device) {
 	VkPresentModeKHR  result     = VK_PRESENT_MODE_FIFO_KHR; // always supported.
 	uint32_t          mode_count = 0;
 	VkPresentModeKHR *modes      = nullptr;
@@ -445,45 +445,45 @@ VkPresentModeKHR vk_get_presentation_mode(skr_device_t &device) {
 
 ///////////////////////////////////////////
 
-int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id) {
+int32_t skg_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 	VkResult result = VK_ERROR_INITIALIZATION_FAILED;
 
 	if (!vk_create_instance (app_name, &vk_inst)) return -1;
-	if (!vk_create_device   (vk_inst, app_hwnd, &skr_device)) return -2;
+	if (!vk_create_device   (vk_inst, app_hwnd, &skg_device)) return -2;
 
 	VkCommandPoolCreateInfo cmd_pool_info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 	cmd_pool_info.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	cmd_pool_info.queueFamilyIndex = skr_device.queue_gfx_index;
-	vkCreateCommandPool(skr_device.device, &cmd_pool_info, 0, &vk_cmd_pool);
+	cmd_pool_info.queueFamilyIndex = skg_device.queue_gfx_index;
+	vkCreateCommandPool(skg_device.device, &cmd_pool_info, 0, &vk_cmd_pool);
 
 	// A command pool for short-lived command buffers
 	cmd_pool_info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 	cmd_pool_info.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-	cmd_pool_info.queueFamilyIndex = skr_device.queue_gfx_index;
-	vkCreateCommandPool(skr_device.device, &cmd_pool_info, 0, &vk_cmd_pool_transient);
+	cmd_pool_info.queueFamilyIndex = skg_device.queue_gfx_index;
+	vkCreateCommandPool(skg_device.device, &cmd_pool_info, 0, &vk_cmd_pool_transient);
 
 	return 1;
 }
 
 ///////////////////////////////////////////
 
-void skr_shutdown() {
-	vkDeviceWaitIdle(skr_device.device);
-	vkDestroyCommandPool(skr_device.device, vk_cmd_pool_transient, 0);
-	vkDestroyCommandPool(skr_device.device, vk_cmd_pool, 0);
-	vkDestroySurfaceKHR(vk_inst, skr_device.surface, 0);
-	vkDestroyDevice(skr_device.device, 0);
+void skg_shutdown() {
+	vkDeviceWaitIdle(skg_device.device);
+	vkDestroyCommandPool(skg_device.device, vk_cmd_pool_transient, 0);
+	vkDestroyCommandPool(skg_device.device, vk_cmd_pool, 0);
+	vkDestroySurfaceKHR(vk_inst, skg_device.surface, 0);
+	vkDestroyDevice(skg_device.device, 0);
 	vkDestroyInstance(vk_inst, 0);
 }
 
 ///////////////////////////////////////////
 
-void skr_draw_begin() {
+void skg_draw_begin() {
 }
 
 ///////////////////////////////////////////
 
-void skr_tex_target_bind(float clear_color[4], const skr_tex_t *render_target, const skr_tex_t *depth_target) {
+void skg_tex_target_bind(float clear_color[4], const skg_tex_t *render_target, const skg_tex_t *depth_target) {
 	/*VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -504,15 +504,15 @@ void skr_tex_target_bind(float clear_color[4], const skr_tex_t *render_target, c
 	viewport_state.scissorCount = 1;
 	viewport_state.pScissors = &scissor;
 
-	skr_draw_hack();*/
-	skr_active_rendertarget = render_target;
+	skg_draw_hack();*/
+	skg_active_rendertarget = render_target;
 
 	VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	beginInfo.flags           = 0; // Optional
 	beginInfo.pInheritanceInfo = nullptr; // Optional
 
 	if (vkBeginCommandBuffer(render_target->rt_commandbuffer, &beginInfo) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "failed to begin recording command buffer!");
+		skg_log(skg_log_critical, "failed to begin recording command buffer!");
 	}
 
 	VkClearValue clear_values = {};
@@ -532,8 +532,8 @@ void skr_tex_target_bind(float clear_color[4], const skr_tex_t *render_target, c
 
 ///////////////////////////////////////////
 
-void skr_draw (int32_t index_start, int32_t index_count, int32_t instance_count) {
-	vkCmdDrawIndexed(skr_active_rendertarget->rt_commandbuffer, index_count, instance_count, index_start, 0, 0);
+void skg_draw (int32_t index_start, int32_t index_count, int32_t instance_count) {
+	vkCmdDrawIndexed(skg_active_rendertarget->rt_commandbuffer, index_count, instance_count, index_start, 0, 0);
 }
 
 ///////////////////////////////////////////
@@ -542,7 +542,7 @@ void skr_draw (int32_t index_start, int32_t index_count, int32_t instance_count)
 
 int32_t vk_find_mem_type(uint32_t type_filter, VkMemoryPropertyFlags properties) {
 	VkPhysicalDeviceMemoryProperties props;
-	vkGetPhysicalDeviceMemoryProperties(skr_device.phys_device, &props);
+	vkGetPhysicalDeviceMemoryProperties(skg_device.phys_device, &props);
 	for (uint32_t i = 0; i < props.memoryTypeCount; i++) {
 		if ((type_filter & (1 << i)) && (props.memoryTypes[i].propertyFlags & properties) == properties) {
 			return i;
@@ -557,22 +557,22 @@ void vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPrope
 	buff_info.usage       = usage;
 	buff_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	if (vkCreateBuffer(skr_device.device, &buff_info, nullptr, out_buffer) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "failed to create buffer!");
+	if (vkCreateBuffer(skg_device.device, &buff_info, nullptr, out_buffer) != VK_SUCCESS) {
+		skg_log(skg_log_critical, "failed to create buffer!");
 	}
 
 	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(skr_device.device, *out_buffer, &memRequirements);
+	vkGetBufferMemoryRequirements(skg_device.device, *out_buffer, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
 	allocInfo.allocationSize  = memRequirements.size;
 	allocInfo.memoryTypeIndex = vk_find_mem_type(memRequirements.memoryTypeBits, properties);
 
-	if (vkAllocateMemory(skr_device.device, &allocInfo, nullptr, out_memory) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "failed to allocate buffer memory!");
+	if (vkAllocateMemory(skg_device.device, &allocInfo, nullptr, out_memory) != VK_SUCCESS) {
+		skg_log(skg_log_critical, "failed to allocate buffer memory!");
 	}
 
-	vkBindBufferMemory(skr_device.device, *out_buffer, *out_memory, 0);
+	vkBindBufferMemory(skg_device.device, *out_buffer, *out_memory, 0);
 }
 
 void vk_copy_buffer(VkBuffer src, VkBuffer dest, VkDeviceSize size) {
@@ -582,7 +582,7 @@ void vk_copy_buffer(VkBuffer src, VkBuffer dest, VkDeviceSize size) {
 	allocInfo.commandBufferCount = 1;
 
 	VkCommandBuffer commandBuffer;
-	vkAllocateCommandBuffers(skr_device.device, &allocInfo, &commandBuffer);
+	vkAllocateCommandBuffers(skg_device.device, &allocInfo, &commandBuffer);
 
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -600,24 +600,24 @@ void vk_copy_buffer(VkBuffer src, VkBuffer dest, VkDeviceSize size) {
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
 
-	vkQueueSubmit  (skr_device.queue_gfx, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(skr_device.queue_gfx);
-	vkFreeCommandBuffers(skr_device.device, vk_cmd_pool_transient, 1, &commandBuffer);
+	vkQueueSubmit  (skg_device.queue_gfx, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(skg_device.queue_gfx);
+	vkFreeCommandBuffers(skg_device.device, vk_cmd_pool_transient, 1, &commandBuffer);
 }
 
-skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer_type_ type, skr_use_ use) {
-	skr_buffer_t result = {};
+skg_buffer_t skg_buffer_create(const void *data, uint32_t size_bytes, skg_buffer_type_ type, skg_use_ use) {
+	skg_buffer_t result = {};
 	result.type = type;
 	result.use  = use;
 
 	VkBufferUsageFlags usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	switch (type) {
-	case skr_buffer_type_vertex:   usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;  break;
-	case skr_buffer_type_index:    usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;   break;
-	case skr_buffer_type_constant: usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; break;
+	case skg_buffer_type_vertex:   usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;  break;
+	case skg_buffer_type_index:    usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;   break;
+	case skg_buffer_type_constant: usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; break;
 	}
 
-	if (use == skr_use_static) {
+	if (use == skg_use_static) {
 		VkBuffer       stage_buffer;
 		VkDeviceMemory stage_memory;
 		vk_create_buffer(size_bytes,
@@ -627,9 +627,9 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 			&stage_buffer, &stage_memory);
 
 		void *gpu_data;
-		vkMapMemory(skr_device.device, stage_memory, 0, size_bytes, 0, &gpu_data);
+		vkMapMemory(skg_device.device, stage_memory, 0, size_bytes, 0, &gpu_data);
 		memcpy(gpu_data, data, (size_t)size_bytes);
-		vkUnmapMemory(skr_device.device, stage_memory);
+		vkUnmapMemory(skg_device.device, stage_memory);
 
 		vk_create_buffer(size_bytes,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT |
@@ -640,8 +640,8 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 
 		vk_copy_buffer(stage_buffer, result.buffer, size_bytes);
 
-		vkDestroyBuffer(skr_device.device, stage_buffer, nullptr);
-		vkFreeMemory(skr_device.device, stage_memory, nullptr);
+		vkDestroyBuffer(skg_device.device, stage_buffer, nullptr);
+		vkFreeMemory(skg_device.device, stage_memory, nullptr);
 	} else {
 		vk_create_buffer(size_bytes,
 			usage,
@@ -649,7 +649,7 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&result.buffer, &result.memory);
 
-		skr_buffer_set_contents(&result, data, size_bytes);
+		skg_buffer_set_contents(&result, data, size_bytes);
 	}
 
 	return result;
@@ -657,36 +657,36 @@ skr_buffer_t skr_buffer_create(const void *data, uint32_t size_bytes, skr_buffer
 
 ///////////////////////////////////////////
 
-void skr_buffer_set_contents(skr_buffer_t *buffer, const void *data, uint32_t size_bytes) {
-	if (buffer->use != skr_use_dynamic)
+void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t size_bytes) {
+	if (buffer->use != skg_use_dynamic)
 		return;
 
 	void *gpu_data;
-	vkMapMemory(skr_device.device, buffer->memory, 0, size_bytes, 0, &gpu_data);
+	vkMapMemory(skg_device.device, buffer->memory, 0, size_bytes, 0, &gpu_data);
 	memcpy(gpu_data, data, (size_t)size_bytes);
-	vkUnmapMemory(skr_device.device, buffer->memory);
+	vkUnmapMemory(skg_device.device, buffer->memory);
 }
 
 ///////////////////////////////////////////
 
-void skr_buffer_bind(const skr_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
-	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
+void skg_buffer_bind(const skg_buffer_t *buffer, uint32_t slot, uint32_t stride, uint32_t offset) {
+	vkCmdBindPipeline(skg_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
 
 	switch (buffer->type) {
-	case skr_buffer_type_vertex: {
+	case skg_buffer_type_vertex: {
 		VkBuffer     buffers[] = {buffer->buffer};
 		VkDeviceSize offsets[] = {offset};
-		vkCmdBindVertexBuffers(skr_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets);
+		vkCmdBindVertexBuffers(skg_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets);
 	} break;
-	case skr_buffer_type_index : vkCmdBindIndexBuffer(skr_active_rendertarget->rt_commandbuffer, buffer->buffer, offset, VK_INDEX_TYPE_UINT32); break;
-	//case skr_buffer_type_vertex: vkCmdBindVertexBuffers(skr_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets); break;
+	case skg_buffer_type_index : vkCmdBindIndexBuffer(skg_active_rendertarget->rt_commandbuffer, buffer->buffer, offset, VK_INDEX_TYPE_UINT32); break;
+	//case skg_buffer_type_vertex: vkCmdBindVertexBuffers(skg_active_rendertarget->rt_commandbuffer, 0, 1, &buffer->buffer, offsets); break;
 	};
 }
 
 ///////////////////////////////////////////
 
-void skr_buffer_destroy(skr_buffer_t *buffer) {
-	vkDestroyBuffer(skr_device.device, buffer->buffer, nullptr);
+void skg_buffer_destroy(skg_buffer_t *buffer) {
+	vkDestroyBuffer(skg_device.device, buffer->buffer, nullptr);
 	*buffer = {};
 }
 
@@ -694,35 +694,35 @@ void skr_buffer_destroy(skr_buffer_t *buffer) {
 // Mesh                                  //
 ///////////////////////////////////////////
 
-skr_mesh_t skr_mesh_create(const skr_buffer_t *vert_buffer, const skr_buffer_t *ind_buffer) {
-	skr_mesh_t result = {};
+skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
+	skg_mesh_t result = {};
 	return result;
 }
-void skr_mesh_bind(const skr_mesh_t *mesh) {
+void skg_mesh_bind(const skg_mesh_t *mesh) {
 }
-void skr_mesh_destroy(skr_mesh_t *mesh) {
+void skg_mesh_destroy(skg_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
 // Shader Stage                          //
 ///////////////////////////////////////////
 
-skr_shader_stage_t skr_shader_stage_create(const uint8_t *shader_data, size_t shader_size, skr_stage_ type) {
-	skr_shader_stage_t result = {};
+skg_shader_stage_t skg_shader_stage_create(const uint8_t *shader_data, size_t shader_size, skg_stage_ type) {
+	skg_shader_stage_t result = {};
 	result.type = type;
 
 	VkShaderModuleCreateInfo shader_info = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
 	shader_info.codeSize = shader_size;
 	shader_info.pCode    = (uint32_t*)shader_data;
 
-	if (vkCreateShaderModule(skr_device.device, &shader_info, nullptr, &result.module) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "Failed to create shader module!");
+	if (vkCreateShaderModule(skg_device.device, &shader_info, nullptr, &result.module) != VK_SUCCESS) {
+		skg_log(skg_log_critical, "Failed to create shader module!");
 	}
 
 	return result;
 }
-void skr_shader_stage_destroy(skr_shader_stage_t *stage) {
-	vkDestroyShaderModule(skr_device.device, stage->module, nullptr);
+void skg_shader_stage_destroy(skg_shader_stage_t *stage) {
+	vkDestroyShaderModule(skg_device.device, stage->module, nullptr);
 	*stage = {};
 }
 
@@ -730,12 +730,12 @@ void skr_shader_stage_destroy(skr_shader_stage_t *stage) {
 // Shader                                //
 ///////////////////////////////////////////
 
-skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shader_stage_t *pixel) {
-	skr_shader_t result = {};
+skg_shader_t skg_shader_create(const skg_shader_stage_t *vertex, const skg_shader_stage_t *pixel) {
+	skg_shader_t result = {};
 
 	vk_pipeline_info_t info = {};
 
-	info.vertex_info = skr_vertex_layout;
+	info.vertex_info = skg_vertex_layout;
 
 	info.shader_stages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	info.shader_stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
@@ -810,7 +810,7 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 	layout_info.pBindings    = &layout_binding;
 
 	VkDescriptorSetLayout desc_layout;
-	vkCreateDescriptorSetLayout(skr_device.device, &layout_info, nullptr, &desc_layout);
+	vkCreateDescriptorSetLayout(skg_device.device, &layout_info, nullptr, &desc_layout);
 
 	// Descriptor sets???
 	VkDescriptorPoolSize poolSize = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
@@ -820,16 +820,16 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 	poolInfo.pPoolSizes      = &poolSize;
 	poolInfo.maxSets         = 1;
 	VkDescriptorPool descriptorPool;
-	if (vkCreateDescriptorPool(skr_device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "failed to create descriptor pool!");
+	if (vkCreateDescriptorPool(skg_device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+		skg_log(skg_log_critical, "failed to create descriptor pool!");
 	}
 	VkDescriptorSetAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
 	allocInfo.descriptorPool     = descriptorPool;
 	allocInfo.descriptorSetCount = 1;
 	allocInfo.pSetLayouts        = &desc_layout;
 	VkDescriptorSet desc_set;
-	if (vkAllocateDescriptorSets(skr_device.device, &allocInfo, &desc_set) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "failed to allocate descriptor sets!");
+	if (vkAllocateDescriptorSets(skg_device.device, &allocInfo, &desc_set) != VK_SUCCESS) {
+		skg_log(skg_log_critical, "failed to allocate descriptor sets!");
 	}
 
 	VkPipelineLayoutCreateInfo pipe_layout = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
@@ -838,8 +838,8 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 	pipe_layout.pushConstantRangeCount = 0; // Optional
 	pipe_layout.pPushConstantRanges    = nullptr; // Optional
 
-	if (vkCreatePipelineLayout(skr_device.device, &pipe_layout, nullptr, &result.pipeline_layout) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "failed to create pipeline layout!");
+	if (vkCreatePipelineLayout(skg_device.device, &pipe_layout, nullptr, &result.pipeline_layout) != VK_SUCCESS) {
+		skg_log(skg_log_critical, "failed to create pipeline layout!");
 	}
 
 	VkViewport viewport = {};
@@ -882,13 +882,13 @@ skr_shader_t skr_shader_create(const skr_shader_stage_t *vertex, const skr_shade
 
 	return result;
 }
-void skr_shader_set(const skr_shader_t *shader) {
-	vk_active_pipeline = &vk_pipeline_cache[shader->pipeline].pipelines[skr_active_rendertarget->rt_renderpass];
-	vkCmdBindPipeline(skr_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
+void skg_shader_set(const skg_shader_t *shader) {
+	vk_active_pipeline = &vk_pipeline_cache[shader->pipeline].pipelines[skg_active_rendertarget->rt_renderpass];
+	vkCmdBindPipeline(skg_active_rendertarget->rt_commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *vk_active_pipeline);
 }
-void skr_shader_destroy(skr_shader_t *shader) {
+void skg_shader_destroy(skg_shader_t *shader) {
 	if (shader->pipeline)        vk_pipeline_release(shader->pipeline);
-	if (shader->pipeline_layout) vkDestroyPipelineLayout(skr_device.device, shader->pipeline_layout, nullptr);
+	if (shader->pipeline_layout) vkDestroyPipelineLayout(skg_device.device, shader->pipeline_layout, nullptr);
 	*shader = {};
 }
 
@@ -896,13 +896,13 @@ void skr_shader_destroy(skr_shader_t *shader) {
 // Swapchain                             //
 ///////////////////////////////////////////
 
-skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_format, int32_t width, int32_t height) {
-	skr_swapchain_t  result = {};
-	VkPresentModeKHR mode   = vk_get_presentation_mode(skr_device);
-	result.format           = vk_get_preferred_fmt    (skr_device);
+skg_swapchain_t skg_swapchain_create(skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height) {
+	skg_swapchain_t  result = {};
+	VkPresentModeKHR mode   = vk_get_presentation_mode(skg_device);
+	result.format           = vk_get_preferred_fmt    (skg_device);
 
 	VkSurfaceCapabilitiesKHR surface_caps;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(skr_device.phys_device, skr_device.surface, &surface_caps);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(skg_device.phys_device, skg_device.surface, &surface_caps);
 
 	result.extents = surface_caps.currentExtent;
 	if (result.extents.width == UINT32_MAX) {
@@ -922,7 +922,7 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 	result.height = height;
 	
 	VkSwapchainCreateInfoKHR swapchain_info = { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
-	swapchain_info.surface          = skr_device.surface;
+	swapchain_info.surface          = skg_device.surface;
 	swapchain_info.minImageCount    = surface_caps.maxImageCount > 0 && surface_caps.minImageCount+1 > surface_caps.maxImageCount 
 		? surface_caps.minImageCount
 		: surface_caps.minImageCount + 1;
@@ -939,47 +939,47 @@ skr_swapchain_t skr_swapchain_create(skr_tex_fmt_ format, skr_tex_fmt_ depth_for
 
 	// Exclusive mode is faster, but can't be used if the presentation queue
 	// and graphics queue are separate.
-	if (skr_device.queue_gfx_index != skr_device.queue_present_index) {
-		uint32_t queue_indices[] = { skr_device.queue_gfx_index, skr_device.queue_present_index };
+	if (skg_device.queue_gfx_index != skg_device.queue_present_index) {
+		uint32_t queue_indices[] = { skg_device.queue_gfx_index, skg_device.queue_present_index };
 		swapchain_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
 		swapchain_info.queueFamilyIndexCount = _countof(queue_indices);
 		swapchain_info.pQueueFamilyIndices   = queue_indices;
 	}
 
-	VkResult call_result = vkCreateSwapchainKHR(skr_device.device, &swapchain_info, 0, &result.swapchain);
+	VkResult call_result = vkCreateSwapchainKHR(skg_device.device, &swapchain_info, 0, &result.swapchain);
 	if (call_result != VK_SUCCESS)
-		skr_log(skr_log_critical, "Failed to create swapchain!");
+		skg_log(skg_log_critical, "Failed to create swapchain!");
 
-	vkGetSwapchainImagesKHR(skr_device.device, result.swapchain, &result.img_count, nullptr);
+	vkGetSwapchainImagesKHR(skg_device.device, result.swapchain, &result.img_count, nullptr);
 	result.imgs      = (VkImage   *)malloc(sizeof(VkImage  ) * result.img_count);
-	result.textures  = (skr_tex_t *)malloc(sizeof(skr_tex_t) * result.img_count);
+	result.textures  = (skg_tex_t *)malloc(sizeof(skg_tex_t) * result.img_count);
 	result.img_fence = (VkFence   *)malloc(sizeof(VkFence  ) * result.img_count);
-	vkGetSwapchainImagesKHR(skr_device.device, result.swapchain, &result.img_count, result.imgs);
+	vkGetSwapchainImagesKHR(skg_device.device, result.swapchain, &result.img_count, result.imgs);
 
 	VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
 	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 	for (uint32_t i = 0; i < result.img_count; i++) {
-		result.textures[i] = skr_tex_create_from_existing(&result.imgs[i], skr_tex_type_rendertarget, skr_native_to_tex_fmt(result.format.format), width, height);
-		vkCreateFence(skr_device.device, &fence_info, nullptr, &result.img_fence[i]);
+		result.textures[i] = skg_tex_create_from_existing(&result.imgs[i], skg_tex_type_rendertarget, skg_native_to_tex_fmt(result.format.format), width, height);
+		vkCreateFence(skg_device.device, &fence_info, nullptr, &result.img_fence[i]);
 	}
 
 	// Create synchronization objects
 	VkSemaphoreCreateInfo sem_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
 	for (size_t i = 0; i < 2; i++) {
-		if (vkCreateSemaphore(skr_device.device, &sem_info,   nullptr, &result.sem_available[i]) != VK_SUCCESS ||
-			vkCreateSemaphore(skr_device.device, &sem_info,   nullptr, &result.sem_finished [i]) != VK_SUCCESS ||
-			vkCreateFence    (skr_device.device, &fence_info, nullptr, &result.fence_flight [i]) != VK_SUCCESS) {
+		if (vkCreateSemaphore(skg_device.device, &sem_info,   nullptr, &result.sem_available[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(skg_device.device, &sem_info,   nullptr, &result.sem_finished [i]) != VK_SUCCESS ||
+			vkCreateFence    (skg_device.device, &fence_info, nullptr, &result.fence_flight [i]) != VK_SUCCESS) {
 
-			skr_log(skr_log_critical, "failed to create synchronization objects for a frame!");
+			skg_log(skg_log_critical, "failed to create synchronization objects for a frame!");
 		}
 	}
 
 	return result;
 }
-void skr_swapchain_resize(skr_swapchain_t *swapchain, int32_t width, int32_t height) {}
-void skr_swapchain_present(skr_swapchain_t *swapchain) {
-	vkCmdEndRenderPass(skr_active_rendertarget->rt_commandbuffer);
-	vkEndCommandBuffer(skr_active_rendertarget->rt_commandbuffer);
+void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t height) {}
+void skg_swapchain_present(skg_swapchain_t *swapchain) {
+	vkCmdEndRenderPass(skg_active_rendertarget->rt_commandbuffer);
+	vkEndCommandBuffer(skg_active_rendertarget->rt_commandbuffer);
 
 	VkSubmitInfo         submitInfo       = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
 	VkSemaphore          waitSemaphores[] = {swapchain->sem_available[swapchain->sync_index]};
@@ -988,15 +988,15 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 	submitInfo.pWaitSemaphores    = waitSemaphores;
 	submitInfo.pWaitDstStageMask  = waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers    = &skr_active_rendertarget->rt_commandbuffer;
+	submitInfo.pCommandBuffers    = &skg_active_rendertarget->rt_commandbuffer;
 
 	VkSemaphore signalSemaphores[] = {swapchain->sem_finished[swapchain->sync_index]};
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores    = signalSemaphores;
 
-	vkResetFences(skr_device.device, 1, &swapchain->fence_flight[swapchain->sync_index]);
-	if (vkQueueSubmit(skr_device.queue_gfx, 1, &submitInfo, swapchain->fence_flight[swapchain->sync_index]) != VK_SUCCESS) {
-		skr_log(skr_log_critical, "failed to submit draw command buffer!");
+	vkResetFences(skg_device.device, 1, &swapchain->fence_flight[swapchain->sync_index]);
+	if (vkQueueSubmit(skg_device.queue_gfx, 1, &submitInfo, swapchain->fence_flight[swapchain->sync_index]) != VK_SUCCESS) {
+		skg_log(skg_log_critical, "failed to submit draw command buffer!");
 	}
 
 	VkSwapchainKHR   swapChains[] = {swapchain->swapchain};
@@ -1008,42 +1008,42 @@ void skr_swapchain_present(skr_swapchain_t *swapchain) {
 	presentInfo.pImageIndices      = &swapchain->img_active;
 	presentInfo.pResults           = nullptr; // Optional
 
-	vkQueuePresentKHR(skr_device.queue_present, &presentInfo);
+	vkQueuePresentKHR(skg_device.queue_present, &presentInfo);
 
 	swapchain->sync_index = (swapchain->sync_index + 1) % 2;
 }
-const skr_tex_t *skr_swapchain_get_target(const skr_swapchain_t *swapchain) {
+const skg_tex_t *skg_swapchain_get_target(const skg_swapchain_t *swapchain) {
 	return nullptr;
 }
-const skr_tex_t *skr_swapchain_get_depth(const skr_swapchain_t *swapchain) {
+const skg_tex_t *skg_swapchain_get_depth(const skg_swapchain_t *swapchain) {
 	return nullptr;
 }
 
-void skr_swapchain_get_next(skr_swapchain_t *swapchain, const skr_tex_t **out_target, const skr_tex_t **out_depth) {
-	vkWaitForFences(skr_device.device, 1, &swapchain->fence_flight[swapchain->sync_index], VK_TRUE, UINT64_MAX);
-	vkAcquireNextImageKHR(skr_device.device, swapchain->swapchain, UINT64_MAX, swapchain->sem_available[swapchain->sync_index], VK_NULL_HANDLE, &swapchain->img_active);
+void skg_swapchain_get_next(skg_swapchain_t *swapchain, const skg_tex_t **out_target, const skg_tex_t **out_depth) {
+	vkWaitForFences(skg_device.device, 1, &swapchain->fence_flight[swapchain->sync_index], VK_TRUE, UINT64_MAX);
+	vkAcquireNextImageKHR(skg_device.device, swapchain->swapchain, UINT64_MAX, swapchain->sem_available[swapchain->sync_index], VK_NULL_HANDLE, &swapchain->img_active);
 	*out_target = &swapchain->textures[swapchain->img_active];
 	*out_depth  = nullptr;
 
 	if (swapchain->img_fence[swapchain->img_active] != VK_NULL_HANDLE) {
-		vkWaitForFences(skr_device.device, 1, &swapchain->img_fence[swapchain->img_active], VK_TRUE, UINT64_MAX);
+		vkWaitForFences(skg_device.device, 1, &swapchain->img_fence[swapchain->img_active], VK_TRUE, UINT64_MAX);
 	}
 	swapchain->img_fence[swapchain->img_active] = swapchain->fence_flight[swapchain->sync_index];
 }
 
-void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
+void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 	for (size_t i = 0; i < 2; i++) {
-		vkDestroySemaphore(skr_device.device, swapchain->sem_finished [i], nullptr);
-		vkDestroySemaphore(skr_device.device, swapchain->sem_available[i], nullptr);
-		vkDestroyFence    (skr_device.device, swapchain->fence_flight [i], nullptr);
+		vkDestroySemaphore(skg_device.device, swapchain->sem_finished [i], nullptr);
+		vkDestroySemaphore(skg_device.device, swapchain->sem_available[i], nullptr);
+		vkDestroyFence    (skg_device.device, swapchain->fence_flight [i], nullptr);
 	}
 
 	for (uint32_t i = 0; i < swapchain->img_count; i++) {
 		swapchain->textures[i].texture = nullptr;
-		skr_tex_destroy(&swapchain->textures[i]);
-		vkDestroyFence(skr_device.device, swapchain->img_fence[i], nullptr);
+		skg_tex_destroy(&swapchain->textures[i]);
+		vkDestroyFence(skg_device.device, swapchain->img_fence[i], nullptr);
 	}
-	vkDestroySwapchainKHR(skr_device.device, swapchain->swapchain, 0);
+	vkDestroySwapchainKHR(skg_device.device, swapchain->swapchain, 0);
 	free(swapchain->imgs);
 	free(swapchain->textures);
 	free(swapchain->img_fence);
@@ -1053,11 +1053,11 @@ void skr_swapchain_destroy(skr_swapchain_t *swapchain) {
 // Texture                               //
 ///////////////////////////////////////////
 
-void skr_tex_create_views(skr_tex_t *tex) {
+void skg_tex_create_views(skg_tex_t *tex) {
 	VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
 	view_info.image    = tex->texture;
 	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	view_info.format   = (VkFormat)skr_tex_fmt_to_native(tex->format);
+	view_info.format   = (VkFormat)skg_tex_fmt_to_native(tex->format);
 	view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1069,10 +1069,10 @@ void skr_tex_create_views(skr_tex_t *tex) {
 	view_info.subresourceRange.baseArrayLayer = 0;
 	view_info.subresourceRange.layerCount     = 1;
 
-	if (vkCreateImageView(skr_device.device, &view_info, nullptr, &tex->view) != VK_SUCCESS)
-		skr_log(skr_log_critical, "vkCreateImageView failed");
+	if (vkCreateImageView(skg_device.device, &view_info, nullptr, &tex->view) != VK_SUCCESS)
+		skg_log(skg_log_critical, "vkCreateImageView failed");
 
-	if (tex->type == skr_tex_type_rendertarget) {
+	if (tex->type == skg_tex_type_rendertarget) {
 		VkAttachmentDescription color_attch = {};
 		color_attch.format         = view_info.format;
 		color_attch.samples        = VK_SAMPLE_COUNT_1_BIT;
@@ -1119,8 +1119,8 @@ void skr_tex_create_views(skr_tex_t *tex) {
 		framebuffer_info.height          = tex->height;
 		framebuffer_info.layers          = 1;
 
-		if (vkCreateFramebuffer(skr_device.device, &framebuffer_info, nullptr, &tex->rt_framebuffer) != VK_SUCCESS) {
-			skr_log(skr_log_critical, "failed to create framebuffer!");
+		if (vkCreateFramebuffer(skg_device.device, &framebuffer_info, nullptr, &tex->rt_framebuffer) != VK_SUCCESS) {
+			skg_log(skg_log_critical, "failed to create framebuffer!");
 		}
 
 		VkCommandBufferAllocateInfo alloc_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
@@ -1128,14 +1128,14 @@ void skr_tex_create_views(skr_tex_t *tex) {
 		alloc_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		alloc_info.commandBufferCount = 1;
 
-		if (vkAllocateCommandBuffers(skr_device.device, &alloc_info, &tex->rt_commandbuffer) != VK_SUCCESS) {
-			skr_log(skr_log_critical, "failed to allocate command buffers!");
+		if (vkAllocateCommandBuffers(skg_device.device, &alloc_info, &tex->rt_commandbuffer) != VK_SUCCESS) {
+			skg_log(skg_log_critical, "failed to allocate command buffers!");
 		}
 	}
 }
 
-skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr_tex_fmt_ format, int32_t width, int32_t height) {
-	skr_tex_t result = {};
+skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height) {
+	skg_tex_t result = {};
 	result.type    = type;
 	result.texture = *(VkImage *)native_tex;
 	result.format  = format;
@@ -1143,12 +1143,12 @@ skr_tex_t skr_tex_create_from_existing(void *native_tex, skr_tex_type_ type, skr
 	result.height  = height;
 	result.rt_renderpass = -1;
 
-	skr_tex_create_views(&result);
+	skg_tex_create_views(&result);
 
 	return result;
 }
-skr_tex_t            skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fmt_ format, skr_mip_ mip_maps) {
-	skr_tex_t result = {};
+skg_tex_t            skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, skg_mip_ mip_maps) {
+	skg_tex_t result = {};
 	result.type = type;
 	result.use = use;
 	result.format = format;
@@ -1156,8 +1156,8 @@ skr_tex_t            skr_tex_create(skr_tex_type_ type, skr_use_ use, skr_tex_fm
 	result.rt_renderpass = -1;
 	return result;
 }
-void skr_tex_settings(skr_tex_t *tex, skr_tex_address_ address, skr_tex_sample_ sample, int32_t anisotropy) {}
-void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {}
+void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
 	imageInfo.imageType     = VK_IMAGE_TYPE_2D;
 	imageInfo.extent.width  = width;
@@ -1172,68 +1172,68 @@ void skr_tex_set_contents(skr_tex_t *tex, void **data_frames, int32_t data_frame
 	imageInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
 	imageInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.flags         = 0; // Optional
-	vkCreateImage(skr_device.device, &imageInfo, nullptr, &tex->texture);
+	vkCreateImage(skg_device.device, &imageInfo, nullptr, &tex->texture);
 
 	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(skr_device.device, tex->texture, &memRequirements);
+	vkGetImageMemoryRequirements(skg_device.device, tex->texture, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
 	allocInfo.allocationSize = memRequirements.size;
 	allocInfo.memoryTypeIndex = vk_find_mem_type(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	vkAllocateMemory(skr_device.device, &allocInfo, nullptr, &tex->texture_mem);
-	vkBindImageMemory(skr_device.device, tex->texture, tex->texture_mem, 0);
+	vkAllocateMemory(skg_device.device, &allocInfo, nullptr, &tex->texture_mem);
+	vkBindImageMemory(skg_device.device, tex->texture, tex->texture_mem, 0);
 }
-void skr_tex_bind(const skr_tex_t *tex, int32_t slot) {}
+void skg_tex_bind(const skg_tex_t *tex, int32_t slot) {}
 
 ///////////////////////////////////////////
 
-void skr_tex_destroy(skr_tex_t *tex) {
-	if (tex->rt_framebuffer) vkDestroyFramebuffer(skr_device.device, tex->rt_framebuffer, nullptr);
+void skg_tex_destroy(skg_tex_t *tex) {
+	if (tex->rt_framebuffer) vkDestroyFramebuffer(skg_device.device, tex->rt_framebuffer, nullptr);
 	if (tex->rt_renderpass ) vk_renderpass_release(tex->rt_renderpass);
 	
-	if (tex->view)        vkDestroyImageView  (skr_device.device, tex->view,        nullptr);
-	if (tex->texture)     vkDestroyImage      (skr_device.device, tex->texture,     nullptr);
-	if (tex->texture_mem) vkFreeMemory        (skr_device.device, tex->texture_mem, nullptr);
+	if (tex->view)        vkDestroyImageView  (skg_device.device, tex->view,        nullptr);
+	if (tex->texture)     vkDestroyImage      (skg_device.device, tex->texture,     nullptr);
+	if (tex->texture_mem) vkFreeMemory        (skg_device.device, tex->texture_mem, nullptr);
 	*tex = {};
 }
 
 ///////////////////////////////////////////
 
-int64_t skr_tex_fmt_to_native(skr_tex_fmt_ format) {
+int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	switch (format) {
-	case skr_tex_fmt_rgba32:        return VK_FORMAT_R8G8B8A8_SRGB;
-	case skr_tex_fmt_rgba32_linear: return VK_FORMAT_R8G8B8A8_UNORM;
-	case skr_tex_fmt_bgra32:        return VK_FORMAT_B8G8R8A8_SRGB;
-	case skr_tex_fmt_bgra32_linear: return VK_FORMAT_B8G8R8A8_UNORM;
-	case skr_tex_fmt_rgba64:        return VK_FORMAT_R16G16B16A16_UNORM;
-	case skr_tex_fmt_rgba128:       return VK_FORMAT_R32G32B32A32_SFLOAT;
-	case skr_tex_fmt_depth16:       return VK_FORMAT_D16_UNORM;
-	case skr_tex_fmt_depth32:       return VK_FORMAT_D32_SFLOAT;
-	case skr_tex_fmt_depthstencil:  return VK_FORMAT_D24_UNORM_S8_UINT;
-	case skr_tex_fmt_r8:            return VK_FORMAT_R8_UNORM;
-	case skr_tex_fmt_r16:           return VK_FORMAT_R16_UNORM;
-	case skr_tex_fmt_r32:           return VK_FORMAT_R32_SFLOAT;
+	case skg_tex_fmt_rgba32:        return VK_FORMAT_R8G8B8A8_SRGB;
+	case skg_tex_fmt_rgba32_linear: return VK_FORMAT_R8G8B8A8_UNORM;
+	case skg_tex_fmt_bgra32:        return VK_FORMAT_B8G8R8A8_SRGB;
+	case skg_tex_fmt_bgra32_linear: return VK_FORMAT_B8G8R8A8_UNORM;
+	case skg_tex_fmt_rgba64:        return VK_FORMAT_R16G16B16A16_UNORM;
+	case skg_tex_fmt_rgba128:       return VK_FORMAT_R32G32B32A32_SFLOAT;
+	case skg_tex_fmt_depth16:       return VK_FORMAT_D16_UNORM;
+	case skg_tex_fmt_depth32:       return VK_FORMAT_D32_SFLOAT;
+	case skg_tex_fmt_depthstencil:  return VK_FORMAT_D24_UNORM_S8_UINT;
+	case skg_tex_fmt_r8:            return VK_FORMAT_R8_UNORM;
+	case skg_tex_fmt_r16:           return VK_FORMAT_R16_UNORM;
+	case skg_tex_fmt_r32:           return VK_FORMAT_R32_SFLOAT;
 	default: return VK_FORMAT_UNDEFINED;
 	}
 }
 
 ///////////////////////////////////////////
 
-skr_tex_fmt_ skr_native_to_tex_fmt(VkFormat format) {
+skg_tex_fmt_ skg_native_to_tex_fmt(VkFormat format) {
 	switch (format) {
-	case VK_FORMAT_R8G8B8A8_SRGB:       return skr_tex_fmt_rgba32;
-	case VK_FORMAT_R8G8B8A8_UNORM:      return skr_tex_fmt_rgba32_linear;
-	case VK_FORMAT_B8G8R8A8_SRGB:       return skr_tex_fmt_bgra32;
-	case VK_FORMAT_B8G8R8A8_UNORM:      return skr_tex_fmt_bgra32_linear;
-	case VK_FORMAT_R16G16B16A16_UNORM:  return skr_tex_fmt_rgba64;
-	case VK_FORMAT_R32G32B32A32_SFLOAT: return skr_tex_fmt_rgba128;
-	case VK_FORMAT_D16_UNORM:           return skr_tex_fmt_depth16;
-	case VK_FORMAT_D32_SFLOAT:          return skr_tex_fmt_depth32;
-	case VK_FORMAT_D24_UNORM_S8_UINT:   return skr_tex_fmt_depthstencil;
-	case VK_FORMAT_R8_UNORM:            return skr_tex_fmt_r8;
-	case VK_FORMAT_R16_UNORM:           return skr_tex_fmt_r16;
-	case VK_FORMAT_R32_SFLOAT:          return skr_tex_fmt_r32;
-	default: return skr_tex_fmt_none;
+	case VK_FORMAT_R8G8B8A8_SRGB:       return skg_tex_fmt_rgba32;
+	case VK_FORMAT_R8G8B8A8_UNORM:      return skg_tex_fmt_rgba32_linear;
+	case VK_FORMAT_B8G8R8A8_SRGB:       return skg_tex_fmt_bgra32;
+	case VK_FORMAT_B8G8R8A8_UNORM:      return skg_tex_fmt_bgra32_linear;
+	case VK_FORMAT_R16G16B16A16_UNORM:  return skg_tex_fmt_rgba64;
+	case VK_FORMAT_R32G32B32A32_SFLOAT: return skg_tex_fmt_rgba128;
+	case VK_FORMAT_D16_UNORM:           return skg_tex_fmt_depth16;
+	case VK_FORMAT_D32_SFLOAT:          return skg_tex_fmt_depth32;
+	case VK_FORMAT_D24_UNORM_S8_UINT:   return skg_tex_fmt_depthstencil;
+	case VK_FORMAT_R8_UNORM:            return skg_tex_fmt_r8;
+	case VK_FORMAT_R16_UNORM:           return skg_tex_fmt_r16;
+	case VK_FORMAT_R32_SFLOAT:          return skg_tex_fmt_r32;
+	default: return skg_tex_fmt_none;
 	}
 }
 

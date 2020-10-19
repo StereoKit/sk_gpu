@@ -718,7 +718,7 @@ void openxr_projection(XrFovf fov, float nearZ, float farZ, float *out_matrix)
 	// Set to tanAngleDown - tanAngleUp for a clip space with positive Y
 	// down (Vulkan). Set to tanAngleUp - tanAngleDown for a clip space with
 	// positive Y up (OpenGL / D3D / Metal).
-#if defined(SKR_VULKAN)
+#if defined(SKG_VULKAN)
 	const float tanAngleHeight = (tanDown - tanUp);
 #else
 	const float tanAngleHeight = (tanUp - tanDown);
@@ -726,7 +726,7 @@ void openxr_projection(XrFovf fov, float nearZ, float farZ, float *out_matrix)
 
 	// Set to nearZ for a [-1,1] Z clip space (OpenGL / OpenGL ES).
 	// Set to zero for a [0,1] Z clip space (Vulkan / D3D / Metal).
-#if defined(SKR_OPENGL) || defined(SKR_OPENGLES)
+#if defined(SKG_OPENGL) || defined(SKG_OPENGLES)
 	const float offsetZ = nearZ;
 #else
 	const float offsetZ = 0;

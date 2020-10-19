@@ -5,66 +5,66 @@
 
 ///////////////////////////////////////////
 
-typedef struct skr_buffer_t {
-	skr_use_         use;
-	skr_buffer_type_ type;
+typedef struct skg_buffer_t {
+	skg_use_         use;
+	skg_buffer_type_ type;
 	uint32_t         stride;
 	ID3D11Buffer    *_buffer;
-} skr_buffer_t;
+} skg_buffer_t;
 
-typedef struct skr_mesh_t {
+typedef struct skg_mesh_t {
 	ID3D11Buffer *_ind_buffer;
 	ID3D11Buffer *_vert_buffer;
-} skr_mesh_t;
+} skg_mesh_t;
 
-typedef struct skr_shader_stage_t {
-	skr_stage_  type;
+typedef struct skg_shader_stage_t {
+	skg_stage_  type;
 	void       *_shader;
-} skr_shader_stage_t;
+} skg_shader_stage_t;
 
-typedef struct skr_shader_t {
-	skr_shader_meta_t   *meta;
+typedef struct skg_shader_t {
+	skg_shader_meta_t   *meta;
 	ID3D11VertexShader  *_vertex;
 	ID3D11PixelShader   *_pixel;
 	ID3D11ComputeShader *_compute;
-} skr_shader_t;
+} skg_shader_t;
 
-typedef struct skr_pipeline_t {
-	skr_transparency_        transparency;
-	skr_cull_                cull;
+typedef struct skg_pipeline_t {
+	skg_transparency_        transparency;
+	skg_cull_                cull;
 	bool                     wireframe;
 	bool                     depth_write;
-	skr_depth_test_          depth_test;
+	skg_depth_test_          depth_test;
 	ID3D11VertexShader      *_vertex;
 	ID3D11PixelShader       *_pixel;
 	ID3D11BlendState        *_blend;
 	ID3D11RasterizerState   *_rasterize;
 	ID3D11DepthStencilState *_depth;
-} skr_pipeline_t;
+} skg_pipeline_t;
 
-typedef struct skr_tex_t {
+typedef struct skg_tex_t {
 	int32_t                   width;
 	int32_t                   height;
 	int32_t                   array_count;
-	skr_use_                  use;
-	skr_tex_type_             type;
-	skr_tex_fmt_              format;
-	skr_mip_                  mips;
+	skg_use_                  use;
+	skg_tex_type_             type;
+	skg_tex_fmt_              format;
+	skg_mip_                  mips;
 	ID3D11Texture2D          *_texture;
 	ID3D11SamplerState       *_sampler;
 	ID3D11ShaderResourceView *_resource;
 	ID3D11RenderTargetView   *_target_view;
 	ID3D11DepthStencilView   *_depth_view;
-} skr_tex_t;
+} skg_tex_t;
 
-typedef struct skr_swapchain_t {
+typedef struct skg_swapchain_t {
 	int32_t          width;
 	int32_t          height;
-	skr_tex_t        _target;
-	skr_tex_t        _depth;
+	skg_tex_t        _target;
+	skg_tex_t        _depth;
 	IDXGISwapChain1 *_swapchain;
-} skr_swapchain_t;
+} skg_swapchain_t;
 
-typedef struct skr_platform_data_t {
+typedef struct skg_platform_data_t {
 	void *_d3d11_device;
-} skr_platform_data_t;
+} skg_platform_data_t;

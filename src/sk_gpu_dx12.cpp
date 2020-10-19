@@ -3,7 +3,7 @@
 // https://www.3dgep.com/learning-directx-12-1/#Direct3D
 
 #include "sk_gpu_dev.h"
-#ifdef SKR_DIRECT3D12
+#ifdef SKG_DIRECT3D12
 ///////////////////////////////////////////
 // Direct3D12 Implementation             //
 ///////////////////////////////////////////
@@ -21,7 +21,7 @@ using namespace DirectX;
 
 ///////////////////////////////////////////
 
-struct skr_fence_t {
+struct skg_fence_t {
 	ID3D12Fence *fence;
 	uint64_t     value;
 	HANDLE       event;
@@ -36,27 +36,27 @@ struct ConstantBuffer {
 	XMFLOAT4   color;
 };
 
-struct skr_vertex_desc_t {
+struct skg_vertex_desc_t {
 	int32_t vert_size;
 };
 
-struct skr_mesh_t {
+struct skg_mesh_t {
 	uint32_t vert_count;
 	uint32_t ind_count;
-	skr_vertex_desc_t        vert_desc;
+	skg_vertex_desc_t        vert_desc;
 	ID3D12Resource          *vert_buffer;
 	D3D12_VERTEX_BUFFER_VIEW vert_buffer_view;
 	ID3D12Resource          *ind_buffer;
 	D3D12_INDEX_BUFFER_VIEW  ind_buffer_view;
 };
 
-struct skr_tex_t {
+struct skg_tex_t {
 	DXGI_FORMAT           format;
 	ID3D12Resource       *resource;
 	ID3D12DescriptorHeap *heap;
 };
 
-struct skr_shader_stage_t {
+struct skg_shader_stage_t {
 };
 
 ///////////////////////////////////////////
@@ -75,14 +75,14 @@ DXGI_FORMAT                d3d_rtarget_format = DXGI_FORMAT_R8G8B8A8_UNORM;
 DXGI_FORMAT                d3d_depth_format   = DXGI_FORMAT_D32_FLOAT;
 ID3D12Resource            *d3d_rtargets    [D3D_FRAME_COUNT];
 ID3D12CommandAllocator    *d3d_allocator   [D3D_FRAME_COUNT];
-skr_fence_t                d3d_fence       [D3D_FRAME_COUNT];
+skg_fence_t                d3d_fence       [D3D_FRAME_COUNT];
 uint64_t                   d3d_fence_value [D3D_FRAME_COUNT];
 uint32_t                   d3d_heap_size   = 0;
 uint32_t                   d3d_frame_index = 0;
 int32_t                    d3d_width       = 1280;
 int32_t                    d3d_height      = 720;
 
-skr_mesh_t app_mesh = {};
+skg_mesh_t app_mesh = {};
 
 ID3D12PipelineState*     pipelineStateObject = nullptr;
 ID3D12RootSignature*     rootSignature = nullptr;
@@ -107,23 +107,23 @@ void d3d_log(const char *message) { printf(message); }
 void d3d_memcpy_subresource(const D3D12_MEMCPY_DEST* dest, const D3D12_SUBRESOURCE_DATA* src, size_t row_size_bytes, uint32_t rows, uint32_t slices);
 void d3d_resize_depth(int width, int height);
 
-void d3d_mesh_create(skr_mesh_t &mesh, Vertex *verts, int32_t vert_count, uint32_t *inds, int32_t ind_count);
-void d3d_mesh_draw(skr_mesh_t &mesh);
-void d3d_mesh_set_verts(skr_mesh_t &mesh, skr_vertex_desc_t vert_desc, void *verts, int32_t vert_count);
-void d3d_mesh_set_inds (skr_mesh_t &mesh, void *inds,  int32_t ind_count);
+void d3d_mesh_create(skg_mesh_t &mesh, Vertex *verts, int32_t vert_count, uint32_t *inds, int32_t ind_count);
+void d3d_mesh_draw(skg_mesh_t &mesh);
+void d3d_mesh_set_verts(skg_mesh_t &mesh, skg_vertex_desc_t vert_desc, void *verts, int32_t vert_count);
+void d3d_mesh_set_inds (skg_mesh_t &mesh, void *inds,  int32_t ind_count);
 
 IDXGIAdapter1 *d3d_get_adapter  (IDXGIFactory4 *factory, void *adapter_id);
 int32_t        d3d_create_device(void *app_hwnd, void *adapter_id, int32_t app_width, int32_t app_height);
 
-skr_fence_t skr_fence_create    ();
-void        skr_fence_destroy   (skr_fence_t &fence);
-void        skr_fence_begin     (skr_fence_t &fence);
-void        skr_fence_signal_end(const skr_fence_t &fence);
-void        skr_fence_wait_end  (const skr_fence_t &fence);
+skg_fence_t skg_fence_create    ();
+void        skg_fence_destroy   (skg_fence_t &fence);
+void        skg_fence_begin     (skg_fence_t &fence);
+void        skg_fence_signal_end(const skg_fence_t &fence);
+void        skg_fence_wait_end  (const skg_fence_t &fence);
 
 ///////////////////////////////////////////
 
-void d3d_mesh_draw(skr_mesh_t &mesh) {
+void d3d_mesh_draw(skg_mesh_t &mesh) {
 	d3d_cmd_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	d3d_cmd_list->IASetVertexBuffers    (0, 1, &mesh.vert_buffer_view);
 	d3d_cmd_list->IASetIndexBuffer      (&mesh.ind_buffer_view);
@@ -132,7 +132,7 @@ void d3d_mesh_draw(skr_mesh_t &mesh) {
 
 ///////////////////////////////////////////
 
-void d3d_mesh_create(skr_mesh_t &mesh, Vertex *verts, int32_t vert_count, uint32_t *inds, int32_t ind_count) {
+void d3d_mesh_create(skg_mesh_t &mesh, Vertex *verts, int32_t vert_count, uint32_t *inds, int32_t ind_count) {
 	size_t vert_size   = sizeof(Vertex ) * vert_count;
 	size_t ind_size    = sizeof(int32_t) * ind_count;
 	size_t buffer_size = ind_size + vert_size;
@@ -187,7 +187,7 @@ void d3d_mesh_create(skr_mesh_t &mesh, Vertex *verts, int32_t vert_count, uint32
 
 ///////////////////////////////////////////
 
-int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t app_width, int32_t app_height) {
+int32_t skg_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t app_width, int32_t app_height) {
 	if (!d3d_create_device(app_hwnd, adapter_id, app_width, app_height)) {
 		return -1;
 	}
@@ -214,7 +214,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 			return -4;
 		d3d_allocator[i]->SetName(L"Swapchain/Allocator");
 
-		d3d_fence[i] = skr_fence_create();
+		d3d_fence[i] = skg_fence_create();
 	}
 	d3d_resize_depth(app_width, app_height);
 
@@ -520,7 +520,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 	d3d_queue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	// increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
-	skr_fence_signal_end(d3d_fence[d3d_frame_index]);
+	skg_fence_signal_end(d3d_fence[d3d_frame_index]);
 
 	d3d_width  = app_width;
 	d3d_height = app_height;
@@ -543,7 +543,7 @@ int32_t skr_init(const char *app_name, void *app_hwnd, void *adapter_id, int32_t
 
 ///////////////////////////////////////////
 
-void skr_resize_swapchain(int32_t width, int32_t height) {
+void skg_resize_swapchain(int32_t width, int32_t height) {
 	if (width  < 1) width  = 1;
 	if (height < 1) height = 1;
 	if (width == d3d_width && height == d3d_height)
@@ -553,8 +553,8 @@ void skr_resize_swapchain(int32_t width, int32_t height) {
 	if (d3d_device == nullptr) return;
 
 	// Flush. Wait until the graphics card isn't busy
-	skr_fence_signal_end(d3d_fence[d3d_frame_index]);
-	skr_fence_wait_end  (d3d_fence[d3d_frame_index]);
+	skg_fence_signal_end(d3d_fence[d3d_frame_index]);
+	skg_fence_wait_end  (d3d_fence[d3d_frame_index]);
 
 	// Release existing references to the swapchain
 	for (int i=0; i<D3D_FRAME_COUNT; i++) {
@@ -588,12 +588,12 @@ void skr_resize_swapchain(int32_t width, int32_t height) {
 
 ///////////////////////////////////////////
 
-void skr_shutdown() {
+void skg_shutdown() {
 
 	// wait for the gpu to finish all frames
 	for (int32_t i=0; i<D3D_FRAME_COUNT; i++) {
-		skr_fence_signal_end(d3d_fence[i]);
-		skr_fence_wait_end  (d3d_fence[i]);
+		skg_fence_signal_end(d3d_fence[i]);
+		skg_fence_wait_end  (d3d_fence[i]);
 	}
 
 	if (pipelineStateObject != nullptr) pipelineStateObject->Release();
@@ -616,7 +616,7 @@ void skr_shutdown() {
 	if (d3d_depth_heap   != nullptr) d3d_depth_heap  ->Release();
 
 	for (int i=0; i<D3D_FRAME_COUNT; i++) {
-		skr_fence_destroy(d3d_fence[i]);
+		skg_fence_destroy(d3d_fence[i]);
 
 		if (d3d_rtargets [i] != nullptr) d3d_rtargets [i]->Release();
 		if (d3d_allocator[i] != nullptr) d3d_allocator[i]->Release();
@@ -628,10 +628,10 @@ void skr_shutdown() {
 
 ///////////////////////////////////////////
 
-void skr_draw() {
+void skg_draw() {
 	d3d_frame_index = d3d_swapchain->GetCurrentBackBufferIndex();
-	skr_fence_wait_end(d3d_fence[d3d_frame_index]);
-	skr_fence_begin   (d3d_fence[d3d_frame_index]);
+	skg_fence_wait_end(d3d_fence[d3d_frame_index]);
+	skg_fence_begin   (d3d_fence[d3d_frame_index]);
 
 	if (FAILED(d3d_allocator[d3d_frame_index]->Reset()) || 
 		FAILED(d3d_cmd_list->Reset(d3d_allocator[d3d_frame_index], nullptr))) {
@@ -684,7 +684,7 @@ void skr_draw() {
 
 	ID3D12CommandList* command_lists[] = { d3d_cmd_list };
 	d3d_queue->ExecuteCommandLists(_countof(command_lists), command_lists);
-	skr_fence_signal_end(d3d_fence[d3d_frame_index]);
+	skg_fence_signal_end(d3d_fence[d3d_frame_index]);
 
 	if (FAILED(d3d_swapchain->Present(1, 0))) {
 		printf("Fail end\n");
@@ -843,8 +843,8 @@ int32_t d3d_create_device(void *app_hwnd, void *adapter_id, int32_t app_width, i
 // Fence                                 //
 ///////////////////////////////////////////
 
-skr_fence_t skr_fence_create() {
-	skr_fence_t result = {};
+skg_fence_t skg_fence_create() {
+	skg_fence_t result = {};
 	result.event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	if (result.event == nullptr) {
 		d3d_log("Failed to create fence event");
@@ -861,7 +861,7 @@ skr_fence_t skr_fence_create() {
 
 ///////////////////////////////////////////
 
-void skr_fence_destroy(skr_fence_t &fence) {
+void skg_fence_destroy(skg_fence_t &fence) {
 	if (fence.event != nullptr) CloseHandle(fence.event);
 	if (fence.fence != nullptr) fence.fence->Release();
 	fence = {};
@@ -869,19 +869,19 @@ void skr_fence_destroy(skr_fence_t &fence) {
 
 ///////////////////////////////////////////
 
-void skr_fence_begin(skr_fence_t &fence) {
+void skg_fence_begin(skg_fence_t &fence) {
 	fence.value += 1;
 }
 
 ///////////////////////////////////////////
 
-void skr_fence_signal_end(const skr_fence_t &fence) {
+void skg_fence_signal_end(const skg_fence_t &fence) {
 	d3d_queue->Signal(fence.fence, fence.value);
 }
 
 ///////////////////////////////////////////
 
-void skr_fence_wait_end(const skr_fence_t &fence) {
+void skg_fence_wait_end(const skg_fence_t &fence) {
 	if (fence.fence->GetCompletedValue() < fence.value) {
 		fence.fence->SetEventOnCompletion(fence.value, fence.event);
 		WaitForSingleObject(fence.event, INFINITE);
@@ -890,7 +890,7 @@ void skr_fence_wait_end(const skr_fence_t &fence) {
 
 ///////////////////////////////////////////
 
-/*void d3d_mesh_set_verts(skr_mesh_t &mesh, skr_vertex_desc_t vert_desc, void *verts, int32_t vert_count) {
+/*void d3d_mesh_set_verts(skg_mesh_t &mesh, skg_vertex_desc_t vert_desc, void *verts, int32_t vert_count) {
 	D3D12_HEAP_PROPERTIES heap_props = {};
 	heap_props.Type             = D3D12_HEAP_TYPE_DEFAULT;
 	heap_props.CreationNodeMask = 1;
@@ -966,7 +966,7 @@ void skr_fence_wait_end(const skr_fence_t &fence) {
 
 ///////////////////////////////////////////
 
-void d3d_mesh_set_inds(skr_mesh_t &mesh, void *inds, int32_t ind_count) {
+void d3d_mesh_set_inds(skg_mesh_t &mesh, void *inds, int32_t ind_count) {
 	D3D12_HEAP_PROPERTIES heap_props = {};
 	heap_props.Type                 = D3D12_HEAP_TYPE_DEFAULT;
 	heap_props.CreationNodeMask     = 1;

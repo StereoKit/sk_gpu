@@ -20,8 +20,8 @@ struct saved_state {
 };
 
 struct swapchain_surfdata_t {
-	skr_tex_t depth_tex;
-	skr_tex_t render_tex;
+	skg_tex_t depth_tex;
+	skg_tex_t render_tex;
 };
 
 struct app_swapchain_t {
@@ -39,7 +39,7 @@ struct engine {
 #ifdef XR
 	app_swapchain_t swapchain;
 #else
-	skr_swapchain_t swapchain;
+	skg_swapchain_t swapchain;
 #endif
 	int animating;
 	struct saved_state state;
@@ -77,12 +77,12 @@ bool android_fopen(const char *filename, void **out_data, size_t *out_size) {
 
 ///////////////////////////////////////////
 
-void android_log_callback(skr_log_ level, const char *text) {
+void android_log_callback(skg_log_ level, const char *text) {
 	int priority = ANDROID_LOG_INFO;
 	switch (level) {
-	case skr_log_info:     priority = ANDROID_LOG_INFO;  break;
-	case skr_log_warning:  priority = ANDROID_LOG_WARN;  break;
-	case skr_log_critical: priority = ANDROID_LOG_ERROR; break;
+	case skg_log_info:     priority = ANDROID_LOG_INFO;  break;
+	case skg_log_warning:  priority = ANDROID_LOG_WARN;  break;
+	case skg_log_critical: priority = ANDROID_LOG_ERROR; break;
 	}
 	__android_log_write(priority, "sk_gpu", text); 
 }
@@ -93,13 +93,13 @@ void android_log_callback(skr_log_ level, const char *text) {
 static int engine_init_display(struct engine* engine) {
 	if (engine->initialized)
 		return 0;
-	skr_callback_file_read(android_fopen);
-	skr_callback_log      (android_log_callback);
-	int result = skr_init("skr_gpu.h", engine->app->window, nullptr);
+	skg_callback_file_read(android_fopen);
+	skg_callback_log      (android_log_callback);
+	int result = skg_init("skg_gpu.h", engine->app->window, nullptr);
 	if (!result) return result;
 
 	engine->initialized = true;
-	engine->swapchain   = skr_swapchain_create(skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, 1280, 720);
+	engine->swapchain   = skg_swapchain_create(skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, 1280, 720);
 
 	return app_init() ? 1 : 0;
 }
@@ -108,10 +108,10 @@ static void engine_draw_frame(struct engine* engine) {
 	if (!engine->initialized)
 		return;
 
-	skr_draw_begin();
+	skg_draw_begin();
 	float clear_color[4] = { 0,1,0,1 };
-	skr_tex_t *target = skr_swapchain_get_next(&engine->swapchain);
-	skr_tex_target_bind(target, true, clear_color);
+	skg_tex_t *target = skg_swapchain_get_next(&engine->swapchain);
+	skg_tex_target_bind(target, true, clear_color);
 
 	static int32_t frame = 0;
 	frame++;
@@ -124,7 +124,7 @@ static void engine_draw_frame(struct engine* engine) {
 
 	app_render(frame * 0.016f, view, proj);
 
-	skr_swapchain_present(&engine->swapchain);
+	skg_swapchain_present(&engine->swapchain);
 }
 
 #else
@@ -133,20 +133,20 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	engine *eng = (engine*)user_data;
 	
 	LOGI("Beginning initialization");
-	skr_callback_file_read(android_fopen);
-	skr_callback_log      (android_log_callback);
-	if (!skr_init("sk_gpu.h", eng->app->window, nullptr))
+	skg_callback_file_read(android_fopen);
+	skg_callback_log      (android_log_callback);
+	if (!skg_init("sk_gpu.h", eng->app->window, nullptr))
 		return false;
 
-	skr_platform_data_t platform = skr_get_platform_data();
-#if defined(SKR_OPENGL) && defined(_WIN32)
+	skg_platform_data_t platform = skg_get_platform_data();
+#if defined(SKG_OPENGL) && defined(_WIN32)
 	out_graphics->hDC     = (HDC  )platform._gl_hdc;
 	out_graphics->hGLRC   = (HGLRC)platform._gl_hrc;
-#elif defined(SKR_OPENGL) && defined(__ANDROID__)
+#elif defined(SKG_OPENGL) && defined(__ANDROID__)
 	out_graphics->display = (EGLDisplay)platform._egl_display;
 	out_graphics->config  = (EGLConfig )platform._egl_config;
 	out_graphics->context = (EGLContext)platform._egl_context;
-#elif defined(SKR_DIRECT3D11)
+#elif defined(SKG_DIRECT3D11)
 	out_graphics->device  = (ID3D11Device*)platform._d3d11_device;
 #endif
 
@@ -160,13 +160,13 @@ bool main_init_swapchain(void *user_data, int32_t view_count, int32_t surface_co
 	eng->swapchain.view_count = view_count;
 	eng->swapchain.surf_count = surface_count;
 	eng->swapchain.surfaces   = (swapchain_surfdata_t*)malloc(sizeof(swapchain_surfdata_t) * view_count * surface_count);
-	skr_tex_fmt_ skr_format = skr_tex_fmt_from_native(fmt);
+	skg_tex_fmt_ skg_format = skg_tex_fmt_from_native(fmt);
 
 	for (int32_t i = 0; i < view_count*surface_count; i++) {
-		eng->swapchain.surfaces[i].render_tex = skr_tex_create_from_existing(textures[i], skr_tex_type_rendertarget, skr_format, width, height, surface_count);
-		eng->swapchain.surfaces[i].depth_tex  = skr_tex_create(skr_tex_type_depth, skr_use_static, skr_tex_fmt_depth32, skr_mip_none);
-		skr_tex_set_contents(&eng->swapchain.surfaces[i].depth_tex, nullptr, 1, width, height);
-		skr_tex_attach_depth(&eng->swapchain.surfaces[i].render_tex, &eng->swapchain.surfaces[i].depth_tex);
+		eng->swapchain.surfaces[i].render_tex = skg_tex_create_from_existing(textures[i], skg_tex_type_rendertarget, skg_format, width, height, surface_count);
+		eng->swapchain.surfaces[i].depth_tex  = skg_tex_create(skg_tex_type_depth, skg_use_static, skg_tex_fmt_depth32, skg_mip_none);
+		skg_tex_set_contents(&eng->swapchain.surfaces[i].depth_tex, nullptr, 1, width, height);
+		skg_tex_attach_depth(&eng->swapchain.surfaces[i].render_tex, &eng->swapchain.surfaces[i].depth_tex);
 	}
 	return true;
 }
@@ -176,8 +176,8 @@ bool main_init_swapchain(void *user_data, int32_t view_count, int32_t surface_co
 void main_destroy_swapchain(void *user_data) {
 	engine *eng = (engine*)user_data;
 	for (int32_t i = 0; i < eng->swapchain.surf_count * eng->swapchain.view_count; i++) {
-		skr_tex_destroy(&eng->swapchain.surfaces[i].render_tex);
-		skr_tex_destroy(&eng->swapchain.surfaces[i].depth_tex);
+		skg_tex_destroy(&eng->swapchain.surfaces[i].render_tex);
+		skg_tex_destroy(&eng->swapchain.surfaces[i].depth_tex);
 	}
 	free(eng->swapchain.surfaces);
 	eng->swapchain = {};
@@ -188,8 +188,8 @@ void main_destroy_swapchain(void *user_data) {
 void main_render(void *user_data, const XrCompositionLayerProjectionView *view, int32_t view_id, int32_t surf_id) {
 	engine *eng = (engine*)user_data;
 	float clear_color[4] = { 0,0,0,1 };
-	skr_tex_t *target = &eng->swapchain.surfaces[view_id * eng->swapchain.surf_count + surf_id].render_tex;
-	skr_tex_target_bind(target, true, clear_color);
+	skg_tex_t *target = &eng->swapchain.surfaces[view_id * eng->swapchain.surf_count + surf_id].render_tex;
+	skg_tex_target_bind(target, true, clear_color);
 
 	hmm_quaternion head_orientation;
 	memcpy(&head_orientation, &view->pose.orientation, sizeof(XrQuaternionf));
@@ -223,13 +223,13 @@ static int engine_init_display(struct engine* engine) {
 	engine->xr_functions.pixel_format_count = 4;
 	engine->xr_functions.depth_formats      = (int64_t*)malloc(sizeof(int64_t) * 3);
 	engine->xr_functions.depth_format_count = 3;
-	engine->xr_functions.pixel_formats[0]   = skr_tex_fmt_to_native(skr_tex_fmt_rgba32_linear);
-	engine->xr_functions.pixel_formats[1]   = skr_tex_fmt_to_native(skr_tex_fmt_bgra32_linear);
-	engine->xr_functions.pixel_formats[2]   = skr_tex_fmt_to_native(skr_tex_fmt_rgba32);
-	engine->xr_functions.pixel_formats[3]   = skr_tex_fmt_to_native(skr_tex_fmt_bgra32);
-	engine->xr_functions.depth_formats[0]   = skr_tex_fmt_to_native(skr_tex_fmt_depth16);
-	engine->xr_functions.depth_formats[1]   = skr_tex_fmt_to_native(skr_tex_fmt_depth32);
-	engine->xr_functions.depth_formats[2]   = skr_tex_fmt_to_native(skr_tex_fmt_depthstencil);
+	engine->xr_functions.pixel_formats[0]   = skg_tex_fmt_to_native(skg_tex_fmt_rgba32_linear);
+	engine->xr_functions.pixel_formats[1]   = skg_tex_fmt_to_native(skg_tex_fmt_bgra32_linear);
+	engine->xr_functions.pixel_formats[2]   = skg_tex_fmt_to_native(skg_tex_fmt_rgba32);
+	engine->xr_functions.pixel_formats[3]   = skg_tex_fmt_to_native(skg_tex_fmt_bgra32);
+	engine->xr_functions.depth_formats[0]   = skg_tex_fmt_to_native(skg_tex_fmt_depth16);
+	engine->xr_functions.depth_formats[1]   = skg_tex_fmt_to_native(skg_tex_fmt_depth32);
+	engine->xr_functions.depth_formats[2]   = skg_tex_fmt_to_native(skg_tex_fmt_depthstencil);
 
 	LOGI("Initializing OpenXR");
 	openxr_log_callback([](const char *text) { __android_log_write(ANDROID_LOG_INFO, "sk_gpu", text); });
@@ -263,7 +263,7 @@ static void engine_term_display(struct engine* engine) {
 #if XR
 	openxr_shutdown();
 #endif
-	skr_shutdown();
+	skg_shutdown();
 	LOGI("Done! Bye :)");
 	engine->initialized = false;
 }

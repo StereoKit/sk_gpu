@@ -5,39 +5,39 @@
 
 ///////////////////////////////////////////
 
-typedef struct skr_buffer_t {
-	skr_use_         use;
-	skr_buffer_type_ type;
+typedef struct skg_buffer_t {
+	skg_use_         use;
+	skg_buffer_type_ type;
 	VkBuffer         buffer;
 	VkDeviceMemory   memory;
 };
 
-typedef struct skr_mesh_t {
-} skr_mesh_t;
+typedef struct skg_mesh_t {
+} skg_mesh_t;
 
-typedef struct skr_shader_stage_t {
-	skr_stage_     type;
+typedef struct skg_shader_stage_t {
+	skg_stage_     type;
 	VkShaderModule module;
-} skr_shader_stage_t;
+} skg_shader_stage_t;
 
-typedef struct skr_shader_t {
-	skr_shader_meta_t *meta;
+typedef struct skg_shader_t {
+	skg_shader_meta_t *meta;
 	VkShaderModule     _vertex;
 	VkShaderModule     _pixel;
-} skr_shader_t;
+} skg_shader_t;
 
-typedef struct skr_pipeline_t {
+typedef struct skg_pipeline_t {
 	int64_t          pipeline;
 	VkPipelineLayout pipeline_layout;
-} skr_pipeline_t;
+} skg_pipeline_t;
 
-typedef struct skr_tex_t {
+typedef struct skg_tex_t {
 	int32_t         width;
 	int32_t         height;
-	skr_use_        use;
-	skr_tex_type_   type;
-	skr_tex_fmt_    format;
-	skr_mip_        mips;
+	skg_use_        use;
+	skg_tex_type_   type;
+	skg_tex_fmt_    format;
+	skg_mip_        mips;
 
 	VkImage         texture;
 	VkDeviceMemory  texture_mem;
@@ -46,13 +46,13 @@ typedef struct skr_tex_t {
 	VkFramebuffer   rt_framebuffer;
 	int64_t         rt_renderpass;
 	VkCommandBuffer rt_commandbuffer;
-} skr_tex_t;
+} skg_tex_t;
 
-typedef struct skr_swapchain_t {
+typedef struct skg_swapchain_t {
 	int32_t width;
 	int32_t height;
-	//skr_tex_t target;
-	//skr_tex_t depth;
+	//skg_tex_t target;
+	//skg_tex_t depth;
 
 	VkSurfaceFormatKHR format;
 	VkSwapchainKHR     swapchain;
@@ -60,7 +60,7 @@ typedef struct skr_swapchain_t {
 	uint32_t           img_active;
 	uint32_t           img_count;
 	VkImage           *imgs;
-	skr_tex_t         *textures;
+	skg_tex_t         *textures;
 	uint32_t           img_curr;
 	VkExtent2D         extents;
 	VkFence           *img_fence;
@@ -69,8 +69,8 @@ typedef struct skr_swapchain_t {
 	VkSemaphore sem_finished[2];
 	VkFence     fence_flight[2];
 	int32_t     sync_index;
-} skr_swapchain_t;
+} skg_swapchain_t;
 
-typedef struct skr_platform_data_t {
+typedef struct skg_platform_data_t {
 
-} skr_platform_data_t;
+} skg_platform_data_t;

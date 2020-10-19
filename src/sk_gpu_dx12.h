@@ -4,6 +4,6 @@
 
 ///////////////////////////////////////////
 
-typedef struct skr_buffer_t {
+typedef struct skg_buffer_t {
 	ID3D12Resource *buffer;
 };

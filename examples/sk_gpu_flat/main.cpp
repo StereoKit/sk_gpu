@@ -13,8 +13,8 @@ HWND app_hwnd;
 #endif
 
 // When using single file header like normal, do this
-//#define SKR_OPENGL
-//#define SKR_IMPL
+//#define SKG_OPENGL
+//#define SKG_IMPL
 //#include "../sk_gpu.h"
 
 // For easier development
@@ -33,7 +33,7 @@ HWND app_hwnd;
 
 ///////////////////////////////////////////
 
-skr_swapchain_t app_swapchain = {};
+skg_swapchain_t app_swapchain = {};
 int             app_width     = 1280;
 int             app_height    = 720;
 bool            app_run       = true;
@@ -66,9 +66,9 @@ int main() {
 ///////////////////////////////////////////
 
 bool main_init() {
-	skr_callback_log([](skr_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
+	skg_callback_log([](skg_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
 #ifdef __EMSCRIPTEN__
-	if (!skr_init(app_name, nullptr, nullptr)) return false;
+	if (!skg_init(app_name, nullptr, nullptr)) return false;
 #else
 	WNDCLASS wc = {}; 
 	wc.lpfnWndProc = [](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -77,7 +77,7 @@ bool main_init() {
 		case WM_SIZE: {
 			app_width  = (UINT)LOWORD(lParam);
 			app_height = (UINT)HIWORD(lParam);
-			skr_swapchain_resize(&app_swapchain, app_width, app_height);
+			skg_swapchain_resize(&app_swapchain, app_width, app_height);
 		} return DefWindowProc(hWnd, message, wParam, lParam);
 		default: return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -94,9 +94,9 @@ bool main_init() {
 		nullptr, nullptr, wc.hInstance, nullptr);
 
 	if( !app_hwnd ) return false;
-	if (!skr_init(app_name, app_hwnd, nullptr)) return false;
+	if (!skg_init(app_name, app_hwnd, nullptr)) return false;
 #endif
-	app_swapchain = skr_swapchain_create(skr_tex_fmt_rgba32_linear, skr_tex_fmt_depth32, app_width, app_height);
+	app_swapchain = skg_swapchain_create(skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, app_width, app_height);
 
 	return app_init();
 }
@@ -105,7 +105,7 @@ bool main_init() {
 
 void main_shutdown() {
 	app_shutdown();
-	skr_shutdown();
+	skg_shutdown();
 }
 
 ///////////////////////////////////////////
@@ -119,10 +119,10 @@ int main_step(double t, void *) {
 	}
 #endif
 
-	skr_draw_begin();
+	skg_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skr_tex_t *target = skr_swapchain_get_next(&app_swapchain);
-	skr_tex_target_bind(target, true, clear_color);
+	skg_tex_t *target = skg_swapchain_get_next(&app_swapchain);
+	skg_tex_target_bind(target, true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(
 		HMM_Vec3(sinf(t*0.001) * 5, 3, cosf(t*0.001) * 5),
@@ -132,7 +132,7 @@ int main_step(double t, void *) {
 
 	app_render(t, view, proj);
 
-	skr_swapchain_present(&app_swapchain);
+	skg_swapchain_present(&app_swapchain);
 	return 1;
 }
 

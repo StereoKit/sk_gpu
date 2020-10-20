@@ -26,6 +26,7 @@ typedef struct skg_shader_file_t {
 ///////////////////////////////////////////
 
 void               skg_log                     (skg_log_ level, const char *text);
+bool               skg_read_file               (const char *filename, void **out_data, size_t *out_size);
 uint64_t           skg_hash                    (const char *string);
 
 bool               skg_shader_file_verify      (const void *file_memory, size_t file_size, uint16_t *out_version, char *out_name, size_t out_name_size);

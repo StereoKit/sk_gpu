@@ -3,6 +3,9 @@
 #include "../../src/sk_gpu_dev.h"
 #include "HandmadeMath.h"
 
+#define MICRO_PLY_IMPL
+#include "micro_ply.h"
+
 #include "test.hlsl.h"
 #include "cubemap.hlsl.h"
 
@@ -64,11 +67,22 @@ skg_vert_t    app_wave_verts[app_wave_size * app_wave_size];
 
 app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count);
 void       app_mesh_destroy(app_mesh_t *mesh);
+bool       ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_vert_count, uint32_t **out_indices, int32_t *out_ind_count);
 
 ///////////////////////////////////////////
 
 bool app_init() {
 	app_compute_buffer = skg_buffer_create(app_wave_verts, app_wave_size * app_wave_size, sizeof(skg_vert_t), skg_buffer_type_compute, skg_use_dynamic);
+	skg_vert_t *platform_verts;
+	uint32_t   *platform_inds;
+	int32_t     platform_v_count, platform_i_count;
+	if (ply_read_skg("../platform.ply", &platform_verts, &platform_v_count, &platform_inds, &platform_i_count)) {
+		app_mesh_model = app_mesh_create(platform_verts, platform_v_count, false, platform_inds, platform_i_count);
+		free(platform_verts);
+		free(platform_inds );
+	} else {
+		skg_log(skg_log_warning, "Couldn't load platform.ply!");
+	}
 
 	// Make a cube
 	skg_vert_t verts[] = {
@@ -379,6 +393,44 @@ void app_mesh_destroy(app_mesh_t *mesh) {
 	skg_buffer_destroy(&mesh->vert_buffer);
 	skg_buffer_destroy(&mesh->ind_buffer);
 	*mesh = {};
+}
+
+///////////////////////////////////////////
+
+bool ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_vert_count, uint32_t **out_indices, int32_t *out_ind_count) {
+	void  *data;
+	size_t size;
+	if (!skg_read_file(filename, &data, &size))
+		return false;
+
+	ply_file_t file;
+	if (!ply_read(data, size, &file))
+		return false;
+
+	float     fzero = 0;
+	uint8_t   white = 255;
+	ply_map_t map_verts[] = {
+		{ PLY_PROP_POSITION_X,  ply_prop_decimal, sizeof(float), 0,  &fzero },
+		{ PLY_PROP_POSITION_Y,  ply_prop_decimal, sizeof(float), 4,  &fzero },
+		{ PLY_PROP_POSITION_Z,  ply_prop_decimal, sizeof(float), 8,  &fzero },
+		{ PLY_PROP_NORMAL_X,    ply_prop_decimal, sizeof(float), 12, &fzero },
+		{ PLY_PROP_NORMAL_Y,    ply_prop_decimal, sizeof(float), 16, &fzero },
+		{ PLY_PROP_NORMAL_Z,    ply_prop_decimal, sizeof(float), 20, &fzero },
+		{ PLY_PROP_TEXCOORD_X,  ply_prop_decimal, sizeof(float), 24, &fzero },
+		{ PLY_PROP_TEXCOORD_Y,  ply_prop_decimal, sizeof(float), 28, &fzero },
+		{ PLY_PROP_COLOR_R,     ply_prop_uint,    sizeof(uint8_t), 32, &white },
+		{ PLY_PROP_COLOR_G,     ply_prop_uint,    sizeof(uint8_t), 33, &white },
+		{ PLY_PROP_COLOR_B,     ply_prop_uint,    sizeof(uint8_t), 34, &white },
+		{ PLY_PROP_COLOR_A,     ply_prop_uint,    sizeof(uint8_t), 35, &white }, };
+	ply_convert(&file, PLY_ELEMENT_VERTICES, map_verts, _countof(map_verts), sizeof(skg_vert_t), (void **)out_verts, out_vert_count);
+
+	uint32_t  izero = 0;
+	ply_map_t map_inds[] = { { PLY_PROP_INDICES, ply_prop_uint, sizeof(uint32_t), 0, &izero } };
+	ply_convert(&file, PLY_ELEMENT_FACES, map_inds, _countof(map_inds), sizeof(uint32_t), (void **)out_indices, out_ind_count);
+
+	ply_free(&file);
+	free(data);
+	return true;
 }
 
 ///////////////////////////////////////////

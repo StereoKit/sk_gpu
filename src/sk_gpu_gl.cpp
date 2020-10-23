@@ -14,7 +14,7 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <GLES3/gl32.h>
-#elif __ANDROID__
+#elif defined(__ANDROID__) || defined(__linux__)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
@@ -220,7 +220,7 @@ HGLRC gl_hrc;
 #define GL_DEBUG_SEVERITY_MEDIUM       0x9147
 #define GL_DEBUG_SEVERITY_LOW          0x9148
 
-#if defined(_WIN32) || defined(__ANDROID__)
+#if defined(_WIN32) || defined(__ANDROID__) || defined(__linux__)
 
 #ifdef _WIN32
 	#define GLDECL __stdcall
@@ -321,7 +321,7 @@ static void gl_load_extensions( ) {
 #undef GLE
 }
 
-#endif // _WIN32 or __ANDROID__
+#endif // _WIN32 or __ANDROID__ or __linux__
 
 ///////////////////////////////////////////
 
@@ -493,8 +493,8 @@ int32_t gl_init_emscripten() {
 
 ///////////////////////////////////////////
 
-int32_t gl_init_android(void *native_window) {
-#ifdef __ANDROID__
+int32_t gl_init_egl(void *native_window) {
+#if defined(__ANDROID__) || defined(__linux__)
 	const EGLint attribs[] = {
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
 		EGL_CONFORMANT,   EGL_OPENGL_ES3_BIT_KHR,
@@ -534,7 +534,7 @@ int32_t gl_init_android(void *native_window) {
 
 	eglQuerySurface(egl_display, egl_surface, EGL_WIDTH,  &gl_width);
 	eglQuerySurface(egl_display, egl_surface, EGL_HEIGHT, &gl_height);
-#endif // __ANDROID__
+#endif // defined(__ANDROID__) || defined(__linux__)
 	return 1;
 }
 
@@ -544,8 +544,8 @@ int32_t gl_init_android(void *native_window) {
 int32_t skg_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 #if defined(_WIN32)
 	int32_t result = gl_init_win32(app_hwnd);
-#elif defined(__ANDROID__)
-	int32_t result = gl_init_android(app_hwnd);
+#elif defined(__ANDROID__) || defined(__linux__)
+	int32_t result = gl_init_egl(app_hwnd);
 #elif defined(__EMSCRIPTEN__)
 	int32_t result = gl_init_emscripten();
 #endif
@@ -599,7 +599,7 @@ void skg_shutdown() {
 	wglMakeCurrent(NULL, NULL);
 	ReleaseDC(gl_hwnd, gl_hdc);
 	wglDeleteContext(gl_hrc);
-#elif __ANDROID__
+#elif defined(__ANDROID__) || defined(__linux__)
 	if (egl_display != EGL_NO_DISPLAY) {
 		eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 		if (egl_context != EGL_NO_CONTEXT) eglDestroyContext(egl_display, egl_context);
@@ -655,7 +655,7 @@ skg_platform_data_t skg_get_platform_data() {
 #ifdef _WIN32
 	result._gl_hdc = gl_hdc;
 	result._gl_hrc = gl_hrc;
-#elif __ANDROID__
+#elif defined(__ANDROID__) || defined(__linux__)
 	result._egl_display = egl_display;
 	result._egl_config  = egl_config;
 	result._egl_context = egl_context;
@@ -821,7 +821,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	// Convert the prefix if it doesn't match the GL version we're using
 #if _WIN32
 	const char   *prefix_gl      = "#version 450";
-#elif __ANDROID__
+#elif defined(__ANDROID__) || defined(__linux__)
 	const char   *prefix_gl      = "#version 320 es";
 #elif __EMSCRIPTEN__
 	const char   *prefix_gl      = "#version 300 es";
@@ -1169,7 +1169,7 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 void skg_swapchain_present(skg_swapchain_t *swapchain) {
 #ifdef _WIN32
 	SwapBuffers(gl_hdc);
-#elif __ANDROID__
+#elif defined(__ANDROID__) || defined(__linux__)
 	eglSwapBuffers(egl_display, egl_surface);
 #elif defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
 	float clear[4] = { 0,0,0,1 };

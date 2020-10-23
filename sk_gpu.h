@@ -486,7 +486,7 @@ void               skg_shader_meta_release     (skg_shader_meta_t *meta);
 // Implementations!                      //
 ///////////////////////////////////////////
 
-#ifdef SKR_IMPL
+#ifdef SKG_IMPL
 
 #ifdef SKG_DIRECT3D11
 ///////////////////////////////////////////
@@ -3508,7 +3508,7 @@ const skg_shader_var_t *skg_shader_get_var_info(const skg_shader_t *shader, int3
 	skg_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	return &buffer->vars[var_id];
 }
-#endif // SKR_IMPL
+#endif // SKG_IMPL
 /*
 ------------------------------------------------------------------------------
 This software is available under 2 licenses -- choose whichever you prefer.

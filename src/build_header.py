@@ -8,7 +8,7 @@ src_header      = src_header_file.read()
 src_header_file.close()
 
 dest_header = src_header
-dest_header += "\n#ifdef SKR_IMPL\n"
+dest_header += "\n#ifdef SKG_IMPL\n"
 
 for match in re.findall(regex_includes, dest_header):
     include_filename = match.split('"')[1]
@@ -30,7 +30,7 @@ for match in re.findall(regex_includes, dest_header):
     dest_header = dest_header.replace(match, include_text)
     dest_header += body_text
     
-dest_header += "\n#endif // SKR_IMPL\n"
+dest_header += "\n#endif // SKG_IMPL\n"
 dest_header += """/*
 ------------------------------------------------------------------------------
 This software is available under 2 licenses -- choose whichever you prefer.

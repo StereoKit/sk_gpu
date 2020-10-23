@@ -357,7 +357,7 @@ typedef struct skg_swapchain_t {
 } skg_swapchain_t;
 
 typedef struct skg_platform_data_t {
-#if __ANDROID__
+#if defined(__ANDROID__) || defined(__linux__)
 	void *_egl_display;
 	void *_egl_config;
 	void *_egl_context;

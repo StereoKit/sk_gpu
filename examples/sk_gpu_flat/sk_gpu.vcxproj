@@ -198,6 +198,7 @@ python build_header.py</Command>
     <ClInclude Include="..\common\cubemap.hlsl.h" />
     <ClInclude Include="..\common\HandmadeMath.h" />
     <ClInclude Include="..\common\app.h" />
+    <ClInclude Include="..\common\micro_ply.h" />
     <ClInclude Include="..\common\test.hlsl.h" />
     <ClInclude Include="..\common\xr_app.h" />
   </ItemGroup>

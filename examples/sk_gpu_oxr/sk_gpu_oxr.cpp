@@ -108,7 +108,7 @@ bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, 
 	luid = (void *)&requirements->adapterLuid;
 #endif
 	skg_callback_log([](skg_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
-	if (!skg_init(app_name, nullptr, luid))
+	if (!skg_init(app_name, luid))
 		return false;
 
 	skg_platform_data_t platform = skg_get_platform_data();

@@ -35,7 +35,7 @@ struct engine {
 
 	xr_settings_t xr_functions;
 
-	bool initialized;
+	bool swapchain_created;
 #ifdef XR
 	app_swapchain_t swapchain;
 #else
@@ -91,27 +91,38 @@ void android_log_callback(skg_log_ level, const char *text) {
 
 #ifndef XR
 static int engine_init_display(struct engine* engine) {
-	if (engine->initialized)
-		return 0;
-	skg_callback_file_read(android_fopen);
-	skg_callback_log      (android_log_callback);
-	int result = skg_init("skg_gpu.h", engine->app->window, nullptr);
-	if (!result) return result;
+	if (engine->swapchain_created)
+		skg_swapchain_destroy(&engine->swapchain);
 
-	engine->initialized = true;
-	engine->swapchain   = skg_swapchain_create(skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, 1280, 720);
+	engine->swapchain_created = true;
+	engine->swapchain         = skg_swapchain_create(engine->app->window, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32);
+	LOGI("Created swapchain");
 
-	return app_init() ? 1 : 0;
+	return 1;
+}
+
+void engine_resize_display(struct engine* engine) {
+	if (engine->swapchain_created) {
+		int32_t width  = ANativeWindow_getWidth (engine->app->window);
+		int32_t height = ANativeWindow_getHeight(engine->app->window);
+		if (AConfiguration_getOrientation(engine->app->config) == ACONFIGURATION_ORIENTATION_PORT) {
+			int32_t tmp = width;
+			width = height;
+			height = tmp;
+		}
+
+		LOGI("Got a resize message! %dx%d", width, height);
+		skg_swapchain_resize(&engine->swapchain, width, height);
+	}
 }
 
 static void engine_draw_frame(struct engine* engine) {
-	if (!engine->initialized)
+	if (!engine->swapchain_created)
 		return;
 
 	skg_draw_begin();
 	float clear_color[4] = { 0,1,0,1 };
-	skg_tex_t *target = skg_swapchain_get_next(&engine->swapchain);
-	skg_tex_target_bind(target, true, clear_color);
+	skg_swapchain_bind(&engine->swapchain, true, clear_color);
 
 	static int32_t frame = 0;
 	frame++;
@@ -127,17 +138,19 @@ static void engine_draw_frame(struct engine* engine) {
 	skg_swapchain_present(&engine->swapchain);
 }
 
+static void engine_term_display(struct engine* engine) {
+	if (engine->swapchain_created)
+		skg_swapchain_destroy(&engine->swapchain);
+	engine->swapchain_created = false;
+
+	LOGI("Destroying swapchain");
+}
+
 #else
 
 bool main_init_gfx(void *user_data, const XrGraphicsRequirements *requirements, XrGraphicsBinding *out_graphics) {
 	engine *eng = (engine*)user_data;
 	
-	LOGI("Beginning initialization");
-	skg_callback_file_read(android_fopen);
-	skg_callback_log      (android_log_callback);
-	if (!skg_init("sk_gpu.h", eng->app->window, nullptr))
-		return false;
-
 	skg_platform_data_t platform = skg_get_platform_data();
 #if defined(SKG_OPENGL) && defined(_WIN32)
 	out_graphics->hDC     = (HDC  )platform._gl_hdc;
@@ -210,7 +223,7 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 static int engine_init_display(struct engine* engine) {
 	engine->xr_functions.user_data = engine;
 
-	if (engine->initialized)
+	if (engine->swapchain_created)
 		return 1;
 
 	engine->xr_functions.android_activity = engine->app->activity->clazz;
@@ -240,33 +253,30 @@ static int engine_init_display(struct engine* engine) {
 		return false;
 	}
 
-	engine->initialized = true;
+	engine->swapchain_created = true;
 
-	return app_init() ? 1 : -1;
+	return 1;
+}
+
+void engine_resize_display(struct engine* engine) {
 }
 
 static void engine_draw_frame(struct engine* engine) {
-	if (!engine->initialized)
+	if (!engine->swapchain_created)
 		return;
 
 	openxr_step();
 }
 
-#endif
-
 static void engine_term_display(struct engine* engine) {
-	if (!engine->initialized)
-		return;
+	if (engine->swapchain_created)
+		openxr_shutdown();
+	engine->swapchain_created = false;
 
-	LOGI("Shutting down...");
-	app_shutdown();
-#if XR
-	openxr_shutdown();
-#endif
-	skg_shutdown();
-	LOGI("Done! Bye :)");
-	engine->initialized = false;
+	LOGI("Destroying swapchain");
 }
+
+#endif
 
 static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) {
 	return 0;
@@ -292,6 +302,8 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 		}
 		break;
 	case APP_CMD_TERM_WINDOW:  LOGI("cmd: term"); engine_term_display(engine); break;
+	case APP_CMD_WINDOW_RESIZED: engine_resize_display(engine); break;
+	case APP_CMD_CONFIG_CHANGED: engine_resize_display(engine); break;
 	case APP_CMD_GAINED_FOCUS: LOGI("cmd: focused"); break;
 	case APP_CMD_LOST_FOCUS:   LOGI("cmd: unfocused"); break;
 	}
@@ -313,6 +325,12 @@ void android_main(struct android_app* state) {
 		engine.state = *(struct saved_state*)state->savedState;
 	}
 
+	skg_callback_file_read(android_fopen);
+	skg_callback_log      (android_log_callback);
+	int result = skg_init("skg_gpu.h", nullptr);
+	if (!result) return;
+	if (!app_init()) return;
+
 	engine.animating = 1;
 	bool run = true;
 	while (run) {
@@ -330,6 +348,9 @@ void android_main(struct android_app* state) {
 	}
 
 	engine_term_display(&engine);
+
+	app_shutdown();
+	skg_shutdown();
 }
 
 ///////////////////////////////////////////

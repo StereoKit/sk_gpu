@@ -58,6 +58,9 @@
     <ClInclude Include="..\common\xr_app.h">
       <Filter>common</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\micro_ply.h">
+      <Filter>common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -22,7 +22,6 @@ ID3D11InfoQueue         *d3d_info        = nullptr;
 ID3D11InputLayout       *d3d_vert_layout = nullptr;
 ID3D11RasterizerState   *d3d_rasterstate = nullptr;
 ID3D11DepthStencilState *d3d_depthstate  = nullptr;
-void                    *d3d_hwnd        = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
@@ -37,8 +36,7 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 
 ///////////////////////////////////////////
 
-int32_t skg_init(const char *app_name, void *hwnd, void *adapter_id) {
-	d3d_hwnd = hwnd;
+int32_t skg_init(const char *app_name, void *adapter_id) {
 	UINT creation_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
 	creation_flags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -631,15 +629,18 @@ void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
 // skg_swapchain                         //
 ///////////////////////////////////////////
 
-skg_swapchain_t skg_swapchain_create(skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height) {
+skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format) {
 	skg_swapchain_t result = {};
-	result.width  = width;
-	result.height = height;
+
+	RECT bounds;
+	GetWindowRect((HWND)hwnd, &bounds);
+	result.width  = bounds.right  - bounds.left;
+	result.height = bounds.bottom - bounds.top;
 
 	DXGI_SWAP_CHAIN_DESC1 swapchain_desc = { };
 	swapchain_desc.BufferCount = 2;
-	swapchain_desc.Width       = width;
-	swapchain_desc.Height      = height;
+	swapchain_desc.Width       = result.width;
+	swapchain_desc.Height      = result.height;
 	swapchain_desc.Format      = (DXGI_FORMAT)skg_tex_fmt_to_native(format);
 	swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapchain_desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -649,7 +650,7 @@ skg_swapchain_t skg_swapchain_create(skg_tex_fmt_ format, skg_tex_fmt_ depth_for
 	IDXGIAdapter  *dxgi_adapter; dxgi_device ->GetParent     (__uuidof(IDXGIAdapter),  (void **)&dxgi_adapter);
 	IDXGIFactory2 *dxgi_factory; dxgi_adapter->GetParent     (__uuidof(IDXGIFactory2), (void **)&dxgi_factory);
 
-	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
+	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
 		skg_log(skg_log_critical, "sk_gpu couldn't create swapchain!");
 		return {};
 	}
@@ -664,9 +665,9 @@ skg_swapchain_t skg_swapchain_create(skg_tex_fmt_ format, skg_tex_fmt_ depth_for
 
 	ID3D11Texture2D *back_buffer;
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	result._target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, width, height, 1);
+	result._target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, result.width, result.height, 1);
 	result._depth  = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
-	skg_tex_set_contents(&result._depth, nullptr, 1, width, height);
+	skg_tex_set_contents(&result._depth, nullptr, 1, result.width, result.height);
 	skg_tex_attach_depth(&result._target, &result._depth);
 	back_buffer->Release();
 
@@ -709,8 +710,8 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skg_tex_t *skg_swapchain_get_next(skg_swapchain_t *swapchain) {
-	return swapchain->_target.format != 0 ? &swapchain->_target : nullptr;
+void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *clear_color_4) {
+	skg_tex_target_bind(swapchain->_target.format != 0 ? &swapchain->_target : nullptr, clear, clear_color_4);
 }
 
 /////////////////////////////////////////// 

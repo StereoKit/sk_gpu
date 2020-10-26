@@ -222,7 +222,7 @@ typedef struct skg_shader_meta_t {
 
 ///////////////////////////////////////////
 
-int32_t             skg_init                     (const char *app_name, void *hwnd, void *adapter_id);
+int32_t             skg_init                     (const char *app_name, void *adapter_id);
 void                skg_shutdown                 ();
 void                skg_callback_log             (void (*callback)(skg_log_ level, const char *text));
 void                skg_callback_file_read       (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
@@ -274,10 +274,10 @@ void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline
 skg_depth_test_     skg_pipeline_get_depth_test  (const skg_pipeline_t *pipeline);
 void                skg_pipeline_destroy         (      skg_pipeline_t *pipeline);
 
-skg_swapchain_t     skg_swapchain_create         (skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height);
+skg_swapchain_t     skg_swapchain_create         (void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format);
 void                skg_swapchain_resize         (      skg_swapchain_t *swapchain, int32_t width, int32_t height);
 void                skg_swapchain_present        (      skg_swapchain_t *swapchain);
-skg_tex_t          *skg_swapchain_get_next       (      skg_swapchain_t *swapchain);
+void                skg_swapchain_bind           (      skg_swapchain_t *swapchain, bool clear, const float *clear_color_4);
 void                skg_swapchain_destroy        (      skg_swapchain_t *swapchain);
 
 skg_tex_t           skg_tex_create_from_existing (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);

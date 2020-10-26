@@ -422,11 +422,11 @@ bool ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_ver
 		{ PLY_PROP_COLOR_G,     ply_prop_uint,    sizeof(uint8_t), 33, &white },
 		{ PLY_PROP_COLOR_B,     ply_prop_uint,    sizeof(uint8_t), 34, &white },
 		{ PLY_PROP_COLOR_A,     ply_prop_uint,    sizeof(uint8_t), 35, &white }, };
-	ply_convert(&file, PLY_ELEMENT_VERTICES, map_verts, _countof(map_verts), sizeof(skg_vert_t), (void **)out_verts, out_vert_count);
+	ply_convert(&file, PLY_ELEMENT_VERTICES, map_verts, sizeof(map_verts)/sizeof(map_verts[0]), sizeof(skg_vert_t), (void **)out_verts, out_vert_count);
 
 	uint32_t  izero = 0;
 	ply_map_t map_inds[] = { { PLY_PROP_INDICES, ply_prop_uint, sizeof(uint32_t), 0, &izero } };
-	ply_convert(&file, PLY_ELEMENT_FACES, map_inds, _countof(map_inds), sizeof(uint32_t), (void **)out_indices, out_ind_count);
+	ply_convert(&file, PLY_ELEMENT_FACES, map_inds, sizeof(map_inds)/sizeof(map_inds[0]), sizeof(uint32_t), (void **)out_indices, out_ind_count);
 
 	ply_free(&file);
 	free(data);

@@ -56,7 +56,12 @@ typedef struct skg_swapchain_t {
 	int32_t  width;
 	int32_t  height;
 
-#if defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
+#ifdef _WIN32
+	void *_hdc;
+	void *_hwnd;
+#elif defined(__ANDROID__) || defined(__linux__)
+	void *_egl_surface;
+#elif defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
 	skg_tex_t      _surface;
 	skg_tex_t      _surface_depth;
 	skg_shader_t   _convert_shader;

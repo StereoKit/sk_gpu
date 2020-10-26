@@ -4,8 +4,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
-
-HWND app_hwnd;
 #else
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -33,6 +31,7 @@ HWND app_hwnd;
 
 ///////////////////////////////////////////
 
+void           *app_hwnd      = nullptr;
 skg_swapchain_t app_swapchain = {};
 int             app_width     = 1280;
 int             app_height    = 720;
@@ -67,9 +66,10 @@ int main() {
 
 bool main_init() {
 	skg_callback_log([](skg_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
-#ifdef __EMSCRIPTEN__
-	if (!skg_init(app_name, nullptr, nullptr)) return false;
-#else
+	if (!skg_init(app_name, nullptr)) 
+		return false;
+
+#ifndef __EMSCRIPTEN__
 	WNDCLASS wc = {}; 
 	wc.lpfnWndProc = [](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 		switch(message) {
@@ -94,9 +94,8 @@ bool main_init() {
 		nullptr, nullptr, wc.hInstance, nullptr);
 
 	if( !app_hwnd ) return false;
-	if (!skg_init(app_name, app_hwnd, nullptr)) return false;
 #endif
-	app_swapchain = skg_swapchain_create(skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, app_width, app_height);
+	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, app_width, app_height);
 
 	return app_init();
 }
@@ -121,8 +120,7 @@ int main_step(double t, void *) {
 
 	skg_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skg_tex_t *target = skg_swapchain_get_next(&app_swapchain);
-	skg_tex_target_bind(target, true, clear_color);
+	skg_swapchain_bind(&app_swapchain, true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(
 		HMM_Vec3(sinf(t*0.001) * 5, 3, cosf(t*0.001) * 5),

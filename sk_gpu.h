@@ -345,6 +345,11 @@ typedef struct skg_swapchain_t {
 	int32_t  width;
 	int32_t  height;
 
+#ifdef _WIN32
+	void *_hdc;
+	void *_hwnd;
+#endif
+
 #if defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
 	skg_tex_t      _surface;
 	skg_tex_t      _surface_depth;
@@ -370,7 +375,7 @@ typedef struct skg_platform_data_t {
 
 ///////////////////////////////////////////
 
-int32_t             skg_init                     (const char *app_name, void *hwnd, void *adapter_id);
+int32_t             skg_init                     (const char *app_name, void *adapter_id);
 void                skg_shutdown                 ();
 void                skg_callback_log             (void (*callback)(skg_log_ level, const char *text));
 void                skg_callback_file_read       (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
@@ -422,10 +427,10 @@ void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline
 skg_depth_test_     skg_pipeline_get_depth_test  (const skg_pipeline_t *pipeline);
 void                skg_pipeline_destroy         (      skg_pipeline_t *pipeline);
 
-skg_swapchain_t     skg_swapchain_create         (skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height);
+skg_swapchain_t     skg_swapchain_create         (void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height);
 void                skg_swapchain_resize         (      skg_swapchain_t *swapchain, int32_t width, int32_t height);
 void                skg_swapchain_present        (      skg_swapchain_t *swapchain);
-skg_tex_t          *skg_swapchain_get_next       (      skg_swapchain_t *swapchain);
+void                skg_swapchain_bind           (      skg_swapchain_t *swapchain, bool clear, const float *clear_color_4);
 void                skg_swapchain_destroy        (      skg_swapchain_t *swapchain);
 
 skg_tex_t           skg_tex_create_from_existing (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
@@ -511,7 +516,6 @@ ID3D11InfoQueue         *d3d_info        = nullptr;
 ID3D11InputLayout       *d3d_vert_layout = nullptr;
 ID3D11RasterizerState   *d3d_rasterstate = nullptr;
 ID3D11DepthStencilState *d3d_depthstate  = nullptr;
-void                    *d3d_hwnd        = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
@@ -526,8 +530,7 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 
 ///////////////////////////////////////////
 
-int32_t skg_init(const char *app_name, void *hwnd, void *adapter_id) {
-	d3d_hwnd = hwnd;
+int32_t skg_init(const char *app_name, void *adapter_id) {
 	UINT creation_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
 	creation_flags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -1120,7 +1123,7 @@ void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
 // skg_swapchain                         //
 ///////////////////////////////////////////
 
-skg_swapchain_t skg_swapchain_create(skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height) {
+skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height) {
 	skg_swapchain_t result = {};
 	result.width  = width;
 	result.height = height;
@@ -1138,7 +1141,7 @@ skg_swapchain_t skg_swapchain_create(skg_tex_fmt_ format, skg_tex_fmt_ depth_for
 	IDXGIAdapter  *dxgi_adapter; dxgi_device ->GetParent     (__uuidof(IDXGIAdapter),  (void **)&dxgi_adapter);
 	IDXGIFactory2 *dxgi_factory; dxgi_adapter->GetParent     (__uuidof(IDXGIFactory2), (void **)&dxgi_factory);
 
-	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)d3d_hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
+	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
 		skg_log(skg_log_critical, "sk_gpu couldn't create swapchain!");
 		return {};
 	}
@@ -1198,8 +1201,8 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 
 /////////////////////////////////////////// 
 
-skg_tex_t *skg_swapchain_get_next(skg_swapchain_t *swapchain) {
-	return swapchain->_target.format != 0 ? &swapchain->_target : nullptr;
+void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *clear_color_4) {
+	skg_tex_target_bind(swapchain->_target.format != 0 ? &swapchain->_target : nullptr, clear, clear_color_4);
 }
 
 /////////////////////////////////////////// 
@@ -1896,6 +1899,12 @@ HGLRC gl_hrc;
 #if defined(_WIN32) || defined(__ANDROID__) || defined(__linux__)
 
 #ifdef _WIN32
+	// Function pointers we need to actually initialize OpenGL
+	typedef BOOL  (*wglChoosePixelFormatARB_proc)    (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats);
+	typedef HGLRC (*wglCreateContextAttribsARB_proc) (HDC hDC, HGLRC hShareContext, const int *attribList);
+	wglChoosePixelFormatARB_proc    wglChoosePixelFormatARB;
+	wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
+
 	#define GLDECL __stdcall
 	// from https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions
 	// Some GL functions can only be loaded with wglGetProcAddress, and others
@@ -1998,8 +2007,8 @@ static void gl_load_extensions( ) {
 
 ///////////////////////////////////////////
 
-int32_t    gl_width  = 0;
-int32_t    gl_height = 0;
+int32_t    gl_active_width        = 0;
+int32_t    gl_active_height       = 0;
 skg_tex_t *gl_active_rendertarget = nullptr;
 uint32_t   gl_current_framebuffer = 0;
 
@@ -2012,7 +2021,7 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format);
 ///////////////////////////////////////////
 
 // Some nice reference: https://gist.github.com/nickrolfe/1127313ed1dbf80254b614a721b3ee9c
-int32_t gl_init_win32(void *app_hwnd) {
+int32_t gl_init_win32() {
 #ifdef _WIN32
 	///////////////////////////////////////////
 	// Dummy initialization for pixel format //
@@ -2061,10 +2070,8 @@ int32_t gl_init_win32(void *app_hwnd) {
 	}
 
 	// Load the function pointers we need to actually initialize OpenGL
-	typedef BOOL  (*wglChoosePixelFormatARB_proc)    (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats);
-	typedef HGLRC (*wglCreateContextAttribsARB_proc) (HDC hDC, HGLRC hShareContext, const int *attribList);
-	wglChoosePixelFormatARB_proc    wglChoosePixelFormatARB    = (wglChoosePixelFormatARB_proc   )wglGetProcAddress("wglChoosePixelFormatARB");
-	wglCreateContextAttribsARB_proc wglCreateContextAttribsARB = (wglCreateContextAttribsARB_proc)wglGetProcAddress("wglCreateContextAttribsARB");
+	wglChoosePixelFormatARB    = (wglChoosePixelFormatARB_proc   )wglGetProcAddress("wglChoosePixelFormatARB");
+	wglCreateContextAttribsARB = (wglCreateContextAttribsARB_proc)wglGetProcAddress("wglCreateContextAttribsARB");
 
 	// Shut down the dummy so we can set up OpenGL for real
 	wglMakeCurrent  (dummy_dc, 0);
@@ -2076,27 +2083,20 @@ int32_t gl_init_win32(void *app_hwnd) {
 	// Real OpenGL initialization            //
 	///////////////////////////////////////////
 
-	if (app_hwnd == nullptr) {
-		WNDCLASSA win_class = { 0 };
-		win_class.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-		win_class.lpfnWndProc   = DefWindowProcA;
-		win_class.hInstance     = GetModuleHandle(0);
-		win_class.lpszClassName = "SKGPUWindow";
-		if (!RegisterClassA(&win_class))
-			return false;
+	WNDCLASSA win_class = { 0 };
+	win_class.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+	win_class.lpfnWndProc   = DefWindowProcA;
+	win_class.hInstance     = GetModuleHandle(0);
+	win_class.lpszClassName = "SKGPUWindow";
+	if (!RegisterClassA(&win_class))
+		return false;
 
-		app_hwnd = CreateWindowExA(0, win_class.lpszClassName, "sk_gpu Window", 0, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, win_class.hInstance, 0);
-		if (!app_hwnd)
-			return false;
-	}
+	void *app_hwnd = CreateWindowExA(0, win_class.lpszClassName, "sk_gpu Window", 0, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, win_class.hInstance, 0);
+	if (!app_hwnd)
+		return false;
 
 	gl_hwnd = (HWND)app_hwnd;
 	gl_hdc  = GetDC(gl_hwnd);
-
-	RECT bounds;
-	GetWindowRect(gl_hwnd, &bounds);
-	gl_width  = bounds.right  - bounds.left;
-	gl_height = bounds.bottom - bounds.top;
 
 	// Find a pixel format
 	const int format_attribs[] = {
@@ -2214,11 +2214,11 @@ int32_t gl_init_egl(void *native_window) {
 ///////////////////////////////////////////
 
 
-int32_t skg_init(const char *app_name, void *app_hwnd, void *adapter_id) {
+int32_t skg_init(const char *app_name, void *adapter_id) {
 #if defined(_WIN32)
-	int32_t result = gl_init_win32(app_hwnd);
+	int32_t result = gl_init_win32();
 #elif defined(__ANDROID__) || defined(__linux__)
-	int32_t result = gl_init_egl(app_hwnd);
+	int32_t result = gl_init_egl();
 #elif defined(__EMSCRIPTEN__)
 	int32_t result = gl_init_emscripten();
 #endif
@@ -2247,11 +2247,6 @@ int32_t skg_init(const char *app_name, void *app_hwnd, void *adapter_id) {
 		}
 	}, nullptr);
 #endif // _DEBUG
-
-	int32_t viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	gl_width  = viewport[2];
-	gl_height = viewport[3];
 	
 	// Some default behavior
 	glEnable   (GL_DEPTH_TEST);  
@@ -2303,7 +2298,7 @@ void skg_tex_target_bind(skg_tex_t *render_target, bool clear, const float *clea
 		glDisable(GL_FRAMEBUFFER_SRGB); 
 #endif
 	} else {
-		glViewport(0, 0, gl_width, gl_height);
+		glViewport(0, 0, gl_active_width, gl_active_height);
 #ifndef __EMSCRIPTEN__
 		glEnable(GL_FRAMEBUFFER_SRGB); 
 #endif
@@ -2343,7 +2338,7 @@ bool skg_capability(skg_cap_ capability) {
 		int32_t ct;
 		glGetIntegerv(GL_NUM_EXTENSIONS, &ct);
 		for (int32_t i = 0; i < ct; i++) {
-			if (strcmp(name, glGetStringi(GL_EXTENSIONS, i)) == 0)
+			if (strcmp(name, (const char *)glGetStringi(GL_EXTENSIONS, i)) == 0)
 				return true;
 		}
 		return false;
@@ -2351,7 +2346,12 @@ bool skg_capability(skg_cap_ capability) {
 
 	switch (capability) {
 	case skg_cap_tex_layer_select: return check_ext("GL_AMD_vertex_shader_layer");
-	case skg_cap_wireframe:        return glPolygonMode != nullptr;
+	case skg_cap_wireframe:
+#ifdef __EMSCRIPTEN__
+		return false;
+#else
+		return glPolygonMode != nullptr;
+#endif
 	default: return false;
 	}
 }
@@ -2359,7 +2359,11 @@ bool skg_capability(skg_cap_ capability) {
 ///////////////////////////////////////////
 
 void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count) {
+#ifdef __EMSCRIPTEN__
+	glDrawElementsInstanced(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count);
+#else
 	glDrawElementsInstancedBaseVertex(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count, index_base);
+#endif
 }
 
 ///////////////////////////////////////////
@@ -2401,9 +2405,13 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
 	if (buffer->type == skg_buffer_type_constant)
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
-	else if (buffer->type == skg_buffer_type_vertex)
-		glBindVertexBuffer(bind.slot, buffer->_buffer, offset,buffer->stride);
-	else
+	else if (buffer->type == skg_buffer_type_vertex) {
+#ifdef __EMSCRIPTEN__
+		glBindBuffer(buffer->_target, buffer->_buffer);
+#else
+		glBindVertexBuffer(bind.slot, buffer->_buffer, offset, buffer->stride);
+#endif
+	} else
 		glBindBuffer(buffer->_target, buffer->_buffer);
 }
 
@@ -2487,8 +2495,9 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 
 	uint32_t gl_type = 0;
 	switch (type) {
-	case skg_stage_pixel:  gl_type = GL_FRAGMENT_SHADER; break;
-	case skg_stage_vertex: gl_type = GL_VERTEX_SHADER;   break;
+	case skg_stage_pixel:   gl_type = GL_FRAGMENT_SHADER; break;
+	case skg_stage_vertex:  gl_type = GL_VERTEX_SHADER;   break;
+	case skg_stage_compute: skg_log(skg_log_critical, "GL compute shaders not implemented yet."); break;
 	}
 
 	// Convert the prefix if it doesn't match the GL version we're using
@@ -2759,13 +2768,51 @@ void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
 
 ///////////////////////////////////////////
 
-skg_swapchain_t skg_swapchain_create(skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height) {
+skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t width, int32_t height) {
 	skg_swapchain_t result = {};
 
+#if _WIN32
+	result._hwnd = hwnd;
+	result._hdc  = GetDC((HWND)hwnd);
+
+	RECT bounds;
+	GetWindowRect((HWND)hwnd, &bounds);
+	result.width  = bounds.right  - bounds.left;
+	result.height = bounds.bottom - bounds.top;
+
+	// Find a pixel format
+	const int format_attribs[] = {
+		WGL_DRAW_TO_WINDOW_ARB, true,
+		WGL_SUPPORT_OPENGL_ARB, true,
+		WGL_DOUBLE_BUFFER_ARB,  true,
+		WGL_ACCELERATION_ARB,   WGL_FULL_ACCELERATION_ARB,
+		WGL_PIXEL_TYPE_ARB,     WGL_TYPE_RGBA_ARB,
+		WGL_COLOR_BITS_ARB,     32,
+		WGL_DEPTH_BITS_ARB,     24,
+		WGL_STENCIL_BITS_ARB,   8,
+		WGL_SAMPLE_BUFFERS_ARB, 1,
+		WGL_SAMPLES_ARB,        4,
+		0 };
+
+	int  pixel_format = 0;
+	UINT num_formats  = 0;
+	if (!wglChoosePixelFormatARB((HDC)result._hdc, format_attribs, nullptr, 1, &pixel_format, &num_formats)) {
+		skg_log(skg_log_critical, "Couldn't find pixel format!");
+		return {};
+	}
+
+	PIXELFORMATDESCRIPTOR format_desc = { sizeof(PIXELFORMATDESCRIPTOR) };
+	DescribePixelFormat((HDC)result._hdc, pixel_format, sizeof(format_desc), &format_desc);
+	if (!SetPixelFormat((HDC)result._hdc, pixel_format, &format_desc)) {
+		skg_log(skg_log_critical, "Couldn't set pixel format!");
+		return {};
+	}
+#else
 	int32_t viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
 	result.width  = viewport[2];
 	result.height = viewport[3];
+#endif
 
 #if defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
 	const char *vs = R"_(#version 300 es
@@ -2804,14 +2851,14 @@ void main() {
 
 	skg_shader_stage_t v_stage = skg_shader_stage_create(vs, strlen(vs), skg_stage_vertex);
 	skg_shader_stage_t p_stage = skg_shader_stage_create(ps, strlen(ps), skg_stage_pixel);
-	result._convert_shader = skg_shader_create_manual(meta, v_stage, p_stage);
+	result._convert_shader = skg_shader_create_manual(meta, v_stage, p_stage, {});
 	result._convert_pipe   = skg_pipeline_create(&result._convert_shader);
 
 	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_dynamic, skg_tex_fmt_rgba32, skg_mip_none);
-	skg_tex_set_contents(&result._surface, nullptr, 1, gl_width, gl_height);
+	skg_tex_set_contents(&result._surface, nullptr, 1, result.width, result.height);
 
 	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_dynamic, depth_format, skg_mip_none);
-	skg_tex_set_contents(&result._surface_depth, nullptr, 1, gl_width, gl_height);
+	skg_tex_set_contents(&result._surface_depth, nullptr, 1, result.width, result.height);
 	skg_tex_attach_depth(&result._surface, &result._surface_depth);
 
 	skg_vert_t quad_verts[] = { 
@@ -2820,11 +2867,10 @@ void main() {
 		{ { 1,-1,0}, {0,0,1}, {1,0}, {255,255,255,255} },
 		{ {-1,-1,0}, {0,0,1}, {0,0}, {255,255,255,255} } };
 	uint32_t quad_inds[] = { 2,1,0, 3,2,0 };
-	result._quad_vbuff = skg_buffer_create(quad_verts, sizeof(quad_verts), skg_buffer_type_vertex, skg_use_static);
-	result._quad_ibuff = skg_buffer_create(quad_inds,  sizeof(quad_inds ), skg_buffer_type_index,  skg_use_static);
+	result._quad_vbuff = skg_buffer_create(quad_verts, 4, sizeof(skg_vert_t), skg_buffer_type_vertex, skg_use_static);
+	result._quad_ibuff = skg_buffer_create(quad_inds,  6, sizeof(uint32_t  ), skg_buffer_type_index,  skg_use_static);
 	result._quad_mesh  = skg_mesh_create(&result._quad_vbuff, &result._quad_ibuff);
 #endif
-	
 	return result;
 }
 
@@ -2833,15 +2879,13 @@ void main() {
 void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t height) {
 	swapchain->width  = width;
 	swapchain->height = height;
-	gl_width  = width;
-	gl_height = height;
 }
 
 /////////////////////////////////////////// 
 
 void skg_swapchain_present(skg_swapchain_t *swapchain) {
 #ifdef _WIN32
-	SwapBuffers(gl_hdc);
+	SwapBuffers((HDC)swapchain->_hdc);
 #elif defined(__ANDROID__) || defined(__linux__)
 	eglSwapBuffers(egl_display, egl_surface);
 #elif defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
@@ -2850,23 +2894,34 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 	skg_tex_bind      (&swapchain->_surface, {0, skg_stage_pixel});
 	skg_mesh_bind     (&swapchain->_quad_mesh);
 	skg_pipeline_bind (&swapchain->_convert_pipe);
-	skg_draw          (0, 6, 1);
+	skg_draw          (0, 0, 6, 1);
 #endif
 }
 
 /////////////////////////////////////////// 
 
-skg_tex_t *skg_swapchain_get_next(skg_swapchain_t *swapchain) {
+void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *clear_color_4) {
+	gl_active_width  = swapchain->width;
+	gl_active_height = swapchain->height;
 #if defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
-	return &swapchain->_surface;
+	skg_tex_target_bind(&swapchain->_surface, clear, clear_color_4);
 #else
-	return nullptr;
+	wglMakeCurrent((HDC)swapchain->_hdc, gl_hrc);
+	skg_tex_target_bind(nullptr, clear, clear_color_4);
 #endif
 }
 
 /////////////////////////////////////////// 
 
 void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
+#ifdef _WIN32
+	if (swapchain->_hdc != nullptr) {
+		wglMakeCurrent(nullptr, nullptr);
+		ReleaseDC((HWND)swapchain->_hwnd, (HDC)swapchain->_hdc);
+		swapchain->_hwnd = nullptr;
+		swapchain->_hdc  = nullptr;
+	}
+#endif
 }
 
 /////////////////////////////////////////// 

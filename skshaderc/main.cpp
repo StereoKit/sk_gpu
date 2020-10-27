@@ -7,8 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define SKR_DIRECT3D11
-#define SKR_IMPL
+#define SKG_IMPL
 #include "../sk_gpu.h"
 
 #define SKSC_IMPL
@@ -49,6 +48,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 		if      (strcmp(argv[i], "-h" ) == 0) result.output_header = true;
 		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = true;
 		else if (strcmp(argv[i], "-r" ) == 0) result.row_major     = true;
+		else if (strcmp(argv[i], "-d" ) == 0) result.debug         = true;
 		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
@@ -84,7 +84,7 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 			char  *file_text;
 			size_t file_size;
 			if (read_file(filename, &file_text, &file_size)) {
-				skr_shader_file_t file;
+				skg_shader_file_t file;
 				if (sksc_compile(filename, file_text, settings, &file)) {
 					char new_filename[512];
 					char drive[16];
@@ -104,7 +104,7 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 					if (settings->output_header)
 						sksc_save_header(new_filename);
 
-					skr_shader_file_destroy(&file);
+					skg_shader_file_destroy(&file);
 				}
 				free(file_text);
 			}

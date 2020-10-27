@@ -26,6 +26,6 @@ typedef struct sksc_settings_t {
 
 void sksc_init       ();
 void sksc_shutdown   ();
-bool sksc_compile    (char *filename, char *hlsl_text, sksc_settings_t *settings, skr_shader_file_t *out_file);
-void sksc_save       (char *filename, const skr_shader_file_t *file);
+bool sksc_compile    (char *filename, char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file);
+void sksc_save       (char *filename, const skg_shader_file_t *file);
 void sksc_save_header(char *sks_file);

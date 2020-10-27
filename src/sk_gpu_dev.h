@@ -274,7 +274,7 @@ void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline
 skg_depth_test_     skg_pipeline_get_depth_test  (const skg_pipeline_t *pipeline);
 void                skg_pipeline_destroy         (      skg_pipeline_t *pipeline);
 
-skg_swapchain_t     skg_swapchain_create         (void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format);
+skg_swapchain_t     skg_swapchain_create         (void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t requested_width, int32_t requested_height);
 void                skg_swapchain_resize         (      skg_swapchain_t *swapchain, int32_t width, int32_t height);
 void                skg_swapchain_present        (      skg_swapchain_t *swapchain);
 void                skg_swapchain_bind           (      skg_swapchain_t *swapchain, bool clear, const float *clear_color_4);

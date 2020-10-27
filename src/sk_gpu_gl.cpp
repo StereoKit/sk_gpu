@@ -24,9 +24,7 @@ EGLConfig  egl_config;
 #elif _WIN32
 #pragma comment(lib, "opengl32.lib")
 
-#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
-#endif
 #include <windows.h>
 
 HWND  gl_hwnd;
@@ -734,7 +732,8 @@ void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offse
 /////////////////////////////////////////// 
 
 void skg_buffer_destroy(skg_buffer_t *buffer) {
-	glDeleteBuffers(1, &buffer->_buffer);
+	uint32_t buffer_list[] = { buffer->_buffer };
+	glDeleteBuffers(1, buffer_list);
 	*buffer = {};
 }
 
@@ -793,7 +792,8 @@ void skg_mesh_bind(const skg_mesh_t *mesh) {
 /////////////////////////////////////////// 
 
 void skg_mesh_destroy(skg_mesh_t *mesh) {
-	glDeleteVertexArrays(1, &mesh->_layout);
+	uint32_t vao_list[] = {mesh->_layout};
+	glDeleteVertexArrays(1, vao_list);
 	*mesh = {};
 }
 
@@ -1084,17 +1084,14 @@ void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
 
 ///////////////////////////////////////////
 
-skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format) {
+skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t requested_width, int32_t requested_height) {
 	skg_swapchain_t result = {};
 
 #if _WIN32
-	result._hwnd = hwnd;
-	result._hdc  = GetDC((HWND)hwnd);
-
-	RECT bounds;
-	GetWindowRect((HWND)hwnd, &bounds);
-	result.width  = bounds.right  - bounds.left;
-	result.height = bounds.bottom - bounds.top;
+	result._hwnd  = hwnd;
+	result._hdc   = GetDC((HWND)hwnd);
+	result.width  = requested_width;
+	result.height = requested_height;
 
 	// Find a pixel format
 	const int format_attribs[] = {
@@ -1465,8 +1462,10 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 /////////////////////////////////////////// 
 
 void skg_tex_destroy(skg_tex_t *tex) {
-	glDeleteTextures    (1, &tex->_texture);
-	glDeleteFramebuffers(1, &tex->_framebuffer);  
+	uint32_t tex_list[] = { tex->_texture     };
+	uint32_t fb_list [] = { tex->_framebuffer };
+	glDeleteTextures    (1, tex_list);
+	glDeleteFramebuffers(1, fb_list );  
 	*tex = {};
 }
 

@@ -94,6 +94,11 @@ bool main_init() {
 		nullptr, nullptr, wc.hInstance, nullptr);
 
 	if( !app_hwnd ) return false;
+
+	RECT bounds;
+	GetClientRect((HWND)app_hwnd, &bounds);
+	app_width  = bounds.right  - bounds.left;
+	app_height = bounds.bottom - bounds.top;
 #endif
 	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, app_width, app_height);
 

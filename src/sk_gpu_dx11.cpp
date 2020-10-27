@@ -12,6 +12,9 @@
 #include <d3dcompiler.h>
 #include <math.h>
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 #include <stdio.h>
 
 ///////////////////////////////////////////
@@ -629,13 +632,10 @@ void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
 // skg_swapchain                         //
 ///////////////////////////////////////////
 
-skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format) {
+skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t requested_width, int32_t requested_height) {
 	skg_swapchain_t result = {};
-
-	RECT bounds;
-	GetWindowRect((HWND)hwnd, &bounds);
-	result.width  = bounds.right  - bounds.left;
-	result.height = bounds.bottom - bounds.top;
+	result.width  = requested_width;
+	result.height = requested_height;
 
 	DXGI_SWAP_CHAIN_DESC1 swapchain_desc = { };
 	swapchain_desc.BufferCount = 2;

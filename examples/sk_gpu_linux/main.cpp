@@ -28,16 +28,15 @@ int main() {
     skg_callback_log([](skg_log_ level, const char *text) {
         printf("[%d] %s", level, text);
     });
-    skg_init("Test!", &window, nullptr);
+    skg_init("Test!", nullptr);
 
-    swapchain = skg_swapchain_create(skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth16, 640, 400);
+    swapchain = skg_swapchain_create(&window, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth16, 640, 400);
 
     while(true) {
         skg_draw_begin();
-        skg_tex_t *target = skg_swapchain_get_next(&swapchain);
         
         float clear_color[4] = {1, 0, 0, 1};
-        skg_tex_target_bind(target, true, clear_color);
+        skg_swapchain_bind(&swapchain, true, clear_color);
 
         skg_swapchain_present(&swapchain);
     }

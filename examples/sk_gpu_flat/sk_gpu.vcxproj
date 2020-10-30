@@ -211,12 +211,14 @@ python build_header.py</Command>
       <Command>$(ProjectDir)..\..\bin\Release\skshaderc.exe -h %(FullPath)</Command>
       <Outputs>%(FullPath).sks</Outputs>
       <TreatOutputAsContent>true</TreatOutputAsContent>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
     <CustomBuild Include="..\common\test.hlsl">
       <FileType>Document</FileType>
       <Command>$(ProjectDir)..\..\bin\Release\skshaderc.exe -h %(FullPath)</Command>
       <Outputs>%(FullPath).sks</Outputs>
       <TreatOutputAsContent>true</TreatOutputAsContent>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

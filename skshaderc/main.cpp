@@ -17,42 +17,73 @@
 
 void            get_folder    (char *filename, char *out_dest,  size_t dest_size);
 bool            read_file     (char *filename, char **out_text, size_t *out_size);
+void            write_file    (char *filename, void *file_data, size_t file_size);
+void            write_header  (char *filename, void *file_data, size_t file_size);
 void            iterate_files (char *input_name, sksc_settings_t *settings);
-sksc_settings_t check_settings(int32_t argc, char **argv);
+sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
+void            show_usage    ();
 
 ///////////////////////////////////////////
 
 int main(int argc, char **argv) {
-	sksc_settings_t settings = check_settings(argc, argv);
+	bool exit = false;
+	sksc_settings_t settings = check_settings(argc, argv, &exit);
+	if (exit) return 0;
+
 	sksc_init();
 
 	iterate_files(argv[argc - 1], &settings);
 
 	sksc_shutdown();
+
+	return 0;
 }
 
 ///////////////////////////////////////////
 
-sksc_settings_t check_settings(int32_t argc, char **argv) {
+sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
+	if (argc <= 1) {
+		*exit = true;
+		show_usage();
+		return {};
+	}
+
 	sksc_settings_t result = {};
 	result.debug         = false;
 	result.optimize      = 3;
-	result.replace_ext   = false;
+	result.replace_ext   = true;
 	result.output_header = false;
 	result.row_major     = false;
+	result.silent_err    = false;
+	result.silent_info   = false;
+	result.silent_warn   = false;
 
 	// Get the inlcude folder
 	get_folder(argv[argc-1], result.folder, sizeof(result.folder));
 
-	for (int32_t i=1; i<argc; i++) {
+	for (int32_t i=1; i<argc-1; i++) {
 		if      (strcmp(argv[i], "-h" ) == 0) result.output_header = true;
-		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = true;
+		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = false;
 		else if (strcmp(argv[i], "-r" ) == 0) result.row_major     = true;
 		else if (strcmp(argv[i], "-d" ) == 0) result.debug         = true;
+		else if (strcmp(argv[i], "-si") == 0) result.silent_info   = true;
+		else if (strcmp(argv[i], "-sw") == 0) { result.silent_info = true; result.silent_warn = true; }
+		else if (strcmp(argv[i], "-s" ) == 0) { result.silent_err = true; result.silent_info = true; result.silent_warn = true;}
+		else if (strcmp(argv[i], "-o0") == 0 ||
+				 strcmp(argv[i], "-O0") == 0) result.optimize = 0;
+		else if (strcmp(argv[i], "-o1") == 0 ||
+				 strcmp(argv[i], "-O1") == 0) result.optimize = 1;
+		else if (strcmp(argv[i], "-o2") == 0 ||
+				 strcmp(argv[i], "-O2") == 0) result.optimize = 2;
+		else if (strcmp(argv[i], "-o3") == 0 ||
+				 strcmp(argv[i], "-O3") == 0) result.optimize = 3;
+		else if (strcmp(argv[i], "-help" ) == 0 ||
+				 strcmp(argv[i], "/?" ) == 0 ) *exit = true;
 		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shader_model,  argv[i+1], sizeof(result.shader_model )); i++; }
+		else { printf("Unrecognized option '%s'\n", argv[i]); *exit = true; }
 	}
 
 	if (result.shader_model[0] == 0)
@@ -64,7 +95,51 @@ sksc_settings_t check_settings(int32_t argc, char **argv) {
 		strncpy(result.vs_entrypoint, "vs", sizeof(result.vs_entrypoint));
 	}
 
+	if (*exit) {
+		show_usage();
+	}
 	return result;
+}
+
+///////////////////////////////////////////
+
+void show_usage() {
+	printf(R"_(
+Usage: skshaderc [options] target_file
+
+Options:
+	-r		Specify row-major matrices, column-major is default.
+	-h		Output a C header file with a byte array instead of a binary file.
+	-e		Appends the sks extension to the resulting file instead of 
+			replacing the extension with sks. Default will replace the 
+			extension.
+	-s		Silent, no errors, warnings or info are printed when compiling 
+			shaders.
+	-sw		No info or warnings are printed when compiling shaders.
+	-si		No info is printed when compiling shaders.
+	
+	-d		Compile shaders with debug info embedded. Enabling this will
+			disable shader optimizations.
+	-o0		Optimization level 0. Default is 3.
+	-o1		Optimization level 1. Default is 3.
+	-o2		Optimization level 2. Default is 3.
+	-o3		Optimization level 3. Default is 3.
+
+	-cs name	Compiles a compute shader stage from this file, using an entry
+			function of [name]. Specifying this removes the default entry 
+			names from vertex and pixel shader stages.
+	-ps name	Compiles a pixel shader stage from this file, using an entry
+			function of [name]. Specifying this removes default entry
+			names from vertex and pixel shader stages. Default is 'ps'.
+	-vs name	Compiles a vertex shader stage from this file, using an entry
+			function of [name]. Specifying this removes default entry
+			names from vertex and pixel shader stages. Default is 'vs'.
+	-m		Lets you set the shader model used for compiling, default is
+			5_0. This may not be implemented yet.
+
+	target_file	This can be any filename, and can use the wildcard '*' to 
+			compile multiple files in the same call.
+)_");
 }
 
 ///////////////////////////////////////////
@@ -73,6 +148,7 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 	HANDLE           handle;
 	WIN32_FIND_DATAA file_info;
 
+	int count = 0;
 	char folder[512] = {};
 	get_folder(input_name, folder, sizeof(folder));
 
@@ -100,16 +176,28 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 					} else {
 						sprintf_s(new_filename, "%s.sks", filename);
 					}
-					sksc_save(new_filename, &file);
+
+					void  *sks_data;
+					size_t sks_size;
+					sksc_build_file(&file, &sks_data, &sks_size);
 					if (settings->output_header)
-						sksc_save_header(new_filename);
+						write_header(new_filename, sks_data, sks_size);
+					else 
+						write_file  (new_filename, sks_data, sks_size);
+					free(sks_data);
 
 					skg_shader_file_destroy(&file);
 				}
+				sksc_log_print(settings);
+				sksc_log_clear();
 				free(file_text);
+			} else {
+				printf("Couldn't read file '%s'!\n", filename);
 			}
 		} while(FindNextFileA(handle, &file_info));
 		FindClose(handle);
+	} else {
+		printf("Couldn't find or read file from '%s'!\n", input_name);
 	}
 }
 
@@ -135,6 +223,54 @@ bool read_file(char *filename, char **out_text, size_t *out_size) {
 
 	(*out_text)[*out_size] = 0;
 	return true;
+}
+
+///////////////////////////////////////////
+
+void write_file(char *filename, void *file_data, size_t file_size) {
+	FILE *fp;
+	if (fopen_s(&fp, filename, "wb") != 0 || fp == nullptr) {
+		return;
+	}
+	fwrite(file_data, file_size, 1, fp);
+	fclose(fp);
+}
+
+///////////////////////////////////////////
+
+void write_header(char *filename, void *file_data, size_t file_size) {
+	char new_filename[512];
+	char drive[16];
+	char dir  [512];
+	char name [128];
+	_splitpath_s(filename,
+		drive, sizeof(drive),
+		dir,   sizeof(dir),
+		name,  sizeof(name), nullptr, 0);
+	sprintf_s(new_filename, "%s%s%s.h", drive, dir, name);
+
+	// '.' may be common, and will bork the variable name
+	size_t len = strlen(name);
+	for (size_t i = 0; i < len; i++) {
+		if (name[i] == '.') name[i] = '_';
+	}
+
+	FILE *fp = nullptr;
+	if (fopen_s(&fp, new_filename, "w") != 0 || fp == nullptr) {
+		return;
+	}
+	fprintf(fp, "#pragma once\n\n");
+	int32_t ct = fprintf_s(fp, "const unsigned char sks_%s[%zu] = {", name, file_size);
+	for (size_t i = 0; i < file_size; i++) {
+		unsigned char byte = ((unsigned char *)file_data)[i];
+		ct += fprintf_s(fp, "%d,", byte);
+		if (ct > 80) { 
+			fprintf(fp, "\n"); 
+			ct = 0; 
+		}
+	}
+	fprintf_s(fp, "};\n");
+	fclose(fp);
 }
 
 ///////////////////////////////////////////

@@ -768,9 +768,9 @@ void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 		glEnableVertexAttribArray(2);
 		glEnableVertexAttribArray(3);
 		// tell the shader how our vertex data binds to the shader inputs
-		glVertexAttribPointer(0, 3, GL_FLOAT, 0, sizeof(skg_vert_t), nullptr);
-		glVertexAttribPointer(1, 3, GL_FLOAT, 0, sizeof(skg_vert_t), (void*)(sizeof(float) * 3));
-		glVertexAttribPointer(2, 2, GL_FLOAT, 0, sizeof(skg_vert_t), (void*)(sizeof(float) * 6));
+		glVertexAttribPointer(0, 3, GL_FLOAT,         0, sizeof(skg_vert_t), nullptr);
+		glVertexAttribPointer(1, 3, GL_FLOAT,         0, sizeof(skg_vert_t), (void*)(sizeof(float) * 3));
+		glVertexAttribPointer(2, 2, GL_FLOAT,         0, sizeof(skg_vert_t), (void*)(sizeof(float) * 6));
 		glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, 1, sizeof(skg_vert_t), (void*)(sizeof(float) * 8));
 	}
 }
@@ -955,7 +955,7 @@ void skg_shader_destroy(skg_shader_t *shader) {
 skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	skg_pipeline_t result = {};
 	result.transparency = skg_transparency_none;
-	result.cull         = skg_cull_none;
+	result.cull         = skg_cull_back;
 	result.wireframe    = false;
 	result.depth_test   = skg_depth_test_less;
 	result.depth_write  = true;

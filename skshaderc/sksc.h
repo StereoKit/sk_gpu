@@ -29,7 +29,7 @@ typedef struct sksc_settings_t {
 
 void    sksc_init       ();
 void    sksc_shutdown   ();
-bool    sksc_compile    (char *filename, char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file);
+bool    sksc_compile    (const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file);
 void    sksc_build_file (const skg_shader_file_t *file, void **out_data, size_t *out_size);
 void    sksc_log_print  (const sksc_settings_t *settings);
 void    sksc_log_clear  ();

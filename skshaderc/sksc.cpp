@@ -3,15 +3,26 @@
 
 #pragma comment(lib,"dxcompiler.lib")
 #pragma comment(lib,"d3dcompiler.lib")
+#ifdef _DEBUG
+#pragma comment(lib,"spirv-cross-cd.lib")
+#pragma comment(lib,"spirv-cross-cored.lib")
+#pragma comment(lib,"spirv-cross-cppd.lib")
+#pragma comment(lib,"spirv-cross-glsld.lib")
+#pragma comment(lib,"spirv-cross-hlsld.lib")
+#pragma comment(lib,"spirv-cross-msld.lib")
+#pragma comment(lib,"spirv-cross-reflectd.lib")
+#pragma comment(lib,"spirv-cross-utild.lib")
+#else
 #pragma comment(lib,"spirv-cross-c.lib")
 #pragma comment(lib,"spirv-cross-core.lib")
 #pragma comment(lib,"spirv-cross-cpp.lib")
-#pragma comment(lib,"spirv-cross-c-shared.lib")
 #pragma comment(lib,"spirv-cross-glsl.lib")
 #pragma comment(lib,"spirv-cross-hlsl.lib")
 #pragma comment(lib,"spirv-cross-msl.lib")
 #pragma comment(lib,"spirv-cross-reflect.lib")
 #pragma comment(lib,"spirv-cross-util.lib")
+#endif
+#pragma comment(lib,"spirv-cross-c-shared.lib")
 
 #include "sksc.h"
 
@@ -80,11 +91,11 @@ struct log_item_t {
 
 ///////////////////////////////////////////
 
-void                  sksc_meta_find_defaults    (char *hlsl_text, skg_shader_meta_t *ref_meta);
+void                  sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
 bool                  sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta);
 
 DWORD                 sksc_d3d11_build_flags     (const sksc_settings_t *settings);
-bool                  sksc_d3d11_compile_shader  (char *filename, char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage);
+bool                  sksc_d3d11_compile_shader  (const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage);
 
 array_t<const char *> sksc_dxc_build_flags       (sksc_settings_t settings, skg_stage_ type, skg_shader_lang_ lang);
 void                  sksc_dxc_shader_meta       (IDxcResult *compile_result, skg_stage_ stage, skg_shader_meta_t *out_meta);
@@ -117,7 +128,7 @@ void sksc_shutdown() {
 
 ///////////////////////////////////////////
 
-bool sksc_compile(char *filename, char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file) {
+bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file) {
 	sksc_log(log_level_info, " ________________\n| Compiling %s...\n|\n", filename);
 
 	IDxcBlobEncoding *source;
@@ -330,7 +341,7 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 
 ///////////////////////////////////////////
 
-void sksc_meta_find_defaults(char *hlsl_text, skg_shader_meta_t *ref_meta) {
+void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta) {
 	// Searches for metadata in comments that look like this:
 	//--name                 = unlit/test
 	//--time: color          = 1,1,1,1
@@ -343,9 +354,9 @@ void sksc_meta_find_defaults(char *hlsl_text, skg_shader_meta_t *ref_meta) {
 	// Metadata can be in // as well as /**/ comments
 
 	// This function will get each line of comment from the file
-	char *(*next_comment)(char *src, char **ref_end, bool *ref_state) = [](char *src, char **ref_end, bool *ref_state) {
-		char *c      = *ref_end == nullptr ? src : *ref_end;
-		char *result = nullptr;
+	const char *(*next_comment)(const char *src, const char **ref_end, bool *ref_state) = [](const char *src, const char **ref_end, bool *ref_state) {
+		const char *c      = *ref_end == nullptr ? src : *ref_end;
+		const char *result = nullptr;
 
 		// If we're inside a /**/ block, continue from the previous line, we
 		// just need to skip any newline characters at the end.
@@ -378,8 +389,8 @@ void sksc_meta_find_defaults(char *hlsl_text, skg_shader_meta_t *ref_meta) {
 	};
 
 	// This function checks if the line is relevant for our metadata
-	char *(*is_relevant)(char *start, char *end) = [](char *start, char *end) {
-		char *c = start;
+	const char *(*is_relevant)(const char *start, const char *end) = [](const char *start, const char *end) {
+		const char *c = start;
 		while (c != end && (*c == ' ' || *c == '\t')) c++;
 
 		return end - c > 1 && c[0] == '-' && c[1] == '-' 
@@ -387,18 +398,18 @@ void sksc_meta_find_defaults(char *hlsl_text, skg_shader_meta_t *ref_meta) {
 			: (char*)nullptr;
 	};
 
-	void (*trim_str)(char **ref_start, char **ref_end) = [] (char **ref_start, char **ref_end){
+	void (*trim_str)(const char **ref_start, const char **ref_end) = [] (const char **ref_start, const char **ref_end){
 		while (**ref_start   == ' ' || **ref_start   == '\t') (*ref_start)++;
 		while (*(*ref_end-1) == ' ' || *(*ref_end-1) == '\t') (*ref_end)--;
 	};
 
-	char *(*index_of)(char *start, char *end, char ch) = [](char *start, char *end, char ch) {
+	const char *(*index_of)(const char *start, const char *end, char ch) = [](const char *start, const char *end, char ch) {
 		while (start != end) {
 			if (*start == ch)
 				return start;
 			start++;
 		}
-		return (char*)nullptr;
+		return (const char*)nullptr;
 	};
 
 	int32_t(*count_ch)(const char *str, char ch) = [](const char *str, char ch) {
@@ -411,38 +422,41 @@ void sksc_meta_find_defaults(char *hlsl_text, skg_shader_meta_t *ref_meta) {
 		return result;
 	};
 
-	bool  in_comment  = false;
-	char *comment_end = nullptr;
-	char *comment     = next_comment(hlsl_text, &comment_end, &in_comment);
+	bool        in_comment  = false;
+	const char *comment_end = nullptr;
+	const char *comment     = next_comment(hlsl_text, &comment_end, &in_comment);
 	while (comment) {
 		comment = is_relevant(comment, comment_end);
 		if (comment) {
-			char *tag_str   = index_of(comment, comment_end, ':');
-			char *value_str = index_of(comment, comment_end, '=');
+			const char *tag_str   = index_of(comment, comment_end, ':');
+			const char *value_str = index_of(comment, comment_end, '=');
 
-			char *name_start = comment;
-			char *name_end   = tag_str?tag_str:(value_str?value_str:comment_end);
+			const char *name_start = comment;
+			const char *name_end   = tag_str?tag_str:(value_str?value_str:comment_end);
 			trim_str(&name_start, &name_end);
 			char name[32];
-			memcpy(name, name_start, min(sizeof(name), name_end - name_start));
-			name[name_end-name_start] = '\0';
+			int32_t ct = name_end - name_start;
+			memcpy(name, name_start, min(sizeof(name), ct));
+			name[ct] = '\0';
 
 			char tag[64]; tag[0] = '\0';
 			if (tag_str) {
-				char *tag_start = tag_str + 1;
-				char *tag_end   = value_str ? value_str : comment_end;
+				const char *tag_start = tag_str + 1;
+				const char *tag_end   = value_str ? value_str : comment_end;
 				trim_str(&tag_start, &tag_end);
-				memcpy(tag, tag_start, min(sizeof(tag), tag_end - tag_start));
-				tag[tag_end-tag_start] = '\0';
+				ct = max(0, tag_end - tag_start);
+				memcpy(tag, tag_start, min(sizeof(tag), ct));
+				tag[ct] = '\0';
 			}
 
 			char value[512]; value[0] = '\0';
 			if (value_str) {
-				char *value_start = value_str + 1;
-				char *value_end   = comment_end;
+				const char *value_start = value_str + 1;
+				const char *value_end   = comment_end;
 				trim_str(&value_start, &value_end);
-				memcpy(value, value_start, min(sizeof(value), value_end - value_start));
-				value[value_end-value_start] = '\0';
+				ct = max(0, value_end - value_start);
+				memcpy(value, value_start, min(sizeof(value), ct));
+				value[ct] = '\0';
 			}
 
 			skg_shader_buffer_t *buff  = &ref_meta->buffers[ref_meta->global_buffer_id];
@@ -557,7 +571,7 @@ DWORD sksc_d3d11_build_flags(const sksc_settings_t *settings) {
 
 ///////////////////////////////////////////
 
-bool sksc_d3d11_compile_shader(char *filename, char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
+bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
 	DWORD flags = sksc_d3d11_build_flags(settings);
 
 	const char *entrypoint = nullptr;

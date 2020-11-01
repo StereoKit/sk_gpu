@@ -18,8 +18,9 @@ typedef struct skg_mesh_t {
 } skg_mesh_t;
 
 typedef struct skg_shader_stage_t {
-	skg_stage_  type;
-	void       *_shader;
+	skg_stage_         type;
+	void              *_shader;
+	ID3D11InputLayout *_layout;
 } skg_shader_stage_t;
 
 typedef struct skg_shader_t {
@@ -27,6 +28,7 @@ typedef struct skg_shader_t {
 	ID3D11VertexShader  *_vertex;
 	ID3D11PixelShader   *_pixel;
 	ID3D11ComputeShader *_compute;
+	ID3D11InputLayout   *_layout;
 } skg_shader_t;
 
 typedef struct skg_pipeline_t {
@@ -38,6 +40,7 @@ typedef struct skg_pipeline_t {
 	skg_shader_meta_t       *meta;
 	ID3D11VertexShader      *_vertex;
 	ID3D11PixelShader       *_pixel;
+	ID3D11InputLayout       *_layout;
 	ID3D11BlendState        *_blend;
 	ID3D11RasterizerState   *_rasterize;
 	ID3D11DepthStencilState *_depth;

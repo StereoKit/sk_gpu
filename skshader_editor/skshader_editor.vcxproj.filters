@@ -52,6 +52,7 @@
     </ClInclude>
     <ClInclude Include="array.h" />
     <ClInclude Include="HandmadeMath.h" />
+    <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="imgui_shader.hlsl" />

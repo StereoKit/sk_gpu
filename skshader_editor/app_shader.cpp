@@ -91,6 +91,8 @@ void app_shader_update_hlsl(const char *text) {
 		app_pipeline = skg_pipeline_create(&app_shader);
 		app_pipeline_valid = true;
 
+		skg_pipeline_set_depth_test(&app_pipeline, skg_depth_test_always);
+
 		app_shader_remap();
 		app_shader_rebuild_buffers();
 	}

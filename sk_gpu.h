@@ -231,8 +231,9 @@ typedef struct skg_mesh_t {
 } skg_mesh_t;
 
 typedef struct skg_shader_stage_t {
-	skg_stage_  type;
-	void       *_shader;
+	skg_stage_         type;
+	void              *_shader;
+	ID3D11InputLayout *_layout;
 } skg_shader_stage_t;
 
 typedef struct skg_shader_t {
@@ -240,6 +241,7 @@ typedef struct skg_shader_t {
 	ID3D11VertexShader  *_vertex;
 	ID3D11PixelShader   *_pixel;
 	ID3D11ComputeShader *_compute;
+	ID3D11InputLayout   *_layout;
 } skg_shader_t;
 
 typedef struct skg_pipeline_t {
@@ -248,8 +250,10 @@ typedef struct skg_pipeline_t {
 	bool                     wireframe;
 	bool                     depth_write;
 	skg_depth_test_          depth_test;
+	skg_shader_meta_t       *meta;
 	ID3D11VertexShader      *_vertex;
 	ID3D11PixelShader       *_pixel;
+	ID3D11InputLayout       *_layout;
 	ID3D11BlendState        *_blend;
 	ID3D11RasterizerState   *_rasterize;
 	ID3D11DepthStencilState *_depth;
@@ -516,7 +520,6 @@ void               skg_shader_meta_release     (skg_shader_meta_t *meta);
 ID3D11Device            *d3d_device      = nullptr;
 ID3D11DeviceContext     *d3d_context     = nullptr;
 ID3D11InfoQueue         *d3d_info        = nullptr;
-ID3D11InputLayout       *d3d_vert_layout = nullptr;
 ID3D11RasterizerState   *d3d_rasterstate = nullptr;
 ID3D11DepthStencilState *d3d_depthstate  = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
@@ -632,7 +635,6 @@ void skg_draw_begin() {
 	d3d_context->RSSetState            (d3d_rasterstate);
 	d3d_context->OMSetDepthStencilState(d3d_depthstate, 1);
 	d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	d3d_context->IASetInputLayout      (d3d_vert_layout);
 }
 
 ///////////////////////////////////////////
@@ -876,14 +878,14 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	case skg_stage_compute : d3d_device->CreateComputeShader(buffer, buffer_size, nullptr, (ID3D11ComputeShader**)&result._shader); break;
 	}
 
-	if (d3d_vert_layout == nullptr && type == skg_stage_vertex) {
+	if (type == skg_stage_vertex) {
 		// Describe how our mesh is laid out in memory
 		D3D11_INPUT_ELEMENT_DESC vert_desc[] = {
 			{"SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"NORMAL",      0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"COLOR" ,      0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0} };
-		d3d_device->CreateInputLayout(vert_desc, (UINT)_countof(vert_desc), buffer, buffer_size, &d3d_vert_layout);
+		d3d_device->CreateInputLayout(vert_desc, (UINT)_countof(vert_desc), buffer, buffer_size, &result._layout);
 	}
 	if (compiled) compiled->Release();
 
@@ -894,7 +896,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 
 void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 	switch(shader->type) {
-	case skg_stage_vertex  : ((ID3D11VertexShader *)shader->_shader)->Release(); break;
+	case skg_stage_vertex  : ((ID3D11VertexShader *)shader->_shader)->Release(); shader->_layout->Release(); break;
 	case skg_stage_pixel   : ((ID3D11PixelShader  *)shader->_shader)->Release(); break;
 	case skg_stage_compute : ((ID3D11ComputeShader*)shader->_shader)->Release(); break;
 	}
@@ -908,10 +910,12 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	skg_shader_t result = {};
 	result.meta    = meta;
 	if (v_shader._shader) result._vertex  = (ID3D11VertexShader *)v_shader._shader;
+	if (v_shader._layout) result._layout  = v_shader._layout;
 	if (p_shader._shader) result._pixel   = (ID3D11PixelShader  *)p_shader._shader;
 	if (c_shader._shader) result._compute = (ID3D11ComputeShader*)c_shader._shader;
 	skg_shader_meta_reference(result.meta);
 	if (result._vertex ) result._vertex ->AddRef();
+	if (result._layout ) result._layout ->AddRef();
 	if (result._pixel  ) result._pixel  ->AddRef();
 	if (result._compute) result._compute->AddRef();
 
@@ -928,7 +932,9 @@ bool skg_shader_is_valid(const skg_shader_t *shader) {
 ///////////////////////////////////////////
 
 void skg_shader_destroy(skg_shader_t *shader) {
+	skg_shader_meta_release(shader->meta);
 	if (shader->_vertex ) shader->_vertex ->Release();
+	if (shader->_layout ) shader->_layout ->Release();
 	if (shader->_pixel  ) shader->_pixel  ->Release();
 	if (shader->_compute) shader->_compute->Release();
 	*shader = {};
@@ -1017,8 +1023,11 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.depth_test   = skg_depth_test_less;
 	result._vertex      = shader->_vertex;
 	result._pixel       = shader->_pixel;
+	result._layout      = shader->_layout;
 	if (result._vertex) result._vertex->AddRef();
+	if (result._layout) result._layout->AddRef();
 	if (result._pixel ) result._pixel ->AddRef();
+	skg_shader_meta_reference(shader->meta);
 
 	skg_pipeline_update_blend     (&result);
 	skg_pipeline_update_rasterizer(&result);
@@ -1034,6 +1043,7 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	d3d_context->RSSetState            (pipeline->_rasterize);
 	d3d_context->VSSetShader           (pipeline->_vertex, nullptr, 0);
 	d3d_context->PSSetShader           (pipeline->_pixel,  nullptr, 0);
+	d3d_context->IASetInputLayout      (pipeline->_layout);
 }
 
 /////////////////////////////////////////// 
@@ -1114,10 +1124,12 @@ skg_depth_test_ skg_pipeline_get_depth_test(const skg_pipeline_t *pipeline) {
 ///////////////////////////////////////////
 
 void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
+	skg_shader_meta_release(pipeline->meta);
 	if (pipeline->_blend    ) pipeline->_blend    ->Release();
 	if (pipeline->_rasterize) pipeline->_rasterize->Release();
 	if (pipeline->_depth    ) pipeline->_depth    ->Release();
 	if (pipeline->_vertex   ) pipeline->_vertex   ->Release();
+	if (pipeline->_layout   ) pipeline->_layout   ->Release();
 	if (pipeline->_pixel    ) pipeline->_pixel    ->Release();
 	*pipeline = {};
 }
@@ -2620,6 +2632,7 @@ bool skg_shader_is_valid(const skg_shader_t *shader) {
 ///////////////////////////////////////////
 
 void skg_shader_destroy(skg_shader_t *shader) {
+	skg_shader_meta_release(shader->meta);
 	glDeleteProgram(shader->_program);
 	glDeleteShader (shader->_vertex);
 	glDeleteShader (shader->_pixel);
@@ -2638,6 +2651,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.depth_test   = skg_depth_test_less;
 	result.depth_write  = true;
 	result._shader      = *shader;
+	skg_shader_meta_reference(result._shader.meta);
 
 	return result;
 }
@@ -2758,6 +2772,7 @@ skg_depth_test_ skg_pipeline_get_depth_test(const skg_pipeline_t *pipeline) {
 ///////////////////////////////////////////
 
 void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
+	skg_shader_meta_release(pipeline->_shader.meta);
 	*pipeline = {};
 }
 
@@ -3460,6 +3475,7 @@ void skg_shader_meta_reference(skg_shader_meta_t *meta) {
 ///////////////////////////////////////////
 
 void skg_shader_meta_release(skg_shader_meta_t *meta) {
+	if (!meta) return;
 	meta->references -= 1;
 	if (meta->references == 0) {
 		for (uint32_t i = 0; i < meta->buffer_count; i++) {

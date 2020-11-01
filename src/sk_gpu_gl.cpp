@@ -941,6 +941,7 @@ bool skg_shader_is_valid(const skg_shader_t *shader) {
 ///////////////////////////////////////////
 
 void skg_shader_destroy(skg_shader_t *shader) {
+	skg_shader_meta_release(shader->meta);
 	glDeleteProgram(shader->_program);
 	glDeleteShader (shader->_vertex);
 	glDeleteShader (shader->_pixel);
@@ -959,6 +960,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.depth_test   = skg_depth_test_less;
 	result.depth_write  = true;
 	result._shader      = *shader;
+	skg_shader_meta_reference(result._shader.meta);
 
 	return result;
 }
@@ -1079,6 +1081,7 @@ skg_depth_test_ skg_pipeline_get_depth_test(const skg_pipeline_t *pipeline) {
 ///////////////////////////////////////////
 
 void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
+	skg_shader_meta_release(pipeline->_shader.meta);
 	*pipeline = {};
 }
 

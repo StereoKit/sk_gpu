@@ -153,6 +153,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 	*out_file = {};
 	 out_file->meta = (skg_shader_meta_t*)malloc(sizeof(skg_shader_meta_t));
 	*out_file->meta = {};
+	 out_file->meta->references = 1;
 
 	array_t<skg_shader_file_stage_t> stages = {};
 

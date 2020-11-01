@@ -35,6 +35,7 @@ typedef struct skg_pipeline_t {
 	bool                     wireframe;
 	bool                     depth_write;
 	skg_depth_test_          depth_test;
+	skg_shader_meta_t       *meta;
 	ID3D11VertexShader      *_vertex;
 	ID3D11PixelShader       *_pixel;
 	ID3D11BlendState        *_blend;

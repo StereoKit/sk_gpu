@@ -434,6 +434,7 @@ bool skg_shader_is_valid(const skg_shader_t *shader) {
 ///////////////////////////////////////////
 
 void skg_shader_destroy(skg_shader_t *shader) {
+	skg_shader_meta_release(shader->meta);
 	if (shader->_vertex ) shader->_vertex ->Release();
 	if (shader->_pixel  ) shader->_pixel  ->Release();
 	if (shader->_compute) shader->_compute->Release();
@@ -525,6 +526,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result._pixel       = shader->_pixel;
 	if (result._vertex) result._vertex->AddRef();
 	if (result._pixel ) result._pixel ->AddRef();
+	skg_shader_meta_reference(shader->meta);
 
 	skg_pipeline_update_blend     (&result);
 	skg_pipeline_update_rasterizer(&result);

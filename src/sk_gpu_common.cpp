@@ -226,6 +226,7 @@ void skg_shader_meta_reference(skg_shader_meta_t *meta) {
 ///////////////////////////////////////////
 
 void skg_shader_meta_release(skg_shader_meta_t *meta) {
+	if (!meta) return;
 	meta->references -= 1;
 	if (meta->references == 0) {
 		for (uint32_t i = 0; i < meta->buffer_count; i++) {

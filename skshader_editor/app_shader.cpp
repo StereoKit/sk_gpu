@@ -47,6 +47,10 @@ int32_t app_shader_engine_val_size(engine_val_ type) {
 }
 
 void app_shader_init() {
+	app_shader_map_engine_val(engine_val_matrix_view, "view");
+	app_shader_map_engine_val(engine_val_matrix_projection, "proj");
+	app_shader_map_engine_val(engine_val_matrix_view_projection, "viewproj");
+	app_shader_map_engine_val(engine_val_time, "time");
 }
 
 void app_shader_update_hlsl(const char *text) {
@@ -133,7 +137,18 @@ void app_shader_show_meta() {
 					case skg_shader_var_uint:   name = "uint";   break;
 					case skg_shader_var_uint8:  name = "byte";   break;
 					}
-					ImGui::LabelText(b->vars[v].name, "%s%d", name, b->vars[v].type_count);
+					if (app_shader_is_engine_val(b->vars[v].name)) {
+						ImGui::LabelText(b->vars[v].name, "engine");
+					} else {
+						if (b->vars[v].type == skg_shader_var_float) {
+							if      (b->vars[v].type_count == 1) { ImGui::InputFloat (b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }
+							else if (b->vars[v].type_count == 2) { ImGui::InputFloat2(b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }
+							else if (b->vars[v].type_count == 3) { ImGui::InputFloat3(b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }
+							else if (b->vars[v].type_count == 4) { ImGui::InputFloat4(b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }
+						} else {
+							ImGui::LabelText(b->vars[v].name, "%s%d", name, b->vars[v].type_count);
+						}
+					}
 				}
 			}
 		}
@@ -147,6 +162,16 @@ void app_shader_set_engine_val(engine_val_ type, void *value) {
 	if (id != -1) {
 		memcpy(engine_vals[id].value, value, size);
 	}
+}
+
+bool app_shader_is_engine_val(const char *name) {
+	int id = -1;
+	for (size_t i = 0; i < engine_vals.count; i++) {
+		if (strcmp(engine_vals[i].name, name) == 0) {
+			return engine_vals[i].type != engine_val_named;
+		}
+	}
+	return false;
 }
 
 void app_shader_set_named_val(const char *name, void *value) {
@@ -184,6 +209,47 @@ void app_shader_set_named_val(const char *name, void *value) {
 		memcpy(engine_vals[id].value, value, engine_vals[id].val_size);
 }
 
+void *app_shader_get_named_val(const char *name) {
+	int id = -1;
+	for (size_t i = 0; i < engine_vals.count; i++) {
+		if (strcmp(engine_vals[i].name, name) == 0) {
+			id = i;
+			break;
+		}
+	}
+	if (id == -1) {
+		skg_shader_buffer_t *var_buff = nullptr;
+		skg_shader_var_t *var = nullptr;
+		for (size_t b = 0; b < app_shader.meta->buffer_count; b++) {
+			skg_shader_buffer_t *buff = &app_shader.meta->buffers[b];
+			for (size_t v = 0; v < buff->var_count; v++) {
+				if (strcmp(buff->vars[v].name, name) == 0) {
+					var = &buff->vars[v];
+					var_buff = buff;
+				}
+			}
+		}
+		if (var) {
+			engine_val_t val = {};
+			val.type      = engine_val_named;
+			val.value     = malloc(var->size);
+			val.val_size  = var->size;
+			val.name      = (char*)malloc(strlen(name) + 1);
+			val.buffer_id = -1;
+			snprintf((char*)val.name, strlen(name) + 1, "%s", name);
+			if (var_buff->defaults) {
+				memcpy(val.value, (uint8_t*)var_buff->defaults + var->offset, var->size);
+			} else {
+				memset(val.value, 0, var->size);
+			}
+			id = engine_vals.add(val);
+
+			app_shader_remap();
+		}
+	}
+	return engine_vals[id].value;
+}
+
 void app_shader_map_engine_val(engine_val_ type, const char *shader_param_name) {
 	for (size_t i = 0; i < engine_vals.count; i++) {
 		if (strcmp(engine_vals[i].name, shader_param_name) == 0) {
@@ -197,6 +263,7 @@ void app_shader_map_engine_val(engine_val_ type, const char *shader_param_name) 
 	map.type       = type;
 	map.buffer_id  = -1;
 	map.val_size   = app_shader_engine_val_size(type);
+	map.value      = malloc(map.val_size);
 	map.name       = (char *)malloc(strlen(shader_param_name) + 1);
 	snprintf((char*)map.name, strlen(shader_param_name) + 1, "%s", shader_param_name);
 	engine_vals.add(map);

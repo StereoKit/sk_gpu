@@ -19,6 +19,8 @@ enum engine_val_ {
 };
 
 void app_shader_set_engine_val(engine_val_ type, void *value);
+bool app_shader_is_engine_val (const char *name);
 void app_shader_set_named_val (const char *name, void *value);
+void*app_shader_get_named_val (const char *name);
 void app_shader_map_engine_val(engine_val_ type, const char *shader_param_name);
 void app_shader_map_clear     ();

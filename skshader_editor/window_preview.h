@@ -89,10 +89,10 @@ void window_preview_render() {
 	hmm_mat4 viewproj = HMM_Transpose(proj * view);
 	view = HMM_Transpose(view);
 	proj = HMM_Transpose(proj);
-	app_shader_set_named_val("time", &time);
-	app_shader_set_named_val("view", &view);
-	app_shader_set_named_val("proj", &proj);
-	app_shader_set_named_val("viewproj", &viewproj);
+	app_shader_set_engine_val(engine_val_time, &time);
+	app_shader_set_engine_val(engine_val_matrix_view, &view);
+	app_shader_set_engine_val(engine_val_matrix_projection, &proj);
+	app_shader_set_engine_val(engine_val_matrix_view_projection, &viewproj);
 
 	float clear[4] = { 0,0,0,0 };
 	skg_tex_target_bind(&surface, true, clear);

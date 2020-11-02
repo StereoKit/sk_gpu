@@ -729,7 +729,7 @@ void sksc_dxc_errors_to_log(const char *error_string) {
 		if (is_err(line)) {
 			char line_num[32];
 			char col_num [32];
-			char type[32];
+			char type    [32];
 			extract(index_seg(line, 1), line_num);
 			extract(index_seg(line, 2), col_num);
 			extract(index_seg(line, 3), type);

@@ -106,11 +106,9 @@ skg_pipeline_t *app_shader_get_pipeline() {
 void app_shader_show_log() {
 	ImGui::Begin("Log");
 	for (size_t i = 0; i < sksc_log_count(); i++) {
-		int32_t level;
-		const char *text;
-		sksc_log_get(i, &level, &text);
-		if (level > 0)
-			ImGui::Text(text, text);
+		sksc_log_item_t item = sksc_log_get(i);
+		if (item.level > 0)
+			ImGui::Text(item.text);
 	}
 	ImGui::End();
 }

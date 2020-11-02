@@ -11,6 +11,7 @@
 
 #include "window_preview.h"
 #include "app_shader.h"
+#include "../skshaderc/sksc.h"
 
 skg_swapchain_t g_pSwapChain = {};
 
@@ -139,6 +140,15 @@ float4 ps(psIn input) : SV_TARGET {
 		if (dirty && now - timer > 500) {
 			dirty = false;
 			app_shader_update_hlsl(editor.GetText().c_str());
+
+			TextEditor::ErrorMarkers markers;
+			for (size_t i = 0; i < sksc_log_count(); i++) {
+				sksc_log_item_t item = sksc_log_get(i);
+				if (item.level > 0 && item.line >= 0) {
+					markers.emplace(item.line, item.text);
+				}
+			}
+			editor.SetErrorMarkers(markers);
 		}
 
 		// Rendering

@@ -84,11 +84,6 @@ enum log_level_ {
 	log_level_err,
 };
 
-struct log_item_t {
-	log_level_ level;
-	char      *text;
-};
-
 ///////////////////////////////////////////
 
 void                  sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
@@ -100,17 +95,20 @@ bool                  sksc_d3d11_compile_shader  (const char *filename, const ch
 array_t<const char *> sksc_dxc_build_flags       (sksc_settings_t settings, skg_stage_ type, skg_shader_lang_ lang);
 void                  sksc_dxc_shader_meta       (IDxcResult *compile_result, skg_stage_ stage, skg_shader_meta_t *out_meta);
 bool                  sksc_dxc_compile_shader    (DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta);
+void                  sksc_dxc_errors_to_log     (const char *error_string);
 
 bool                  sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta);
 
+void                  sksc_line_col              (const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
+void                  sksc_log_at                (log_level_ level, int32_t line, int32_t column, const char *text, ...);
 void                  sksc_log                   (log_level_ level, const char *text, ...);
 
 
 ///////////////////////////////////////////
 
 IDxcCompiler3      *sksc_compiler;
-IDxcUtils          *sksc_utils;
-array_t<log_item_t> sksc_log_list = {};
+IDxcUtils               *sksc_utils;
+array_t<sksc_log_item_t> sksc_log_list = {};
 
 ///////////////////////////////////////////
 
@@ -471,9 +469,13 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 						int32_t commas = count_ch(value, ',');
 
 						if (buff->vars[i].type == skg_shader_var_none) {
-							sksc_log(log_level_warn, "Can't set default for --%s, unimplemented type\n", name);
+							int32_t line, col;
+							sksc_line_col(hlsl_text, value_str, &line, &col);
+							sksc_log_at(log_level_warn, line, col, "Can't set default for --%s, unimplemented type\n", name);
 						} else if (commas + 1 != buff->vars[i].type_count) {
-							sksc_log(log_level_warn, "Default value for --%s has an incorrect number of arguments\n", name);
+							int32_t line, col;
+							sksc_line_col(hlsl_text, value_str, &line, &col);
+							sksc_log_at(log_level_warn, line, col, "Default value for --%s has an incorrect number of arguments\n", name);
 						} else {
 							if (buff->defaults == nullptr) {
 								buff->defaults = malloc(buff->size);
@@ -515,7 +517,9 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 						found += 1;
 						strcpy_s(ref_meta->textures[i].extra, value);
 					} else {
-						sksc_log(log_level_warn, "--%s doesn't properly provide a value\n", name);
+						int32_t line, col;
+						sksc_line_col(hlsl_text, value_str, &line, &col);
+						sksc_log_at(log_level_warn, line, col, "--%s doesn't properly provide a value\n", name);
 					}
 					break;
 				}
@@ -527,9 +531,13 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 			
 
 			if (found != 1) {
-				sksc_log(log_level_warn, "Can't find shader var named '%s'\n", name);
+				int32_t line, col;
+				sksc_line_col(hlsl_text, name_start, &line, &col);
+				sksc_log_at(log_level_warn, line, col, "Can't find shader var named '%s'\n", name);
 			} else if (!tag_str && !value_str) {
-				sksc_log(log_level_warn, "Shader var tag for %s not used, missing a ':' or '='?\n", name);
+				int32_t line, col;
+				sksc_line_col(hlsl_text, tag_str, &line, &col);
+				sksc_log_at(log_level_warn, line, col, "Shader var tag for %s not used, missing a ':' or '='?\n", name);
 			}
 		}
 		comment = next_comment(hlsl_text, &comment_end, &in_comment);
@@ -630,7 +638,7 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 	const char *type_name = type == skg_stage_pixel      ? "Pixel" : "Vertex";
 	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
 	if (errors && errors->GetStringLength() > 0) {
-		sksc_log(log_level_err,"%s %s shader error: %s\n", lang_name, type_name, (char*)errors->GetBufferPointer());
+		sksc_dxc_errors_to_log((char *)errors->GetBufferPointer());
 	} else {
 		out_stage->stage    = type;
 		out_stage->language = lang;
@@ -659,6 +667,83 @@ bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include
 	wflags.free();
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+void sksc_dxc_errors_to_log(const char *error_string) {
+	const char *(*next_line)(const char *from) = [](const char *from) {
+		const char *curr = from;
+		while (*curr != '\n') {
+			if (*curr == '\0') return (const char*)nullptr;
+			curr++;
+		}
+		while (*curr == '\n' || *curr == '\r') { curr++; }
+
+		if (*curr == '\0') return (const char*)nullptr;
+		return curr;
+	};
+
+	bool (*is_err)(const char *line) = [](const char *line) {
+		const char *curr = line;
+		int32_t ct = 0;
+		while (*curr != '\n' && *curr != '\0') {
+			if (*curr == ':') ct++;
+			curr++;
+		}
+		return ct >= 4;
+	};
+
+	size_t (*line_len)(const char *line) = [](const char *line) {
+		const char *curr = line;
+		while (*curr != '\n' && *curr != '\0') curr++;
+		return (size_t)(curr-line);
+	};
+
+	void (*extract)(const char *line, char *out_word) = [](const char *line, char *out_word) {
+		const char *curr = line;
+		int32_t     ct   = 0;
+		while (*curr != '\n' && *curr != '\0' && *curr != ':') {
+			out_word[ct] = *curr;
+			ct++;
+			curr++;
+		}
+		out_word[ct] = '\0';
+	};
+
+	const char *(*index_seg)(const char *line, int out_word) = [](const char *line, int out_word) {
+		const char *curr = line;
+		while (*curr != '\n' && *curr != '\0') {
+			if (*curr == ':') out_word -= 1;
+			curr++;
+			if (out_word <= 0) {
+				while (*curr == ' ' || *curr == '\t') curr++;
+				return curr;
+			}
+		}
+		return (const char *)nullptr;
+	};
+
+	const char *line = error_string;
+	while (line != nullptr) {
+		if (is_err(line)) {
+			char line_num[32];
+			char col_num [32];
+			char type[32];
+			extract(index_seg(line, 1), line_num);
+			extract(index_seg(line, 2), col_num);
+			extract(index_seg(line, 3), type);
+			const char *msg = index_seg(line, 4);
+
+			log_level_ level = log_level_err;
+			if (strcmp(type, "warning") == 0) level = log_level_warn;
+			int32_t line_id = atoi(line_num);
+			int32_t col_id  = atoi(col_num);
+
+			sksc_log_at(level, line_id, col_id, "%.*s", line_len(msg), msg);
+		}
+		line = next_line(line);
+	}
 }
 
 ///////////////////////////////////////////
@@ -841,10 +926,6 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 	spvc_resources resources = nullptr;
 	spvc_compiler_create_shader_resources(compiler_glsl, &resources);
 
-	const char *lang_name = "GLSL";
-	const char *type_name = src_stage->stage == skg_stage_pixel ? "Pixel" : "Vertex";
-	//printf("|--%s %s shader--\n", lang_name, type_name);
-
 	// Ensure buffer ids stay the same
 	const spvc_reflected_resource *list = nullptr;
 	size_t                         count;
@@ -857,16 +938,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 				break;
 			}
 		}
-		//printf("| Param b%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), spvc_compiler_get_name(compiler_glsl, list[i].id));
 	}
-	/*spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_SAMPLERS, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-		printf("| Param s%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), list[i].name);
-	}
-	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-		printf("| Param t%u : %s\n", spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding), list[i].name);
-	}*/
 
 	// Modify options.
 	spvc_compiler_options options = nullptr;
@@ -933,8 +1005,6 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
 
-	//printf("%s\n", (char*)out_stage->code);
-
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);
 	return true;
@@ -942,14 +1012,63 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 
 ///////////////////////////////////////////
 
+void sksc_line_col(const char *from_text, const char *at, int32_t *out_line, int32_t *out_column) {
+	if (out_line  ) *out_line   = -1;
+	if (out_column) *out_column = -1;
+
+	bool found = false;
+	const char *curr = from_text;
+	int32_t line = 0, col = 0;
+	while (*curr != '\0') {
+		if (*curr == '\n') { line++; col = 0; } 
+		else if (*curr != '\r') col++;
+		if (curr == at) {
+			found = true;
+			break;
+		}
+		curr++;
+	}
+
+	if (found) {
+		if (out_line  ) *out_line   = line+1;
+		if (out_column) *out_column = col;
+	}
+}
+
+///////////////////////////////////////////
+
 void sksc_log(log_level_ level, const char *text, ...) {
+	sksc_log_item_t item = {};
+	item.level  = level;
+	item.line   = -1;
+	item.column = -1;
+
 	va_list args;
 	va_start(args, text);
 	size_t length = vsnprintf(nullptr, 0, text, args);
-	char* buffer = (char*)malloc(length + 2);
-	vsnprintf(buffer, length + 2, text, args);
-	sksc_log_list.add({ level, buffer });
+	item.text = (char*)malloc(length + 2);
+	vsnprintf((char*)item.text, length + 2, text, args);
 	va_end(args);
+
+	sksc_log_list.add(item);
+}
+
+///////////////////////////////////////////
+
+void sksc_log_at(log_level_ level, int32_t line, int32_t column, const char *text, ...) {
+	sksc_log_item_t item = {};
+	item.level  = level;
+	item.line   = line;
+	item.column = column;
+
+	va_list args;
+	va_start(args, text);
+	size_t length = vsnprintf(nullptr, 0, text, args);
+	item.text = (char*)malloc(length + 2);
+	vsnprintf((char*)item.text, length + 2, text, args);
+	va_end(args);
+
+	sksc_log_list.add(item);
 }
 
 ///////////////////////////////////////////
@@ -968,7 +1087,7 @@ void sksc_log_print(const sksc_settings_t *settings) {
 ///////////////////////////////////////////
 
 void sksc_log_clear() {
-	sksc_log_list.each([](log_item_t &i) {free(i.text); });
+	sksc_log_list.each([](sksc_log_item_t &i) {free((void*)i.text); });
 	sksc_log_list.clear();
 }
 
@@ -980,11 +1099,8 @@ int32_t sksc_log_count() {
 
 ///////////////////////////////////////////
 
-void sksc_log_get(int32_t index, int32_t *out_log_level, const char **out_log_text) {
-	*out_log_level = 0;
-	*out_log_text  = nullptr;
+sksc_log_item_t sksc_log_get(int32_t index) {
 	if (index < 0 || index >= sksc_log_list.count)
-		return;
-	*out_log_level = sksc_log_list[index].level;
-	*out_log_text  = sksc_log_list[index].text;
+		return {};
+	return sksc_log_list[index];
 }

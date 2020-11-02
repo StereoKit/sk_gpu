@@ -25,13 +25,20 @@ typedef struct sksc_settings_t {
 	char shader_model_str[16];
 } sksc_settings_t;
 
+typedef struct sksc_log_item_t {
+	int32_t     level;
+	int32_t     line;
+	int32_t     column;
+	const char *text;
+} sksc_log_item_t;
+
 ///////////////////////////////////////////
 
 void    sksc_init       ();
 void    sksc_shutdown   ();
 bool    sksc_compile    (const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file);
 void    sksc_build_file (const skg_shader_file_t *file, void **out_data, size_t *out_size);
-void    sksc_log_print  (const sksc_settings_t *settings);
-void    sksc_log_clear  ();
-int32_t sksc_log_count  ();
-void    sksc_log_get    (int32_t index, int32_t *out_log_level, const char **out_log_text);
+void            sksc_log_print  (const sksc_settings_t *settings);
+void            sksc_log_clear  ();
+int32_t         sksc_log_count  ();
+sksc_log_item_t sksc_log_get    (int32_t index);

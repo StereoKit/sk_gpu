@@ -941,18 +941,49 @@ void TextEditor::Render()
 				auto end = ImVec2(lineStartScreenPos.x + contentSize.x + 2.0f * scrollX, lineStartScreenPos.y + mCharAdvance.y);
 				drawList->AddRectFilled(start, end, mPalette[(int)PaletteIndex::ErrorMarker]);
 
-				if (ImGui::IsMouseHoveringRect(lineStartScreenPos, end))
-				{
-					ImGui::BeginTooltip();
-					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
-					ImGui::Text("Error at line %d:", errorIt->first);
+				if (lineNo == this->GetCursorPosition().mLine) {
+
+					ImGui::SetNextWindowPos({ start.x, end.y });
+					ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 4,4 });
+					ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.2f, 1.0f));
+					ImGui::Begin("tooltip", NULL, ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
+					ImGui::Text(errorIt->second.c_str());
+					ImGui::End();
+					ImGui::PopStyleVar(2);
 					ImGui::PopStyleColor();
-					ImGui::Separator();
+
+					/*ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 4,4 });
+					ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+					ImGui::BeginTooltip();
 					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.2f, 1.0f));
 					ImGui::Text("%s", errorIt->second.c_str());
 					ImGui::PopStyleColor();
 					ImGui::EndTooltip();
-				}
+					ImGui::PopStyleVar(2);*/
+				} else if (ImGui::IsMouseHoveringRect(lineStartScreenPos, end)) {
+					ImVec2 m = ImGui::GetIO().MousePos;
+					ImGui::SetNextWindowPos(ImVec2(m.x, m.y+16));
+					ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 4,4 });
+					ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.2f, 1.0f));
+					//ImGui::Begin("tooltip_hover", NULL, ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
+					ImGui::BeginTooltip();
+					ImGui::Text(errorIt->second.c_str());
+					ImGui::EndTooltip();
+					//ImGui::End();
+					ImGui::PopStyleVar(2);
+					ImGui::PopStyleColor();
+
+					/*ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 4,4 });
+					ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+					ImGui::BeginTooltip();
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.2f, 1.0f));
+					ImGui::Text("%s", errorIt->second.c_str());
+					ImGui::PopStyleColor();
+					ImGui::EndTooltip();
+					ImGui::PopStyleVar(2);*/
+				} 
 			}
 
 			// Draw line number (right aligned)
@@ -969,7 +1000,7 @@ void TextEditor::Render()
 				if (!HasSelection())
 				{
 					auto end = ImVec2(start.x + contentSize.x + scrollX, start.y + mCharAdvance.y);
-					drawList->AddRectFilled(start, end, mPalette[(int)(focused ? PaletteIndex::CurrentLineFill : PaletteIndex::CurrentLineFillInactive)]);
+					//wdrawList->AddRectFilled(start, end, mPalette[(int)(focused ? PaletteIndex::CurrentLineFill : PaletteIndex::CurrentLineFillInactive)]);
 					drawList->AddRect(start, end, mPalette[(int)PaletteIndex::CurrentLineEdge], 1.0f);
 				}
 
@@ -2025,7 +2056,7 @@ const TextEditor::Palette & TextEditor::GetDarkPalette()
 			0xff101010, // Background
 			0xffe0e0e0, // Cursor
 			0x80a06020, // Selection
-			0x800020ff, // ErrorMarker
+			0x80002044, // ErrorMarker
 			0x40f08000, // Breakpoint
 			0xff707000, // Line number
 			0x40000000, // Current line fill
@@ -2053,7 +2084,7 @@ const TextEditor::Palette & TextEditor::GetLightPalette()
 			0xffffffff, // Background
 			0xff000000, // Cursor
 			0x80600000, // Selection
-			0xa00010ff, // ErrorMarker
+			0xa0001044, // ErrorMarker
 			0x80f08000, // Breakpoint
 			0xff505000, // Line number
 			0x40000000, // Current line fill
@@ -2081,7 +2112,7 @@ const TextEditor::Palette & TextEditor::GetRetroBluePalette()
 			0xff800000, // Background
 			0xff0080ff, // Cursor
 			0x80ffff00, // Selection
-			0xa00000ff, // ErrorMarker
+			0xa0000044, // ErrorMarker
 			0x80ff8000, // Breakpoint
 			0xff808000, // Line number
 			0x40000000, // Current line fill
@@ -2835,7 +2866,7 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::HLSL()
 			langDef.mKeywords.insert(k);
 
 		static const char* const identifiers[] = {
-			"abort", "abs", "acos", "all", "AllMemoryBarrier", "AllMemoryBarrierWithGroupSync", "any", "asdouble", "asfloat", "asin", "asint", "asint", "asuint",
+			"abort", "abs", "acos", "all", "AllMemoryBarrier", "AllMemoryBarrierWithGroupSync", "any", "asdouble", "asfloat", "asin", "asint",
 			"asuint", "atan", "atan2", "ceil", "CheckAccessFullyMapped", "clamp", "clip", "cos", "cosh", "countbits", "cross", "D3DCOLORtoUBYTE4", "ddx",
 			"ddx_coarse", "ddx_fine", "ddy", "ddy_coarse", "ddy_fine", "degrees", "determinant", "DeviceMemoryBarrier", "DeviceMemoryBarrierWithGroupSync",
 			"distance", "dot", "dst", "errorf", "EvaluateAttributeAtCentroid", "EvaluateAttributeAtSample", "EvaluateAttributeSnapped", "exp", "exp2",
@@ -2846,14 +2877,152 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::HLSL()
 			"Process2DQuadTessFactorsAvg", "Process2DQuadTessFactorsMax", "Process2DQuadTessFactorsMin", "ProcessIsolineTessFactors", "ProcessQuadTessFactorsAvg",
 			"ProcessQuadTessFactorsMax", "ProcessQuadTessFactorsMin", "ProcessTriTessFactorsAvg", "ProcessTriTessFactorsMax", "ProcessTriTessFactorsMin",
 			"radians", "rcp", "reflect", "refract", "reversebits", "round", "rsqrt", "saturate", "sign", "sin", "sincos", "sinh", "smoothstep", "sqrt", "step",
-			"tan", "tanh", "tex1D", "tex1D", "tex1Dbias", "tex1Dgrad", "tex1Dlod", "tex1Dproj", "tex2D", "tex2D", "tex2Dbias", "tex2Dgrad", "tex2Dlod", "tex2Dproj",
-			"tex3D", "tex3D", "tex3Dbias", "tex3Dgrad", "tex3Dlod", "tex3Dproj", "texCUBE", "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc"
+			"tan", "tanh", "tex1D", "tex1Dbias", "tex1Dgrad", "tex1Dlod", "tex1Dproj", "tex2D", "tex2Dbias", "tex2Dgrad", "tex2Dlod", "tex2Dproj",
+			"tex3D", "tex3Dbias", "tex3Dgrad", "tex3Dlod", "tex3Dproj", "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc"
 		};
-		for (auto& k : identifiers)
+		static const char* const identifier_signature[] = {
+			"abort()\nSubmits an error message to the information queue and terminates the current draw or dispatch call being executed.", 
+			"any abs(any x)\nReturns the absolute value of the specified value.", 
+			"any acos(any x)\nReturns the arccosine of each component of x.", 
+			"bool all(any x)\nTest if all components of x are nonzero.", 
+			"AllMemoryBarrier()\nBlocks execution of all threads in a group until all memory accesses have been completed.", 
+			"AllMemoryBarrierWithGroupSync()\nBlocks execution of all threads in a group until all memory accesses have been completed and all threads in the group have reached this call.",
+			"bool any(any x)\nTest if any component of x is nonzero.",
+			"double asdouble(uint lowbits, uint highbits)\nReinterprets a cast value (two 32-bit values) into a double.",
+			
+			"asfloat\nConvert the input type to a float.", 
+			"asin\nReturns the arcsine of each component of x.", 
+			"asint\nConvert the input type to an integer.",
+			"asuint\nConvert the input type to an unsigned integer.", 
+			"atan\nReturns the arctangent of x.", 
+			"atan2\nReturns the arctangent of of two values (x,y).", 
+			"ceil\nReturns the smallest integer which is greater than or equal to x.", 
+			"CheckAccessFullyMapped\nDetermines whether all values from a Sample or Load operation accessed mapped tiles in a tiled resource.", 
+			"clamp\nClamps x to the range [min, max].", 
+			"clip\nDiscards the current pixel, if any component of x is less than zero.",
+			"cos\nReturns the cosine of x.", 
+			"cosh\nReturns the hyperbolic cosine of x.", 
+			"countbits\nCounts the number of bits (per component) in the input integer.", 
+			"cross\nReturns the cross product of two 3D vectors.", 
+			"D3DCOLORtoUBYTE4\nSwizzles and scales components of the 4D vector xto compensate for the lack of UBYTE4 support in some hardware.", 
+			"ddx\nReturns the partial derivative of x with respect to the screen-space x-coordinate.",
+			"ddx_coarse\nComputes a low precision partial derivative with respect to the screen-space x-coordinate.", 
+			"ddx_fine\nComputes a high precision partial derivative with respect to the screen-space x-coordinate.", 
+			"ddy\nReturns the partial derivative of x with respect to the screen-space y-coordinate.", 
+			"ddy_coarse\nComputes a low precision partial derivative with respect to the screen-space y-coordinate.", 
+			"ddy_fine\nComputes a high precision partial derivative with respect to the screen-space y-coordinate.", 
+			"degrees\nConverts x from radians to degrees.", 
+			"determinant\nReturns the determinant of the square matrix m.", 
+			"DeviceMemoryBarrier\nBlocks execution of all threads in a group until all device memory accesses have been completed.", 
+			"DeviceMemoryBarrierWithGroupSync\nBlocks execution of all threads in a group until all device memory accesses have been completed and all threads in the group have reached this call.",
+			"distance\nReturns the distance between two points.", 
+			"dot\nReturns the dot product of two vectors.", 
+			"dst\nCalculates a distance vector.", 
+			"errorf\nSubmits an error message to the information queue.", 
+			"EvaluateAttributeAtCentroid\nEvaluates at the pixel centroid.", 
+			"EvaluateAttributeAtSample\nEvaluates at the indexed sample location.", 
+			"EvaluateAttributeSnapped\nEvaluates at the pixel centroid with an offset.", 
+			"exp\nReturns the base-e exponent.", 
+			"exp2\nBase 2 exponent (per component).",
+			"f16tof32\nConverts the float16 stored in the low-half of the uint to a float.", 
+			"f32tof16\nConverts an input into a float16 type.", 
+			"faceforward\nReturns -n * sign(dot(i, ng)).", 
+			"firstbithigh\nGets the location of the first set bit starting from the highest order bit and working downward, per component.", 
+			"firstbitlow\nReturns the location of the first set bit starting from the lowest order bit and working upward, per component.", 
+			"floor\nReturns the greatest integer which is less than or equal to x.", 
+			"fma\nReturns the double-precision fused multiply-addition of a * b + c.", 
+			"fmod\nReturns the floating point remainder of x/y.", 
+			"frac\nReturns the fractional part of x.", 
+			"frexp\nReturns the mantissa and exponent of x.", 
+			"fwidth\nReturns abs(ddx(x)) + abs(ddy(x))", 
+			"GetRenderTargetSampleCount\nReturns the number of render-target samples.",
+			"GetRenderTargetSamplePosition\nReturns a sample position (x,y) for a given sample index.",
+			"GroupMemoryBarrier\nBlocks execution of all threads in a group until all group shared accesses have been completed.",
+			"GroupMemoryBarrierWithGroupSync\nBlocks execution of all threads in a group until all group shared accesses have been completed and all threads in the group have reached this call.", 
+			"InterlockedAdd\nPerforms a guaranteed atomic add of value to the dest resource variable.", 
+			"InterlockedAnd\nPerforms a guaranteed atomic and.", 
+			"InterlockedCompareExchange\nAtomically compares the input to the comparison value and exchanges the result.",
+			"InterlockedCompareStore\nAtomically compares the input to the comparison value.", 
+			"InterlockedExchange\nAssigns value to dest and returns the original value.", 
+			"InterlockedMax\nPerforms a guaranteed atomic max.", 
+			"InterlockedMin\nPerforms a guaranteed atomic min.", 
+			"InterlockedOr\nPerforms a guaranteed atomic or.", 
+			"InterlockedXor\nPerforms a guaranteed atomic xor.", 
+			"isfinite\nReturns true if x is finite, false otherwise.", 
+			"isinf\nReturns true if x is +INF or -INF, false otherwise.", 
+			"isnan\nReturns true if x is NAN or QNAN, false otherwise.",
+			"ldexp\nReturns x * 2exp",
+			"length\nReturns the length of the vector v.",
+			"lerp\nReturns x + s(y - x).",
+			"lit\nReturns a lighting vector (ambient, diffuse, specular, 1)",
+			"log\nReturns the base-e logarithm of x.",
+			"log10\nReturns the base-10 logarithm of x.",
+			"log2\nReturns the base-2 logarithm of x.",
+			"mad\nPerforms an arithmetic multiply/add operation on three values.",
+			"max\nSelects the greater of x and y.",
+			"min\nSelects the lesser of x and y.",
+			"modf\nSplits the value x into fractional and integer parts.",
+			"msad4\nCompares a 4-byte reference value and an 8-byte source value and accumulates a vector of 4 sums.",
+			"mul\nPerforms matrix multiplication using x and y.",
+			"noise\nGenerates a random value using the Perlin-noise algorithm.",
+			"normalize\nReturns a normalized vector.",
+			"pow\nReturns x^y.",
+			"printf\nSubmits a custom shader message to the information queue.",
+			"Process2DQuadTessFactorsAvg\nGenerates the corrected tessellation factors for a quad patch.",
+			"Process2DQuadTessFactorsMax\nGenerates the corrected tessellation factors for a quad patch.",
+			"Process2DQuadTessFactorsMin\nGenerates the corrected tessellation factors for a quad patch.",
+			"ProcessIsolineTessFactors\nGenerates the rounded tessellation factors for an isoline.",
+			"ProcessQuadTessFactorsAvg\nGenerates the corrected tessellation factors for a quad patch.",
+			"ProcessQuadTessFactorsMax\nGenerates the corrected tessellation factors for a quad patch.",
+			"ProcessQuadTessFactorsMin\nGenerates the corrected tessellation factors for a quad patch.",
+			"ProcessTriTessFactorsAvg\nGenerates the corrected tessellation factors for a tri patch.",
+			"ProcessTriTessFactorsMax\nGenerates the corrected tessellation factors for a tri patch.",
+			"ProcessTriTessFactorsMin\nGenerates the corrected tessellation factors for a tri patch.",
+			"radians\nConverts x from degrees to radians.",
+			"rcp\nCalculates a fast, approximate, per-component reciprocal.",
+			"reflect\nReturns a reflection vector.",
+			"refract\nReturns the refraction vector.",
+			"reversebits\nReverses the order of the bits, per component.",
+			"round\nRounds x to the nearest integer",
+			"rsqrt\nReturns 1 / sqrt(x)",
+			"saturate\nClamps x to the range [0, 1]",
+			"sign\nComputes the sign of x.",
+			"sin\nReturns the sine of x.",
+			"sincos\nReturns the sine and cosine of x.",
+			"sinh\nReturns the hyperbolic sine of x.",
+			"smoothstep\nReturns a smooth Hermite interpolation between 0 and 1.",
+			"sqrt\nSquare root (per component)",
+			"step\nReturns (x >= a) ? 1 : 0",
+			"tan\nReturns the tangent of x.",
+			"tanh\nReturns the hyperbolic tangent of x.",
+			"tex1D\n1D texture lookup.",
+			"tex1Dbias\n1D texture lookup with bias.",
+			"tex1Dgrad\n1D texture lookup with a gradient.",
+			"tex1Dlod\n1D texture lookup with LOD.",
+			"tex1Dproj\n1D texture lookup with projective divide.",
+			"tex2D\n2D texture lookup.",
+			"tex2Dbias\n2D texture lookup with bias.",
+			"tex2Dgrad\n2D texture lookup with a gradient.",
+			"tex2Dlod\n2D texture lookup with LOD.",
+			"tex2Dproj\n2D texture lookup with projective divide.",
+			"tex3D\n3D texture lookup.",
+			"tex3Dbias\n3D texture lookup with bias.",
+			"tex3Dgrad\n3D texture lookup with a gradient.",
+			"tex3Dlod\n3D texture lookup with LOD.",
+			"tex3Dproj\n3D texture lookup with projective divide.",
+			"texCUBE\nCube texture lookup.",
+			"texCUBEbias\nCube texture lookup with bias.",
+			"texCUBEgrad\nCube texture lookup with a gradient.",
+			"texCUBElod\nCube texture lookup with LOD.",
+			"texCUBEproj\nCube texture lookup with projective divide.",
+			"transpose\nReturns the transpose of the matrix m.",
+			"trunc\nTruncates floating-point value(s) to integer value(s)"
+		};
+		for (int i = 0; i < sizeof(identifiers) / sizeof(identifiers[0]); ++i)
 		{
 			Identifier id;
-			id.mDeclaration = "Built-in function";
-			langDef.mIdentifiers.insert(std::make_pair(std::string(k), id));
+			id.mDeclaration = std::string(identifier_signature[i]);;
+			langDef.mIdentifiers.insert(std::make_pair(std::string(identifiers[i]), id));
 		}
 
 		langDef.mTokenRegexStrings.push_back(std::make_pair<std::string, PaletteIndex>("[ \\t]*#[ \\t]*[a-zA-Z_]+", PaletteIndex::Preprocessor));

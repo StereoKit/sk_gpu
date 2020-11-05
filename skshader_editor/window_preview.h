@@ -13,6 +13,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+float camera_arc_x = 3.14159f/4.0f;
+float camera_arc_y = 3.14159f/8.0f;
+float camera_arc_dist = 8;
+
 skg_tex_t    surface    = {};
 skg_tex_t    zbuffer    = {};
 skg_buffer_t cube_verts = {};
@@ -81,11 +85,15 @@ void window_preview_render() {
 	static float time = 0;
 	time += 0.016f;
 
+	float c = cosf(camera_arc_y);
 	hmm_mat4 view = HMM_LookAt(
-		HMM_Vec3(sinf(time) * 3, 2, cosf(time) * 3),
+		HMM_Vec3(
+			sinf(camera_arc_x) * c * camera_arc_dist,
+			sinf(camera_arc_y) *     camera_arc_dist,
+			cosf(camera_arc_x) * c * camera_arc_dist),
 		HMM_Vec3(0, 0, 0),
 		HMM_Vec3(0, 1, 0));
-	hmm_mat4 proj     = HMM_Perspective(90, surface.width / (float)surface.height, 0.01f, 1000);
+	hmm_mat4 proj     = HMM_Perspective(45, surface.width / (float)surface.height, 0.01f, 1000);
 	hmm_mat4 viewproj = HMM_Transpose(proj * view);
 	view = HMM_Transpose(view);
 	proj = HMM_Transpose(proj);
@@ -117,6 +125,18 @@ void window_preview() {
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0,0 });
 	ImGui::Begin("Preview");
+
+	camera_arc_dist -= ImGui::GetIO().MouseWheel * .2f;
+	if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && ImGui::IsWindowHovered()) {
+		ImVec2 delta = ImGui::GetMouseDragDelta();
+		ImGui::ResetMouseDragDelta();
+		camera_arc_x -= delta.x * 0.005f;
+		camera_arc_y += delta.y * 0.005f;
+		if (camera_arc_y < -3.14159f/2.0f)
+			camera_arc_y = -3.14159f/2.0f;
+		if (camera_arc_y >  3.14159f/2.0f)
+			camera_arc_y =  3.14159f/2.0f;
+	}
 
 	ImVec2 min  = ImGui::GetWindowContentRegionMin();
 	ImVec2 max  = ImGui::GetWindowContentRegionMax();

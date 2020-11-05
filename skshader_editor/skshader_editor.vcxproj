@@ -179,6 +179,7 @@
     <ClInclude Include="imgui_impl_win32.h" />
     <ClInclude Include="imgui_shader.hlsl.h" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="str_util.h" />
     <ClInclude Include="TextEditor.h" />
     <ClInclude Include="window_preview.h" />
   </ItemGroup>

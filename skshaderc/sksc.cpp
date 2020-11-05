@@ -458,9 +458,9 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 				value[ct] = '\0';
 			}
 
-			skg_shader_buffer_t *buff  = &ref_meta->buffers[ref_meta->global_buffer_id];
+			skg_shader_buffer_t *buff  = ref_meta->global_buffer_id == -1 ? nullptr : &ref_meta->buffers[ref_meta->global_buffer_id];
 			int32_t              found = 0;
-			for (size_t i = 0; i < buff->var_count; i++) {
+			for (size_t i = 0; buff && i < buff->var_count; i++) {
 				if (strcmp(buff->vars[i].name, name) == 0) {
 					found += 1;
 					strcpy_s(buff->vars[i].extra, tag);
@@ -851,6 +851,14 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shad
 	out_meta->buffer_count  = (uint32_t)buffer_list .count;
 	out_meta->textures      =           texture_list.data;
 	out_meta->texture_count = (uint32_t)texture_list.count;
+
+	// Find the globals buffer, if there is one
+	out_meta->global_buffer_id = -1;
+	for (size_t i = 0; i < out_meta->buffer_count; i++) {
+		if (strcmp(out_meta->buffers[i].name, "$Globals") == 0) {
+			out_meta->global_buffer_id = i;
+		}
+	}
 
 	shader_reflection->Release();
 	reflection       ->Release();

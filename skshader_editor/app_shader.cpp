@@ -3,6 +3,7 @@
 #include "app_shader.h"
 #include "imgui/imgui.h"
 #include "array.h"
+#include "str_util.h"
 
 #include "../skshaderc/sksc.h"
 #include <stdio.h>
@@ -57,7 +58,7 @@ void app_shader_update_hlsl(const char *text) {
 	printf("Updating hlsl\n");
 	skg_shader_file_t file = {};
 	sksc_settings_t settings = {};
-	settings.debug         = false;
+	settings.debug         = true;
 	settings.optimize      = 3;
 	settings.replace_ext   = true;
 	settings.output_header = false;
@@ -141,7 +142,13 @@ void app_shader_show_meta() {
 						ImGui::LabelText(b->vars[v].name, "engine");
 					} else {
 						if (b->vars[v].type == skg_shader_var_float) {
-							if      (b->vars[v].type_count == 1) { ImGui::InputFloat (b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }
+							if (b->vars[v].type_count == 1) { 
+								if (str_starts_with(b->vars[v].extra, "range")) {
+									ImGui::SliderFloat(b->vars[v].name, (float *)app_shader_get_named_val(b->vars[v].name), 0, 1);
+								} else {
+									ImGui::InputFloat(b->vars[v].name, (float *)app_shader_get_named_val(b->vars[v].name));
+								}
+							}
 							else if (b->vars[v].type_count == 2) { ImGui::InputFloat2(b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }
 							else if (b->vars[v].type_count == 3) { ImGui::InputFloat3(b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }
 							else if (b->vars[v].type_count == 4) { ImGui::InputFloat4(b->vars[v].name, (float*)app_shader_get_named_val(b->vars[v].name)); }

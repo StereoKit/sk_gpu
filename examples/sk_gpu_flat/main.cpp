@@ -33,6 +33,7 @@
 
 void           *app_hwnd      = nullptr;
 skg_swapchain_t app_swapchain = {};
+bool            app_resize    = false;
 int             app_width     = 1280;
 int             app_height    = 720;
 bool            app_run       = true;
@@ -77,6 +78,16 @@ bool main_init() {
 		case WM_SIZE: {
 			app_width  = (UINT)LOWORD(lParam);
 			app_height = (UINT)HIWORD(lParam);
+			if (app_resize || wParam == SIZE_MAXIMIZED) {
+				app_resize = false;
+				skg_swapchain_resize(&app_swapchain, app_width, app_height);
+			}
+		} return DefWindowProc(hWnd, message, wParam, lParam);
+		case WM_SYSCOMMAND: {
+			if (GET_SC_WPARAM(wParam) == SC_RESTORE)
+				app_resize = true;
+		} return DefWindowProc(hWnd, message, wParam, lParam); 
+		case WM_EXITSIZEMOVE: {
 			skg_swapchain_resize(&app_swapchain, app_width, app_height);
 		} return DefWindowProc(hWnd, message, wParam, lParam);
 		default: return DefWindowProc(hWnd, message, wParam, lParam);

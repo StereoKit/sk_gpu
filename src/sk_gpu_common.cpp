@@ -337,3 +337,23 @@ const skg_shader_var_t *skg_shader_get_var_info(const skg_shader_t *shader, int3
 	skg_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	return &buffer->vars[var_id];
 }
+
+///////////////////////////////////////////
+
+uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
+	switch (format) {
+	case skg_tex_fmt_rgba32:        return sizeof(uint8_t )*4;
+	case skg_tex_fmt_rgba32_linear: return sizeof(uint8_t )*4;
+	case skg_tex_fmt_bgra32:        return sizeof(uint8_t )*4;
+	case skg_tex_fmt_bgra32_linear: return sizeof(uint8_t )*4;
+	case skg_tex_fmt_rgba64:        return sizeof(uint16_t)*4;
+	case skg_tex_fmt_rgba128:       return sizeof(uint32_t)*4;
+	case skg_tex_fmt_depth16:       return sizeof(uint16_t);
+	case skg_tex_fmt_depth32:       return sizeof(uint32_t);
+	case skg_tex_fmt_depthstencil:  return sizeof(uint32_t);
+	case skg_tex_fmt_r8:            return sizeof(uint8_t );
+	case skg_tex_fmt_r16:           return sizeof(uint16_t);
+	case skg_tex_fmt_r32:           return sizeof(uint32_t);
+	default: return 0;
+	}
+}

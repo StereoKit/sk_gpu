@@ -28,8 +28,7 @@ skg_tex_t               *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
 
-uint32_t skg_tex_fmt_size (skg_tex_fmt_ format);
-bool     skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32_t array_start, uint32_t array_size, bool use_in_shader);
+bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32_t array_start, uint32_t array_size, bool use_in_shader);
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -1030,6 +1029,68 @@ void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame
 
 /////////////////////////////////////////// 
 
+bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
+	// Make sure we've been provided enough memory to hold this texture
+	size_t format_size = skg_tex_fmt_size(tex->format);
+	if (data_size != (size_t)tex->width * (size_t)tex->height * format_size) {
+		skg_log(skg_log_critical, "Insufficient buffer size for skg_tex_get_contents");
+		return false;
+	}
+
+	D3D11_TEXTURE2D_DESC desc             = {};
+	ID3D11Texture2D     *copy_tex         = nullptr;
+	bool                 copy_tex_release = true;
+	tex->_texture->GetDesc(&desc);
+
+	// Make sure copy_tex is a texture that we can read from!
+	if (desc.SampleDesc.Count > 1) {
+		// Not gonna bother with MSAA stuff
+		skg_log(skg_log_warning, "skg_tex_get_contents MSAA surfaces not implemented");
+		return false;
+	} else if ((desc.Usage == D3D11_USAGE_STAGING) && (desc.CPUAccessFlags & D3D11_CPU_ACCESS_READ)) {
+		// Handle case where the source is already a staging texture we can use directly
+		copy_tex         = tex->_texture;
+		copy_tex_release = false;
+	} else {
+		// Otherwise, create a staging texture from the non-MSAA source
+		desc.BindFlags      = 0;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		desc.Usage          = D3D11_USAGE_STAGING;
+
+		if (FAILED(d3d_device->CreateTexture2D(&desc, nullptr, &copy_tex))) {
+			skg_log(skg_log_critical, "CreateTexture2D failed!");
+			return false;
+		}
+		d3d_context->CopyResource(copy_tex, tex->_texture);
+	}
+
+	// Load the data into CPU RAM
+	D3D11_MAPPED_SUBRESOURCE data;
+	if (FAILED(d3d_context->Map(copy_tex, 0, D3D11_MAP_READ, 0, &data))) {
+		skg_log(skg_log_critical, "Texture Map failed!");
+		return false;
+	}
+
+	// Copy it into our waiting buffer
+	uint8_t *srcPtr  = (uint8_t*)data.pData;
+	uint8_t *destPtr = (uint8_t*)ref_data;
+	size_t   msize   = tex->width*format_size;
+	for (size_t h = 0; h < desc.Height; ++h) {
+		memcpy(destPtr, srcPtr, msize);
+		srcPtr  += data.RowPitch;
+		destPtr += msize;
+	}
+
+	// And cleanup
+	d3d_context->Unmap(copy_tex, 0);
+	if (copy_tex_release)
+		copy_tex->Release();
+
+	return true;
+}
+
+/////////////////////////////////////////// 
+
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	if (texture != nullptr) {
 		if (bind.stage_bits & skg_stage_pixel) {
@@ -1153,26 +1214,6 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case DXGI_FORMAT_R16_UNORM:           return skg_tex_fmt_r16;
 	case DXGI_FORMAT_R32_FLOAT:           return skg_tex_fmt_r32;
 	default: return skg_tex_fmt_none;
-	}
-}
-
-/////////////////////////////////////////// 
-
-uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
-	switch (format) {
-	case skg_tex_fmt_rgba32:        return sizeof(uint8_t )*4;
-	case skg_tex_fmt_rgba32_linear: return sizeof(uint8_t )*4;
-	case skg_tex_fmt_bgra32:        return sizeof(uint8_t )*4;
-	case skg_tex_fmt_bgra32_linear: return sizeof(uint8_t )*4;
-	case skg_tex_fmt_rgba64:        return sizeof(uint16_t)*4;
-	case skg_tex_fmt_rgba128:       return sizeof(uint32_t)*4;
-	case skg_tex_fmt_depth16:       return sizeof(uint16_t);
-	case skg_tex_fmt_depth32:       return sizeof(uint32_t);
-	case skg_tex_fmt_depthstencil:  return sizeof(uint32_t);
-	case skg_tex_fmt_r8:            return sizeof(uint8_t );
-	case skg_tex_fmt_r16:           return sizeof(uint16_t);
-	case skg_tex_fmt_r32:           return sizeof(uint32_t);
-	default: return 0;
 	}
 }
 

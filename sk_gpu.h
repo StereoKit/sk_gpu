@@ -444,13 +444,14 @@ bool                skg_tex_is_valid             (const skg_tex_t *tex);
 void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
 void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
 void                skg_tex_set_contents         (      skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
-void                skg_tex_get_contents         (      skg_tex_t *tex);
+bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 void                skg_tex_target_bind          (      skg_tex_t *render_target, bool clear, const float *clear_color_4);
 skg_tex_t          *skg_tex_target_get           ();
 void                skg_tex_destroy              (      skg_tex_t *tex);
 int64_t             skg_tex_fmt_to_native        (skg_tex_fmt_ format);
 skg_tex_fmt_        skg_tex_fmt_from_native      (int64_t      format);
+uint32_t            skg_tex_fmt_size             (skg_tex_fmt_ format);
 
 
 ///////////////////////////////////////////
@@ -526,8 +527,7 @@ skg_tex_t               *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
 
-uint32_t skg_tex_fmt_size (skg_tex_fmt_ format);
-bool     skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32_t array_start, uint32_t array_size, bool use_in_shader);
+bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32_t array_start, uint32_t array_size, bool use_in_shader);
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -1528,6 +1528,68 @@ void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame
 
 /////////////////////////////////////////// 
 
+bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
+	// Make sure we've been provided enough memory to hold this texture
+	size_t format_size = skg_tex_fmt_size(tex->format);
+	if (data_size != (size_t)tex->width * (size_t)tex->height * format_size) {
+		skg_log(skg_log_critical, "Insufficient buffer size for skg_tex_get_contents");
+		return false;
+	}
+
+	D3D11_TEXTURE2D_DESC desc             = {};
+	ID3D11Texture2D     *copy_tex         = nullptr;
+	bool                 copy_tex_release = true;
+	tex->_texture->GetDesc(&desc);
+
+	// Make sure copy_tex is a texture that we can read from!
+	if (desc.SampleDesc.Count > 1) {
+		// Not gonna bother with MSAA stuff
+		skg_log(skg_log_warning, "skg_tex_get_contents MSAA surfaces not implemented");
+		return false;
+	} else if ((desc.Usage == D3D11_USAGE_STAGING) && (desc.CPUAccessFlags & D3D11_CPU_ACCESS_READ)) {
+		// Handle case where the source is already a staging texture we can use directly
+		copy_tex         = tex->_texture;
+		copy_tex_release = false;
+	} else {
+		// Otherwise, create a staging texture from the non-MSAA source
+		desc.BindFlags      = 0;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		desc.Usage          = D3D11_USAGE_STAGING;
+
+		if (FAILED(d3d_device->CreateTexture2D(&desc, nullptr, &copy_tex))) {
+			skg_log(skg_log_critical, "CreateTexture2D failed!");
+			return false;
+		}
+		d3d_context->CopyResource(copy_tex, tex->_texture);
+	}
+
+	// Load the data into CPU RAM
+	D3D11_MAPPED_SUBRESOURCE data;
+	if (FAILED(d3d_context->Map(copy_tex, 0, D3D11_MAP_READ, 0, &data))) {
+		skg_log(skg_log_critical, "Texture Map failed!");
+		return false;
+	}
+
+	// Copy it into our waiting buffer
+	uint8_t *srcPtr  = (uint8_t*)data.pData;
+	uint8_t *destPtr = (uint8_t*)ref_data;
+	size_t   msize   = tex->width*format_size;
+	for (size_t h = 0; h < desc.Height; ++h) {
+		memcpy(destPtr, srcPtr, msize);
+		srcPtr  += data.RowPitch;
+		destPtr += msize;
+	}
+
+	// And cleanup
+	d3d_context->Unmap(copy_tex, 0);
+	if (copy_tex_release)
+		copy_tex->Release();
+
+	return true;
+}
+
+/////////////////////////////////////////// 
+
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	if (texture != nullptr) {
 		if (bind.stage_bits & skg_stage_pixel) {
@@ -1651,26 +1713,6 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case DXGI_FORMAT_R16_UNORM:           return skg_tex_fmt_r16;
 	case DXGI_FORMAT_R32_FLOAT:           return skg_tex_fmt_r32;
 	default: return skg_tex_fmt_none;
-	}
-}
-
-/////////////////////////////////////////// 
-
-uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
-	switch (format) {
-	case skg_tex_fmt_rgba32:        return sizeof(uint8_t )*4;
-	case skg_tex_fmt_rgba32_linear: return sizeof(uint8_t )*4;
-	case skg_tex_fmt_bgra32:        return sizeof(uint8_t )*4;
-	case skg_tex_fmt_bgra32_linear: return sizeof(uint8_t )*4;
-	case skg_tex_fmt_rgba64:        return sizeof(uint16_t)*4;
-	case skg_tex_fmt_rgba128:       return sizeof(uint32_t)*4;
-	case skg_tex_fmt_depth16:       return sizeof(uint16_t);
-	case skg_tex_fmt_depth32:       return sizeof(uint32_t);
-	case skg_tex_fmt_depthstencil:  return sizeof(uint32_t);
-	case skg_tex_fmt_r8:            return sizeof(uint8_t );
-	case skg_tex_fmt_r16:           return sizeof(uint16_t);
-	case skg_tex_fmt_r32:           return sizeof(uint32_t);
-	default: return 0;
 	}
 }
 
@@ -1892,6 +1934,8 @@ HGLRC gl_hrc;
 #define GL_UNSIGNED_INT 0x1405
 #define GL_FLOAT 0x1406
 #define GL_DOUBLE 0x140A
+#define GL_UNSIGNED_INT_8_8_8_8 0x8035
+#define GL_UNSIGNED_INT_8_8_8_8_REV 0x8367
 
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_VERTEX_SHADER 0x8B31
@@ -1982,6 +2026,7 @@ GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalforma
 GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
 GLE(void,     glTexParameterf,           uint32_t target, uint32_t pname, float param) \
 GLE(void,     glTexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
+GLE(void,     glGetnTexImage,            uint32_t target, int32_t level, uint32_t format, uint32_t type, uint32_t bufSize, void *img) \
 GLE(void,     glActiveTexture,           uint32_t texture) \
 GLE(void,     glGenerateMipmap,          uint32_t target) \
 GLE(void,     glBindAttribLocation,      uint32_t program, uint32_t index, const char *name) \
@@ -3140,6 +3185,31 @@ void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame
 
 /////////////////////////////////////////// 
 
+bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
+	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
+	glBindTexture (tex->_target, tex->_texture);
+	glGetnTexImage(tex->_target, 0, format, skg_tex_fmt_to_gl_type(tex->format), data_size, ref_data);
+	bool result = glGetError() == 0;
+
+	// This is OpenGL, and textures are upside-down
+	if (result) {
+		int32_t line_size = skg_tex_fmt_size(tex->format) * tex->width;
+		void   *tmp       = malloc(line_size);
+		for (int32_t y = 0; y < tex->height/2; y++) {
+			void *top_line = ((uint8_t*)ref_data) + line_size * y;
+			void *bot_line = ((uint8_t*)ref_data) + line_size * ((tex->height-1) - y);
+			memcpy(tmp,      top_line, line_size);
+			memcpy(top_line, bot_line, line_size);
+			memcpy(bot_line, tmp,      line_size);
+		}
+		free(tmp);
+	}
+
+	return result;
+}
+
+/////////////////////////////////////////// 
+
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	// Added this in to fix textures initially? Removed it after I switched to
 	// explicit binding locations in GLSL. This may need further attention? I
@@ -3218,6 +3288,8 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba32_linear:
 	case skg_tex_fmt_rgba64:
 	case skg_tex_fmt_rgba128:       return GL_RGBA;
+	case skg_tex_fmt_bgra32:
+	case skg_tex_fmt_bgra32_linear: return GL_BGRA;
 	case skg_tex_fmt_depth16:
 	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT;
 	case skg_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;
@@ -3234,6 +3306,8 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	switch (format) {
 	case skg_tex_fmt_rgba32:        return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_rgba32_linear: return GL_UNSIGNED_BYTE;
+	case skg_tex_fmt_bgra32:        return GL_UNSIGNED_BYTE;
+	case skg_tex_fmt_bgra32_linear: return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_rgba64:        return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_rgba128:       return GL_FLOAT;
 	case skg_tex_fmt_depth16:       return GL_UNSIGNED_SHORT;
@@ -3585,6 +3659,26 @@ const skg_shader_var_t *skg_shader_get_var_info(const skg_shader_t *shader, int3
 
 	skg_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
 	return &buffer->vars[var_id];
+}
+
+///////////////////////////////////////////
+
+uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
+	switch (format) {
+	case skg_tex_fmt_rgba32:        return sizeof(uint8_t )*4;
+	case skg_tex_fmt_rgba32_linear: return sizeof(uint8_t )*4;
+	case skg_tex_fmt_bgra32:        return sizeof(uint8_t )*4;
+	case skg_tex_fmt_bgra32_linear: return sizeof(uint8_t )*4;
+	case skg_tex_fmt_rgba64:        return sizeof(uint16_t)*4;
+	case skg_tex_fmt_rgba128:       return sizeof(uint32_t)*4;
+	case skg_tex_fmt_depth16:       return sizeof(uint16_t);
+	case skg_tex_fmt_depth32:       return sizeof(uint32_t);
+	case skg_tex_fmt_depthstencil:  return sizeof(uint32_t);
+	case skg_tex_fmt_r8:            return sizeof(uint8_t );
+	case skg_tex_fmt_r16:           return sizeof(uint16_t);
+	case skg_tex_fmt_r32:           return sizeof(uint32_t);
+	default: return 0;
+	}
 }
 #endif // SKG_IMPL
 /*

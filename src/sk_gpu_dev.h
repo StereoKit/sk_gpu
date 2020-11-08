@@ -287,13 +287,14 @@ bool                skg_tex_is_valid             (const skg_tex_t *tex);
 void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
 void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
 void                skg_tex_set_contents         (      skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
-void                skg_tex_get_contents         (      skg_tex_t *tex);
+bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 void                skg_tex_target_bind          (      skg_tex_t *render_target, bool clear, const float *clear_color_4);
 skg_tex_t          *skg_tex_target_get           ();
 void                skg_tex_destroy              (      skg_tex_t *tex);
 int64_t             skg_tex_fmt_to_native        (skg_tex_fmt_ format);
 skg_tex_fmt_        skg_tex_fmt_from_native      (int64_t      format);
+uint32_t            skg_tex_fmt_size             (skg_tex_fmt_ format);
 
 #include "sk_gpu_common.h"
 ///////////////////////////////////////////

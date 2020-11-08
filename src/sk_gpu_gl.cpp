@@ -201,6 +201,8 @@ HGLRC gl_hrc;
 #define GL_UNSIGNED_INT 0x1405
 #define GL_FLOAT 0x1406
 #define GL_DOUBLE 0x140A
+#define GL_UNSIGNED_INT_8_8_8_8 0x8035
+#define GL_UNSIGNED_INT_8_8_8_8_REV 0x8367
 
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_VERTEX_SHADER 0x8B31
@@ -291,6 +293,7 @@ GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalforma
 GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
 GLE(void,     glTexParameterf,           uint32_t target, uint32_t pname, float param) \
 GLE(void,     glTexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
+GLE(void,     glGetnTexImage,            uint32_t target, int32_t level, uint32_t format, uint32_t type, uint32_t bufSize, void *img) \
 GLE(void,     glActiveTexture,           uint32_t texture) \
 GLE(void,     glGenerateMipmap,          uint32_t target) \
 GLE(void,     glBindAttribLocation,      uint32_t program, uint32_t index, const char *name) \
@@ -1449,6 +1452,31 @@ void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame
 
 /////////////////////////////////////////// 
 
+bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
+	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
+	glBindTexture (tex->_target, tex->_texture);
+	glGetnTexImage(tex->_target, 0, format, skg_tex_fmt_to_gl_type(tex->format), data_size, ref_data);
+	bool result = glGetError() == 0;
+
+	// This is OpenGL, and textures are upside-down
+	if (result) {
+		int32_t line_size = skg_tex_fmt_size(tex->format) * tex->width;
+		void   *tmp       = malloc(line_size);
+		for (int32_t y = 0; y < tex->height/2; y++) {
+			void *top_line = ((uint8_t*)ref_data) + line_size * y;
+			void *bot_line = ((uint8_t*)ref_data) + line_size * ((tex->height-1) - y);
+			memcpy(tmp,      top_line, line_size);
+			memcpy(top_line, bot_line, line_size);
+			memcpy(bot_line, tmp,      line_size);
+		}
+		free(tmp);
+	}
+
+	return result;
+}
+
+/////////////////////////////////////////// 
+
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	// Added this in to fix textures initially? Removed it after I switched to
 	// explicit binding locations in GLSL. This may need further attention? I
@@ -1527,6 +1555,8 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba32_linear:
 	case skg_tex_fmt_rgba64:
 	case skg_tex_fmt_rgba128:       return GL_RGBA;
+	case skg_tex_fmt_bgra32:
+	case skg_tex_fmt_bgra32_linear: return GL_BGRA;
 	case skg_tex_fmt_depth16:
 	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT;
 	case skg_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;
@@ -1543,6 +1573,8 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	switch (format) {
 	case skg_tex_fmt_rgba32:        return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_rgba32_linear: return GL_UNSIGNED_BYTE;
+	case skg_tex_fmt_bgra32:        return GL_UNSIGNED_BYTE;
+	case skg_tex_fmt_bgra32_linear: return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_rgba64:        return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_rgba128:       return GL_FLOAT;
 	case skg_tex_fmt_depth16:       return GL_UNSIGNED_SHORT;

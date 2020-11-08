@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef __EMSCRIPTEN__
+#include <stdio.h>
+#endif
+
 ///////////////////////////////////////////
 
 struct app_mesh_t {
@@ -63,11 +67,45 @@ skg_buffer_t app_compute_buffer = {};
 const int32_t app_wave_size = 32;
 skg_vert_t    app_wave_verts[app_wave_size * app_wave_size];
 
+// Make a cube
+skg_vert_t app_cube_verts[] = {
+	skg_vert_t{ {-1,-1,-1}, {-1,-1,-1}, {0.00f,0}, {255,255,255,255}}, // Bottom verts
+	skg_vert_t{ { 1,-1,-1}, { 1,-1,-1}, {0.50f,0}, {255,255,255,255}},
+	skg_vert_t{ { 1, 1,-1}, { 1, 1,-1}, {1.00f,0}, {255,255,255,255}},
+	skg_vert_t{ {-1, 1,-1}, {-1, 1,-1}, {0.50f,0}, {255,255,255,255}},
+	skg_vert_t{ {-1,-1, 1}, {-1,-1, 1}, {0.00f,1}, {255,255,255,255}}, // Top verts
+	skg_vert_t{ { 1,-1, 1}, { 1,-1, 1}, {0.50f,1}, {255,255,255,255}},
+	skg_vert_t{ { 1, 1, 1}, { 1, 1, 1}, {1.00f,1}, {255,255,255,255}},
+	skg_vert_t{ {-1, 1, 1}, {-1, 1, 1}, {0.50f,1}, {255,255,255,255}}, };
+uint32_t app_cube_inds[] = {
+	0,2,1, 0,3,2, 5,6,4, 4,6,7,
+	1,2,6, 1,6,5, 4,7,3, 4,3,0,
+	1,5,4, 1,4,0, 3,7,2, 7,6,2, };
+
+// Make a pyramid
+skg_vert_t app_pyramid_verts[] = {
+	skg_vert_t{ { 0, 1, 0}, { 0, 1, 0}, {0.00f,1}, {255,255,255,255}},
+	skg_vert_t{ {-1,-1,-1}, {-1,-1,-1}, {0.00f,0}, {0,255,0,255}},
+	skg_vert_t{ { 1,-1,-1}, { 1,-1,-1}, {0.25f,0}, {0,0,255,255}},
+	skg_vert_t{ { 1,-1, 1}, {-1,-1, 1}, {0.50f,0}, {255,255,0,255}},
+	skg_vert_t{ {-1,-1, 1}, { 1,-1, 1}, {0.75f,0}, {255,0,255,255}},};
+uint32_t app_pyramid_inds[] = {
+	2,1,0, 3,2,0, 4,3,0, 1,4,0, 1,2,3, 1,3,4 };
+
+// make a double-sided triangle
+skg_vert_t app_tri_verts[] = {
+	skg_vert_t{ {-.7f,-.5f,0}, {0,1,0}, {0,0}, {255,0,0,255}},
+	skg_vert_t{ { .0f, .5f,0}, {0,1,0}, {0,0}, {0,255,0,255}},
+	skg_vert_t{ { .7f,-.5f,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
+uint32_t app_tri_inds[] = {
+	0,1,2, 2,1,0 };
+
 ///////////////////////////////////////////
 
 app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count);
 void       app_mesh_destroy(app_mesh_t *mesh);
 bool       ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_vert_count, uint32_t **out_indices, int32_t *out_ind_count);
+void       tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataBGRA, uint8_t dataChannels = 4, uint8_t fileChannels = 3);
 
 ///////////////////////////////////////////
 
@@ -84,45 +122,13 @@ bool app_init() {
 		skg_log(skg_log_warning, "Couldn't load platform.ply!");
 	}
 
-	// Make a cube
-	skg_vert_t verts[] = {
-		skg_vert_t{ {-1,-1,-1}, {-1,-1,-1}, {0.00f,0}, {255,255,255,255}}, // Bottom verts
-		skg_vert_t{ { 1,-1,-1}, { 1,-1,-1}, {0.50f,0}, {255,255,255,255}},
-		skg_vert_t{ { 1, 1,-1}, { 1, 1,-1}, {1.00f,0}, {255,255,255,255}},
-		skg_vert_t{ {-1, 1,-1}, {-1, 1,-1}, {0.50f,0}, {255,255,255,255}},
-		skg_vert_t{ {-1,-1, 1}, {-1,-1, 1}, {0.00f,1}, {255,255,255,255}}, // Top verts
-		skg_vert_t{ { 1,-1, 1}, { 1,-1, 1}, {0.50f,1}, {255,255,255,255}},
-		skg_vert_t{ { 1, 1, 1}, { 1, 1, 1}, {1.00f,1}, {255,255,255,255}},
-		skg_vert_t{ {-1, 1, 1}, {-1, 1, 1}, {0.50f,1}, {255,255,255,255}}, };
-	uint32_t inds[] = {
-		0,2,1, 0,3,2, 5,6,4, 4,6,7,
-		1,2,6, 1,6,5, 4,7,3, 4,3,0,
-		1,5,4, 1,4,0, 3,7,2, 7,6,2, };
-	app_mesh_cube = app_mesh_create(verts, sizeof(verts)/sizeof(skg_vert_t), false, inds, sizeof(inds)/sizeof(uint32_t));
-
-	// Make a pyramid
-	skg_vert_t verts2[] = {
-		skg_vert_t{ { 0, 1, 0}, { 0, 1, 0}, {0.00f,1}, {255,255,255,255}},
-		skg_vert_t{ {-1,-1,-1}, {-1,-1,-1}, {0.00f,0}, {0,255,0,255}},
-		skg_vert_t{ { 1,-1,-1}, { 1,-1,-1}, {0.25f,0}, {0,0,255,255}},
-		skg_vert_t{ { 1,-1, 1}, {-1,-1, 1}, {0.50f,0}, {255,255,0,255}},
-		skg_vert_t{ {-1,-1, 1}, { 1,-1, 1}, {0.75f,0}, {255,0,255,255}},};
-	uint32_t inds2[] = {
-		2,1,0, 3,2,0, 4,3,0, 1,4,0, 1,2,3, 1,3,4 };
-	app_mesh_pyramid = app_mesh_create(verts2, sizeof(verts2)/sizeof(skg_vert_t), false, inds2, sizeof(inds2)/sizeof(uint32_t));
-
-	// make a double-sided triangle
-	skg_vert_t verts3[] = {
-		skg_vert_t{ {-.7f,-.5f,0}, {0,1,0}, {0,0}, {255,0,0,255}},
-		skg_vert_t{ { .0f, .5f,0}, {0,1,0}, {0,0}, {0,255,0,255}},
-		skg_vert_t{ { .7f,-.5f,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
-	uint32_t inds3[] = {
-		0,1,2, 2,1,0 };
-	app_mesh_tri = app_mesh_create(verts3, sizeof(verts3)/sizeof(skg_vert_t), false, inds3, sizeof(inds3)/sizeof(uint32_t));
+	app_mesh_cube    = app_mesh_create(app_cube_verts,    sizeof(app_cube_verts   )/sizeof(skg_vert_t), false, app_cube_inds,    sizeof(app_cube_inds   )/sizeof(uint32_t));
+	app_mesh_pyramid = app_mesh_create(app_pyramid_verts, sizeof(app_pyramid_verts)/sizeof(skg_vert_t), false, app_pyramid_inds, sizeof(app_pyramid_inds)/sizeof(uint32_t));
+	app_mesh_tri     = app_mesh_create(app_tri_verts,     sizeof(app_tri_verts    )/sizeof(skg_vert_t), false, app_tri_inds,     sizeof(app_tri_inds    )/sizeof(uint32_t));
 
 	// Make wave indices
 	uint32_t inds_wave[(app_wave_size - 1) * (app_wave_size - 1) * 6];
-	int32_t curr = 0;
+	int32_t  curr = 0;
 	for (int32_t y = 0; y < app_wave_size-1; y++) {
 		for (int32_t x = 0; x < app_wave_size-1; x++) {
 			inds_wave[curr++] = (x+1) + (y+1) * app_wave_size;
@@ -142,7 +148,7 @@ bool app_init() {
 	for (int32_t y = 0; y < h; y++) {
 		for (int32_t x = 0; x < w; x++) {
 			int32_t i = (x + y * w) * 4;
-			uint8_t c = (x/4 + y/4) % 2 == 0 ? 255 : 0;
+			uint8_t c = (x/4 + y/4) % 2 == 0 ? 255 : (y/(float)h)*255;
 			colors[i  ] = c;
 			colors[i+1] = c;
 			colors[i+2] = c;
@@ -305,6 +311,16 @@ void app_test_rendertarget(double t) {
 	skg_draw         (0, 0, app_mesh_tri.ind_count, 1);
 
 	skg_tex_target_bind(old_target, false, color);
+
+	static bool has_saved = false;
+	if (!has_saved) {
+		has_saved = true;
+		size_t   size       = skg_tex_fmt_size(app_target.format) * app_target.width * app_target.height;
+		uint8_t *color_data = (uint8_t*)malloc(size);
+		if (skg_tex_get_contents(&app_target, color_data, size))
+			tga_write("test.tga", app_target.width, app_target.height, color_data);
+		free(color_data);
+	}
 }
 
 ///////////////////////////////////////////
@@ -333,10 +349,12 @@ void app_test_instancing() {
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
 	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
 
-	skg_mesh_bind    (&app_mesh_model.mesh);
-	skg_pipeline_bind(&app_mat_default);
-	skg_tex_bind     (&app_target, app_sh_default_tex_bind);
-	skg_draw         (0, 0, app_mesh_model.ind_count, 100);
+	if (skg_buffer_is_valid(&app_mesh_model.vert_buffer)) {
+		skg_mesh_bind    (&app_mesh_model.mesh);
+		skg_pipeline_bind(&app_mat_default);
+		skg_tex_bind     (&app_target, app_sh_default_tex_bind);
+		skg_draw         (0, 0, app_mesh_model.ind_count, 100);
+	}
 }
 
 ///////////////////////////////////////////
@@ -353,8 +371,8 @@ void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
 	
 	app_test_colors();
 	app_test_instancing();
-	app_test_cubemap();
 	app_test_dyn_update(t);
+	app_test_cubemap();
 }
 
 ///////////////////////////////////////////
@@ -431,6 +449,27 @@ bool ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_ver
 	ply_free(&file);
 	free(data);
 	return true;
+}
+
+///////////////////////////////////////////
+
+void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataBGRA, uint8_t dataChannels, uint8_t fileChannels) {
+#ifndef __EMSCRIPTEN__
+	FILE *fp = NULL;
+	fopen_s(&fp, filename, "wb");
+	if (fp == NULL) return;
+
+	// You can find details about TGA headers here: http://www.paulbourke.net/dataformats/tga/
+	uint8_t header[18] = { 0,0,2,0,0,0,0,0,0,0,0,0, (uint8_t)(width%256), (uint8_t)(width/256), (uint8_t)(height%256), (uint8_t)(height/256), (uint8_t)(fileChannels*8), 0x20 };
+	fwrite(&header, 18, 1, fp);
+
+	for (uint32_t i = 0; i < width*height; i++) {
+		for (uint32_t b = 0; b < fileChannels; b++) {
+			fputc(dataBGRA[(i*dataChannels) + (b%dataChannels)], fp);
+		}
+	}
+	fclose(fp);
+#endif
 }
 
 ///////////////////////////////////////////

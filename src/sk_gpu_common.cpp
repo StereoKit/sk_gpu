@@ -6,6 +6,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #if __ANDROID__
 #include <android/asset_manager.h>
@@ -56,6 +57,34 @@ uint64_t skg_hash(const char *string) {
 	while ((c = *string++))
 		hash = (hash ^ c) * 1099511628211;
 	return hash;
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_hsv32(float h, float s, float v, float a) {
+	skg_color128_t col = skg_hsv128(h,s,v,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+skg_color128_t skg_hsv128(float h, float s, float v, float a) {
+	const float K[4] = { 1.0f, 2.0f/3.0f, 1.0f/3.0f, 3.0f };
+	float p[3] = {
+		fabsf(((h + K[0]) - floorf(h + K[0])) * 6.0f - K[3]),
+		fabsf(((h + K[1]) - floorf(h + K[1])) * 6.0f - K[3]),
+		fabsf(((h + K[2]) - floorf(h + K[2])) * 6.0f - K[3]) };
+
+	// lerp: a + (b - a) * t
+	return skg_color128_t {
+		(K[0] + (fmaxf(0,fminf(p[0] - K[0], 1.0f)) - K[0]) * s) * v,
+		(K[0] + (fmaxf(0,fminf(p[1] - K[0], 1.0f)) - K[0]) * s) * v,
+		(K[0] + (fmaxf(0,fminf(p[2] - K[0], 1.0f)) - K[0]) * s) * v,
+		a };
 }
 
 ///////////////////////////////////////////

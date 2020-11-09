@@ -68,19 +68,11 @@ const int32_t app_wave_size = 32;
 skg_vert_t    app_wave_verts[app_wave_size * app_wave_size];
 
 // Make a cube
-skg_vert_t app_cube_verts[] = {
-	skg_vert_t{ {-1,-1,-1}, {-1,-1,-1}, {0.00f,0}, {255,255,255,255}}, // Bottom verts
-	skg_vert_t{ { 1,-1,-1}, { 1,-1,-1}, {0.50f,0}, {255,255,255,255}},
-	skg_vert_t{ { 1, 1,-1}, { 1, 1,-1}, {1.00f,0}, {255,255,255,255}},
-	skg_vert_t{ {-1, 1,-1}, {-1, 1,-1}, {0.50f,0}, {255,255,255,255}},
-	skg_vert_t{ {-1,-1, 1}, {-1,-1, 1}, {0.00f,1}, {255,255,255,255}}, // Top verts
-	skg_vert_t{ { 1,-1, 1}, { 1,-1, 1}, {0.50f,1}, {255,255,255,255}},
-	skg_vert_t{ { 1, 1, 1}, { 1, 1, 1}, {1.00f,1}, {255,255,255,255}},
-	skg_vert_t{ {-1, 1, 1}, {-1, 1, 1}, {0.50f,1}, {255,255,255,255}}, };
-uint32_t app_cube_inds[] = {
-	0,2,1, 0,3,2, 5,6,4, 4,6,7,
-	1,2,6, 1,6,5, 4,7,3, 4,3,0,
-	1,5,4, 1,4,0, 3,7,2, 7,6,2, };
+skg_vert_t app_cube_verts[24];
+uint32_t   app_cube_inds [36] = {
+	0, 1, 2,  0, 2, 3,  4, 5, 6,  4, 6, 7, 
+	8, 9, 10, 8, 10,11, 12,13,14, 12,14,15, 
+	16,17,18, 16,18,19, 20,21,22, 20,22,23 };
 
 // Make a pyramid
 skg_vert_t app_pyramid_verts[] = {
@@ -121,6 +113,24 @@ bool app_init() {
 	} else {
 		skg_log(skg_log_warning, "Couldn't load platform.ply!");
 	}
+	
+	// Generate cube verts
+	for (size_t i = 0; i < 24; i++) {
+		float neg = (float)((i / 4) % 2 ? -1 : 1);
+		int nx  = ((i+24) / 16) % 2;
+		int ny  = (i / 8)       % 2;
+		int nz  = (i / 16)      % 2;
+		int u   = ((i+1) / 2)   % 2; // U: 0,1,1,0
+		int v   = (i / 2)       % 2; // V: 0,0,1,1
+		skg_vert_t vert = {
+			{ (nx ? neg : ny ? (u?-1:1)*neg : (u?1:-1)*neg), 
+			  (nx || nz ? (v?1:-1) : neg), 
+			  (nx ? (u?-1:1)*neg : ny ? (v?1:-1) : neg) },
+			{ nx*neg, ny*neg, nz*neg }, 
+			{ u, v },
+			{ 255, 255, 255, 255 } };
+		app_cube_verts[i] = vert;
+	}
 
 	app_mesh_cube    = app_mesh_create(app_cube_verts,    sizeof(app_cube_verts   )/sizeof(skg_vert_t), false, app_cube_inds,    sizeof(app_cube_inds   )/sizeof(uint32_t));
 	app_mesh_pyramid = app_mesh_create(app_pyramid_verts, sizeof(app_pyramid_verts)/sizeof(skg_vert_t), false, app_pyramid_inds, sizeof(app_pyramid_inds)/sizeof(uint32_t));
@@ -143,27 +153,24 @@ bool app_init() {
 	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skg_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t));
 
 	// Make a checkered texture
-	const int w = 128, h = 64;
-	uint8_t colors[w * h * 4];
+	const int w = 64, h = 64;
+	skg_color32_t colors[w * h];
 	for (int32_t y = 0; y < h; y++) {
 		for (int32_t x = 0; x < w; x++) {
-			int32_t i = (x + y * w) * 4;
-			uint8_t c = (x/4 + y/4) % 2 == 0 ? 255 : (y/(float)h)*255;
-			colors[i  ] = c;
-			colors[i+1] = c;
-			colors[i+2] = c;
-			colors[i+3] = c;
+			int32_t i = x + y*w;
+			float   c = (x/4 + y/4) % 2 == 0 ? 1 : y/(float)h;
+			colors[i] = skg_hsv32(0, 0, c, 1);
 		}
 	}
 	void *color_arr[1] = { colors };
-	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
-	skg_tex_settings    (&app_tex, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
+	skg_tex_settings    (&app_tex, skg_tex_address_repeat, skg_tex_sample_point, 0);
 	skg_tex_set_contents(&app_tex, color_arr, 1, w, h);
 
 	// Make a plain white texture
-	uint8_t colors_wht[2*2*4];
-	for (int32_t i = 0; i < sizeof(colors_wht); i++) {
-		colors_wht[i] = 255;
+	skg_color32_t colors_wht[2*2];
+	for (int32_t i = 0; i < sizeof(colors_wht)/sizeof(skg_color32_t); i++) {
+		colors_wht[i].hex = 0xFFFFFFFF;
 	}
 	void *color_wht_arr[1] = { colors };
 	app_tex_white = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
@@ -176,17 +183,21 @@ bool app_init() {
 	skg_tex_attach_depth(&app_target, &app_target_depth);
 
 	app_cubemap = skg_tex_create(skg_tex_type_cubemap, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
-	uint8_t *cube_cols[6];
+	skg_color32_t *cube_cols[6];
+	const int32_t  cube_face_size = 64;
 	for (size_t f = 0; f < 6; f++) {
-		cube_cols[f] = (uint8_t*)malloc(sizeof(uint8_t) * 4 * 4);
-		for (size_t p = 0; p < 4; p++) {
-			cube_cols[f][p*4 + 0] = (f/2) % 3 == 0 ? (f%2==0?128:255) : 0;
-			cube_cols[f][p*4 + 1] = (f/2) % 3 == 1 ? (f%2==0?128:255) : 0;
-			cube_cols[f][p*4 + 2] = (f/2) % 3 == 2 ? (f%2==0?128:255) : 0;
-			cube_cols[f][p*4 + 3] = 255;
+		cube_cols[f] = (skg_color32_t*)malloc(sizeof(skg_color32_t) * cube_face_size*cube_face_size);
+		for (size_t p = 0; p < cube_face_size*cube_face_size; p++) {
+			skg_color32_t col;
+			switch ((f/2) % 3) {
+			case 0: col = skg_hsv32(.09f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
+			case 1: col = skg_hsv32(.45f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
+			case 2: col = skg_hsv32(.78f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
+			}
+			cube_cols[f][p] = col;
 		}
 	}
-	skg_tex_set_contents(&app_cubemap, (void**)&cube_cols, 6, 2, 2);
+	skg_tex_set_contents(&app_cubemap, (void**)&cube_cols, 6, cube_face_size, cube_face_size);
 
 	app_sh_cube              = skg_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
 	app_sh_cube_tex_bind     = skg_shader_get_tex_bind   (&app_sh_cube, "tex");
@@ -228,10 +239,7 @@ void app_test_dyn_update(double time) {
 			app_wave_verts[i].norm[1] = .6f/mag;
 			app_wave_verts[i].norm[2] = c/mag;
 
-			app_wave_verts[i].col[0] = 255;
-			app_wave_verts[i].col[1] = 255;
-			app_wave_verts[i].col[2] = 255;
-			app_wave_verts[i].col[3] = 255;
+			app_wave_verts[i].col.hex = 0xFFFFFF;
 
 			app_wave_verts[i].uv[0] = xp;
 			app_wave_verts[i].uv[1] = yp;
@@ -326,41 +334,27 @@ void app_test_rendertarget(double t) {
 ///////////////////////////////////////////
 
 void app_test_instancing() {
-	// Set transforms for 100 instances
-	for (int32_t i = 0; i < 100; i++) {
-		int32_t y = i / 10 - 4, x = i % 10 -4;
-		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(float)x - 0.5f,0,(float)y - 0.5f} }) * HMM_Scale(hmm_vec3{ {.2f,.2f,.2f} }));
+	// Set transforms for another 16 instances
+	for (int32_t i = 0; i < 16; i++) {
+		int32_t y = i / 4 - 1, x = i % 4 - 1;
+		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {((float)x-0.5f)*2.5f,0,((float)y-0.5f)*2.5f} }) * HMM_Scale(hmm_vec3{{.4f,.4f,.4f}}));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
 	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
 
-	skg_mesh_bind    (&app_mesh_cube.mesh);
+	app_mesh_t *mesh = skg_buffer_is_valid(&app_mesh_model.vert_buffer)
+		? &app_mesh_model
+		: &app_mesh_cube;
+	skg_mesh_bind    (&mesh->mesh);
 	skg_pipeline_bind(&app_mat_default);
 	skg_tex_bind     (&app_tex, app_sh_default_tex_bind);
-	skg_draw         (0, 0, app_mesh_cube.ind_count, 100);
-
-	// Set transforms for another 100 instances
-	for (int32_t i = 0; i < 100; i++) {
-		int32_t y = i / 10 - 4, x = i % 10 -4;
-		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(float)x -0.5f,1,(float)y-0.5f} }) * HMM_Scale(hmm_vec3{{.2f,.2f,.2f}}));
-		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
-	}
-	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
-
-	if (skg_buffer_is_valid(&app_mesh_model.vert_buffer)) {
-		skg_mesh_bind    (&app_mesh_model.mesh);
-		skg_pipeline_bind(&app_mat_default);
-		skg_tex_bind     (&app_target, app_sh_default_tex_bind);
-		skg_draw         (0, 0, app_mesh_model.ind_count, 100);
-	}
+	skg_draw         (0, 0, mesh->ind_count, 16);
 }
 
 ///////////////////////////////////////////
 
 void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
-	
 	app_test_rendertarget(t);
 
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
@@ -368,11 +362,11 @@ void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
 	skg_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
 	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
-	
 	app_test_colors();
 	app_test_instancing();
-	app_test_dyn_update(t);
 	app_test_cubemap();
+	app_test_dyn_update(t);
+	
 }
 
 ///////////////////////////////////////////

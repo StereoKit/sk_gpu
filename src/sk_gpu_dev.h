@@ -159,11 +159,30 @@ typedef enum skg_cap_ {
 	skg_cap_wireframe,
 } skg_cap_;
 
+typedef struct {
+	union {
+		struct {
+			uint8_t r, g, b, a;
+		};
+		uint32_t hex;
+		uint8_t  arr[4];
+	};
+} skg_color32_t;
+
+typedef struct {
+	union {
+		struct {
+			float r, g, b, a;
+		};
+		float arr[4];
+	};
+} skg_color128_t;
+
 typedef struct skg_vert_t {
-	float   pos [3];
-	float   norm[3];
-	float   uv  [2];
-	uint8_t col [4];
+	float         pos [3];
+	float         norm[3];
+	float         uv  [2];
+	skg_color32_t col;
 } skg_vert_t;
 
 typedef struct skg_bind_t {

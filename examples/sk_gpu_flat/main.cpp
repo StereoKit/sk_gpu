@@ -169,13 +169,15 @@ void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 	float clear_color[4] = { 0,0,0,1 };
 	skg_swapchain_bind(&app_swapchain, true, clear_color);
 
+	static uint64_t frame = 0;
+	frame++;
 	for (size_t i = 0; i < 2; i++) {
 		skg_viewport(views[i].viewport);
 		
 		hmm_mat4 view, proj;
 		memcpy(&view, views[i].viewMatrix,       sizeof(hmm_mat4));
 		memcpy(&proj, views[i].projectionMatrix, sizeof(hmm_mat4));
-		app_render(0, view, proj);
+		app_render(frame, view, proj);
 	}
 
 	skg_swapchain_present(&app_swapchain);

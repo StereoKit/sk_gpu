@@ -200,6 +200,25 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_viewport(const int32_t *xywh) {
+	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT((float)xywh[0], (float)xywh[1], (float)xywh[2], (float)xywh[3]);
+	d3d_context->RSSetViewports(1, &viewport);
+}
+
+///////////////////////////////////////////
+
+void skg_viewport_get(int32_t *out_xywh) {
+	uint32_t       count = 1;
+	D3D11_VIEWPORT viewport;
+	d3d_context->RSGetViewports(&count, &viewport);
+	out_xywh[0] = viewport.TopLeftX;
+	out_xywh[1] = viewport.TopLeftY;
+	out_xywh[2] = viewport.Width;
+	out_xywh[3] = viewport.Height;
+}
+
+///////////////////////////////////////////
+
 skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use) {
 	skg_buffer_t result = {};
 	result.use    = use;
@@ -216,7 +235,6 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 		buffer_desc.Usage          = D3D11_USAGE_DYNAMIC;
 		buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	}break;
-	default: throw "Not implemented yet!";
 	}
 	switch (type) {
 	case skg_buffer_type_vertex:   buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;   break;
@@ -227,7 +245,6 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 		buffer_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED; 
 		buffer_desc.Usage     = D3D11_USAGE_DEFAULT;
 	} break;
-	default: throw "Not implemented yet!";
 	}
 	d3d_device->CreateBuffer(&buffer_desc, data==nullptr ? nullptr : &buffer_data, &result._buffer);
 	return result;
@@ -259,14 +276,29 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 /////////////////////////////////////////// 
 
 void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size) {
+	ID3D11Buffer* cpu_buff = nullptr;
+
+	D3D11_BUFFER_DESC desc = {};
+	buffer->_buffer->GetDesc( &desc );
+	desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	desc.Usage          = D3D11_USAGE_STAGING;
+	desc.BindFlags      = 0;
+	desc.MiscFlags      = 0;
+	if (FAILED(d3d_device->CreateBuffer(&desc, nullptr, &cpu_buff)) ) {
+		skg_log(skg_log_critical, "Couldn't create a tep buffer for copy!");
+		return;
+	}
+	d3d_context->CopyResource( cpu_buff, buffer->_buffer );
+
 	D3D11_MAPPED_SUBRESOURCE resource;
-	if (SUCCEEDED(d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_READ, 0, &resource))) {
+	if (SUCCEEDED(d3d_context->Map(cpu_buff, 0, D3D11_MAP_READ, 0, &resource))) {
 		memcpy(ref_buffer, resource.pData, min(resource.DepthPitch * resource.DepthPitch, buffer_size));
 		d3d_context->Unmap(buffer->_buffer, 0);
 	} else {
 		memset(ref_buffer, 0, buffer_size);
-		skg_log(skg_log_critical, "Failed to get contents of buffer, may not be using a readable buffer type?");
+		skg_log(skg_log_critical, "Failed to get contents of buffer!");
 	}
+	cpu_buff->Release();
 }
 
 /////////////////////////////////////////// 
@@ -674,7 +706,7 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	result._target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, result.width, result.height, 1);
 	result._depth  = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
-	skg_tex_set_contents(&result._depth, nullptr, 1, result.width, result.height);
+	skg_tex_set_contents(&result._depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._target, &result._depth);
 	back_buffer->Release();
 
@@ -704,7 +736,7 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	swapchain->_target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, width, height, 1);
 	swapchain->_depth  = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_fmt, skg_mip_none);
-	skg_tex_set_contents(&swapchain->_depth, nullptr, 1, width, height);
+	skg_tex_set_contents(&swapchain->_depth, nullptr, width, height);
 	skg_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
 	back_buffer->Release();
 }
@@ -844,10 +876,10 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 ///////////////////////////////////////////
 
-void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, void *curr_data, skg_tex_fmt_ format, int32_t width, int32_t height, uint32_t mip_levels) {
-	void    *mip_data = curr_data;
-	int32_t  mip_w    = width;
-	int32_t  mip_h    = height;
+void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_tex_fmt_ format, int32_t width, int32_t height, uint32_t mip_levels) {
+	const void *mip_data = curr_data;
+	int32_t     mip_w    = width;
+	int32_t     mip_h    = height;
 	for (uint32_t m = 1; m < mip_levels; m++) {
 		tex_mem[m] = {};
 		switch (format) {
@@ -940,7 +972,14 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
+	const void *data_arr[1] = { data };
+	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
+}
+
+///////////////////////////////////////////
+
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	// Some warning messages
 	if (tex->use != skg_use_dynamic && tex->_texture) {
 		skg_log(skg_log_warning, "Only dynamic textures can be updated!");

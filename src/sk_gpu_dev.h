@@ -250,6 +250,8 @@ bool                skg_capability               (skg_cap_ capability);
 
 void                skg_draw_begin               ();
 void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
+void                skg_viewport                 (const int32_t *xywh);
+void                skg_viewport_get             (int32_t *out_xywh);
 
 skg_buffer_t        skg_buffer_create            (const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use);
 bool                skg_buffer_is_valid          (const skg_buffer_t *buffer);
@@ -305,7 +307,8 @@ skg_tex_t           skg_tex_create               (skg_tex_type_ type, skg_use_ u
 bool                skg_tex_is_valid             (const skg_tex_t *tex);
 void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
 void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
-void                skg_tex_set_contents         (      skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
+void                skg_tex_set_contents         (      skg_tex_t *tex, const void *data, int32_t width, int32_t height);
+void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
 bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 void                skg_tex_target_bind          (      skg_tex_t *render_target, bool clear, const float *clear_color_4);

@@ -685,6 +685,18 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_viewport(const int32_t *xywh) {
+	glViewport(xywh[0], xywh[1], xywh[2], xywh[3]);
+}
+
+///////////////////////////////////////////
+
+void skg_viewport_get(int32_t *out_xywh) {
+	glGetIntegerv(GL_VIEWPORT, out_xywh);
+}
+
+///////////////////////////////////////////
+
 skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use) {
 	skg_buffer_t result = {};
 	result.use     = use;
@@ -1180,10 +1192,10 @@ void main() {
 	result._convert_pipe   = skg_pipeline_create(&result._convert_shader);
 
 	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_dynamic, skg_tex_fmt_rgba32, skg_mip_none);
-	skg_tex_set_contents(&result._surface, nullptr, 1, result.width, result.height);
+	skg_tex_set_contents(&result._surface, nullptr, result.width, result.height);
 
 	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_dynamic, depth_format, skg_mip_none);
-	skg_tex_set_contents(&result._surface_depth, nullptr, 1, result.width, result.height);
+	skg_tex_set_contents(&result._surface_depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._surface, &result._surface_depth);
 
 	skg_vert_t quad_verts[] = { 
@@ -1408,9 +1420,16 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 #endif
 }
 
+///////////////////////////////////////////
+
+void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
+	const void *data_arr[1] = { data };
+	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
+}
+
 /////////////////////////////////////////// 
 
-void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	tex->width       = width;
 	tex->height      = height;
 	tex->array_count = data_frame_count;
@@ -1453,6 +1472,9 @@ void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame
 /////////////////////////////////////////// 
 
 bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
+#ifdef __EMSCRIPTEN__
+	return false;
+#else
 	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
 	glBindTexture (tex->_target, tex->_texture);
 	glGetnTexImage(tex->_target, 0, format, skg_tex_fmt_to_gl_type(tex->format), data_size, ref_data);
@@ -1473,6 +1495,7 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 	}
 
 	return result;
+#endif
 }
 
 /////////////////////////////////////////// 

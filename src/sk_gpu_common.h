@@ -29,12 +29,23 @@ void               skg_log                     (skg_log_ level, const char *text
 bool               skg_read_file               (const char *filename, void **out_data, size_t *out_size);
 uint64_t           skg_hash                    (const char *string);
 
-// For Hue: 0 is red, 0.1667 is yellow, 0.3333 is green, 0.5 is cyan, 0.6667 
-// is blue, 0.8333 is magenta, and 1 is red again!
-skg_color32_t      skg_hsv32                   (float h, float s, float v, float a);
-// For Hue: 0 is red, 0.1667 is yellow, 0.3333 is green, 0.5 is cyan, 0.6667 
-// is blue, 0.8333 is magenta, and 1 is red again!
-skg_color128_t     skg_hsv128                  (float h, float s, float v, float a);
+skg_color32_t      skg_col_hsv32               (float hue, float saturation, float value, float alpha);
+skg_color128_t     skg_col_hsv128              (float hue, float saturation, float value, float alpha);
+skg_color32_t      skg_col_hsl32               (float hue, float saturation, float lightness, float alpha);
+skg_color128_t     skg_col_hsl128              (float hue, float saturation, float lightness, float alpha);
+skg_color32_t      skg_col_hcy32               (float hue, float chroma, float lightness, float alpha);
+skg_color128_t     skg_col_hcy128              (float hue, float chroma, float lightness, float alpha);
+skg_color32_t      skg_col_lch32               (float hue, float chroma, float lightness, float alpha);
+skg_color128_t     skg_col_lch128              (float hue, float chroma, float lightness, float alpha);
+skg_color32_t      skg_col_helix32             (float hue, float saturation, float lightness, float alpha);
+skg_color128_t     skg_col_helix128            (float hue, float saturation, float lightness, float alpha);
+skg_color32_t      skg_col_jab32               (float j, float a, float b, float alpha);
+skg_color128_t     skg_col_jab128              (float j, float a, float b, float alpha);
+skg_color32_t      skg_col_jsl32               (float hue, float saturation, float lightness, float alpha);
+skg_color128_t     skg_col_jsl128              (float hue, float saturation, float lightness, float alpha);
+skg_color32_t      skg_col_lab32               (float l, float a, float b, float alpha);
+skg_color128_t     skg_col_lab128              (float l, float a, float b, float alpha);
+skg_color128_t     skg_col_rgb_to_lab128       (skg_color128_t rgb);
 
 bool               skg_shader_file_verify      (const void *file_memory, size_t file_size, uint16_t *out_version, char *out_name, size_t out_name_size);
 bool               skg_shader_file_load_memory (const void *file_memory, size_t file_size, skg_shader_file_t *out_file);

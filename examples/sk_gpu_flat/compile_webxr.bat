@@ -11,6 +11,7 @@ emcc^
  -s WASM=1^
  -s -Oz^
  -o index.js^
+ --js-library ../common/library_webxr.js^
  -g4
 
 :: Release version with minifying flags

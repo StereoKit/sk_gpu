@@ -61,8 +61,8 @@ uint64_t skg_hash(const char *string) {
 
 ///////////////////////////////////////////
 
-skg_color32_t skg_hsv32(float h, float s, float v, float a) {
-	skg_color128_t col = skg_hsv128(h,s,v,a);
+skg_color32_t skg_col_hsv32(float h, float s, float v, float a) {
+	skg_color128_t col = skg_col_hsv128(h,s,v,a);
 	return skg_color32_t{
 		(uint8_t)(col.r*255),
 		(uint8_t)(col.g*255),
@@ -72,7 +72,8 @@ skg_color32_t skg_hsv32(float h, float s, float v, float a) {
 
 ///////////////////////////////////////////
 
-skg_color128_t skg_hsv128(float h, float s, float v, float a) {
+// Reference from here: http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
+skg_color128_t skg_col_hsv128(float h, float s, float v, float a) {
 	const float K[4] = { 1.0f, 2.0f/3.0f, 1.0f/3.0f, 3.0f };
 	float p[3] = {
 		fabsf(((h + K[0]) - floorf(h + K[0])) * 6.0f - K[3]),
@@ -85,6 +86,319 @@ skg_color128_t skg_hsv128(float h, float s, float v, float a) {
 		(K[0] + (fmaxf(0,fminf(p[1] - K[0], 1.0f)) - K[0]) * s) * v,
 		(K[0] + (fmaxf(0,fminf(p[2] - K[0], 1.0f)) - K[0]) * s) * v,
 		a };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_hsl32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_hsl128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+skg_color128_t skg_col_hsl128(float h, float s, float l, float a) {
+	if (h < 0) h -= floorf(h);
+	float r = fabsf(h * 6 - 3) - 1;
+	float g = 2 - fabsf(h * 6 - 2);
+	float b = 2 - fabsf(h * 6 - 4);
+	r = fmaxf(0, fminf(1, r));
+	g = fmaxf(0, fminf(1, g));
+	b = fmaxf(0, fminf(1, b));
+
+	float C = (1 - fabsf(2 * l - 1)) * s;
+	return {
+		(r - 0.5f) * C + l,
+		(g - 0.5f) * C + l,
+		(b - 0.5f) * C + l, a };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_hcy32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_hcy128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+// Reference from here https://www.chilliant.com/rgb2hsv.html
+skg_color128_t skg_col_hcy128(float h, float c, float y, float a) {
+	if (h < 0) h -= floorf(h);
+	float r = fabsf(h * 6 - 3) - 1;
+	float g = 2 - fabsf(h * 6 - 2);
+	float b = 2 - fabsf(h * 6 - 4);
+	r = fmaxf(0, fminf(1, r));
+	g = fmaxf(0, fminf(1, g));
+	b = fmaxf(0, fminf(1, b));
+
+	float Z = r*0.299f + g*0.587f + b*0.114f;
+	if (y < Z) {
+		c *= y / Z;
+	} else if (Z < 1) {
+		c *= (1 - y) / (1 - Z);
+	}
+	return skg_color128_t { 
+		(r - Z) * c + y,
+		(g - Z) * c + y,
+		(b - Z) * c + y,
+		a };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_lch32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_lch128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+// Reference from here: https://www.easyrgb.com/en/math.php
+skg_color128_t skg_col_lch128(float h, float c, float l, float alpha) {
+	const float tau = 6.283185307179586476925286766559f;
+	c = c * 200;
+	l = l * 100;
+	float a = cosf( h*tau ) * c;
+	float b = sinf( h*tau ) * c;
+	
+	float
+		y = (l + 16.f) / 116.f,
+		x = (a / 500.f) + y,
+		z = y - (b / 200.f);
+
+	x = 0.95047f * ((x*x*x > 0.008856f) ? x*x*x : (x - 16/116.f) / 7.787f);
+	y = 1.00000f * ((y*y*y > 0.008856f) ? y*y*y : (y - 16/116.f) / 7.787f);
+	z = 1.08883f * ((z*z*z > 0.008856f) ? z*z*z : (z - 16/116.f) / 7.787f);
+
+	float r = x *  3.2406f + y * -1.5372f + z * -0.4986f;
+	float g = x * -0.9689f + y *  1.8758f + z *  0.0415f;
+	      b = x *  0.0557f + y * -0.2040f + z *  1.0570f;
+
+	r = (r > 0.0031308f) ? (1.055f * powf(r, 1/2.4f) - 0.055f) : 12.92f * r;
+	g = (g > 0.0031308f) ? (1.055f * powf(g, 1/2.4f) - 0.055f) : 12.92f * g;
+	b = (b > 0.0031308f) ? (1.055f * powf(b, 1/2.4f) - 0.055f) : 12.92f * b;
+
+	return skg_color128_t { 
+		fmaxf(0, fminf(1, r)),
+		fmaxf(0, fminf(1, g)),
+		fmaxf(0, fminf(1, b)), alpha };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_helix32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_helix128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+// Reference here: http://www.mrao.cam.ac.uk/~dag/CUBEHELIX/
+skg_color128_t skg_col_helix128(float h, float s, float l, float alpha) {
+	const float tau = 6.28318f;
+	l = fminf(1,l);
+	float angle = tau * (h+(1/3.f));
+	float amp   = s * l * (1.f - l); // Helix in some implementations will 
+	// divide this by 2.0f and go at half s, but if we clamp rgb at the end, 
+	// we can get full s at the cost of a bit of artifacting at high 
+	// s+lightness values.
+
+	float a_cos = cosf(angle);
+	float a_sin = sinf(angle);
+	float r = l + amp * (-0.14861f * a_cos + 1.78277f * a_sin);
+	float g = l + amp * (-0.29227f * a_cos - 0.90649f * a_sin);
+	float b = l + amp * ( 1.97294f * a_cos);
+	r = fmax(0,fminf(1, r));
+	g = fmax(0,fminf(1, g));
+	b = fmax(0,fminf(1, b));
+	return { r, g, b, alpha };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_jab32(float j, float a, float b, float alpha) {
+	skg_color128_t col = skg_col_jab128(j, a, b, alpha);
+	return skg_color32_t{ (uint8_t)(col.r*255), (uint8_t)(col.g*255), (uint8_t)(col.b*255), (uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+float lms(float t) {
+	if (t > 0.) {
+		float r = powf(t, 0.007460772656268214f);
+		float s = (0.8359375f - r) / (18.6875*r + -18.8515625f);
+		return powf(s, 6.277394636015326f);
+	} else {
+		return 0.f;
+	}
+}
+
+float srgb(float c) {
+	if (c <= 0.0031308049535603713f) {
+		return c * 12.92;
+	} else {
+		float c_ = powf(c, 0.41666666666666666f);
+		return c_ * 1.055f + -0.055f;
+	}
+}
+
+// ref : https://thebookofshaders.com/edit.php?log=180722032925
+skg_color128_t jchz2srgb(float h, float s, float l, float alpha) {
+	float jz = l*0.16717463120366200f + 1.6295499532821566e-11f;
+	float cz = s*0.16717463120366200f;
+	float hz = h*6.28318530717958647f;
+
+	float iz = jz / (0.56f*jz + 0.44f);
+	float az = cz * cosf(hz);
+	float bz = cz * sinf(hz);
+
+	float l_ = iz + az* +0.13860504327153930f + bz* +0.058047316156118830f;
+	float m_ = iz + az* -0.13860504327153927f + bz* -0.058047316156118904f;
+	float s_ = iz + az* -0.09601924202631895f + bz* -0.811891896056039000f;
+
+	      l = lms(l_);
+	float m = lms(m_);
+	      s = lms(s_);
+
+	float lr = l* +0.0592896375540425100e4f + m* -0.052239474257975140e4f + s* +0.003259644233339027e4f;
+	float lg = l* -0.0222329579044572220e4f + m* +0.038215274736946150e4f + s* -0.005703433147128812e4f;
+	float lb = l* +0.0006270913830078808e4f + m* -0.007021906556220012e4f + s* +0.016669756032437408e4f;
+
+	lr = fmax(0,fminf(1, srgb(lr)));
+	lg = fmax(0,fminf(1, srgb(lg)));
+	lb = fmax(0,fminf(1, srgb(lb)));
+	return skg_color128_t{lr, lg, lb, alpha };
+}
+
+// Reference here: https://observablehq.com/@jrus/jzazbz
+float pqi(float x) {
+	x = powf(x, .007460772656268214f);
+	return x <= 0 ? 0 : powf(
+		(0.8359375f - x) / (18.6875f*x - 18.8515625f),
+		6.277394636015326f); 
+};
+skg_color128_t skg_col_jab128(float j, float a, float b, float alpha) {
+	// JAB to XYZ
+	j = j + 1.6295499532821566e-11f;
+	float iz = j / (0.44f + 0.56f * j);
+	float l  = pqi(iz + .1386050432715393f*a + .0580473161561187f*b);
+	float m  = pqi(iz - .1386050432715393f*a - .0580473161561189f*b);
+	float s  = pqi(iz - .0960192420263189f*a - .8118918960560390f*b);
+
+	float r = l* +0.0592896375540425100e4 + m* -0.052239474257975140e4 + s* +0.003259644233339027e4;
+	float g = l* -0.0222329579044572220e4 + m* +0.038215274736946150e4 + s* -0.005703433147128812e4;
+	      b = l* +0.0006270913830078808e4 + m* -0.007021906556220012e4 + s* +0.016669756032437408e4;
+
+	/*float x = +1.661373055774069e+00f * L - 9.145230923250668e-01f * M + 2.313620767186147e-01f * S;
+	float y = -3.250758740427037e-01f * L + 1.571847038366936e+00f * M - 2.182538318672940e-01f * S;
+	float z = -9.098281098284756e-02f * L - 3.127282905230740e-01f * M + 1.522766561305260e+00f * S;
+
+	// XYZ to sRGB
+	float r = x *  3.2406f + y * -1.5372f + z * -0.4986f;
+	float g = x * -0.9689f + y *  1.8758f + z *  0.0415f;
+	      b = x *  0.0557f + y * -0.2040f + z *  1.0570f;*/
+
+	// to sRGB
+	r = (r > 0.0031308f) ? (1.055f * powf(r, 1/2.4f) - 0.055f) : 12.92f * r;
+	g = (g > 0.0031308f) ? (1.055f * powf(g, 1/2.4f) - 0.055f) : 12.92f * g;
+	b = (b > 0.0031308f) ? (1.055f * powf(b, 1/2.4f) - 0.055f) : 12.92f * b;
+
+	return skg_color128_t { 
+		fmaxf(0, fminf(1, r)),
+		fmaxf(0, fminf(1, g)),
+		fmaxf(0, fminf(1, b)), alpha };
+}
+
+skg_color32_t skg_col_jsl32(float h, float s, float l, float alpha) {
+	skg_color128_t col = skg_col_jsl128(h, s, l, alpha);
+	return skg_color32_t{ (uint8_t)(col.r*255), (uint8_t)(col.g*255), (uint8_t)(col.b*255), (uint8_t)(col.a*255)};
+}
+skg_color128_t skg_col_jsl128(float h, float s, float l, float alpha) {
+	return jchz2srgb(h, s, l, alpha);/*
+	const float tau = 6.28318f;
+	h = h * tau - tau/2;
+	s = s * 0.16717463120366200f;
+	l = l * 0.16717463120366200f;
+	return skg_col_jab128(fmaxf(0,l), s * cosf(h), s * sinf(h), alpha);*/
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_lab32(float l, float a, float b, float alpha) {
+	skg_color128_t col = skg_col_lab128(l,a,b,alpha);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+skg_color128_t skg_col_lab128(float l, float a, float b, float alpha) {
+	l = l * 100;
+	a = a * 400 - 200;
+	b = b * 400 - 200;
+	float
+		y = (l + 16.f) / 116.f,
+		x = (a / 500.f) + y,
+		z = y - (b / 200.f);
+
+	x = 0.95047f * ((x * x * x > 0.008856f) ? x * x * x : (x - 16/116.f) / 7.787f);
+	y = 1.00000f * ((y * y * y > 0.008856f) ? y * y * y : (y - 16/116.f) / 7.787f);
+	z = 1.08883f * ((z * z * z > 0.008856f) ? z * z * z : (z - 16/116.f) / 7.787f);
+
+	float r = x *  3.2406f + y * -1.5372f + z * -0.4986f;
+	float g = x * -0.9689f + y *  1.8758f + z *  0.0415f;
+	      b = x *  0.0557f + y * -0.2040f + z *  1.0570f;
+
+	r = (r > 0.0031308f) ? (1.055f * powf(r, 1/2.4f) - 0.055f) : 12.92f * r;
+	g = (g > 0.0031308f) ? (1.055f * powf(g, 1/2.4f) - 0.055f) : 12.92f * g;
+	b = (b > 0.0031308f) ? (1.055f * powf(b, 1/2.4f) - 0.055f) : 12.92f * b;
+
+	return skg_color128_t { 
+		fmaxf(0, fminf(1, r)),
+		fmaxf(0, fminf(1, g)),
+		fmaxf(0, fminf(1, b)), alpha };
+}
+
+///////////////////////////////////////////
+
+skg_color128_t skg_col_rgb_to_lab128(skg_color128_t rgb) {
+	rgb.r = (rgb.r > 0.04045f) ? powf((rgb.r + 0.055f) / 1.055f, 2.4f) : rgb.r / 12.92f;
+	rgb.g = (rgb.g > 0.04045f) ? powf((rgb.g + 0.055f) / 1.055f, 2.4f) : rgb.g / 12.92f;
+	rgb.b = (rgb.b > 0.04045f) ? powf((rgb.b + 0.055f) / 1.055f, 2.4f) : rgb.b / 12.92f;
+
+	// D65, Daylight, sRGB, aRGB
+	float x = (rgb.r * 0.4124f + rgb.g * 0.3576f + rgb.b * 0.1805f) / 0.95047f;
+	float y = (rgb.r * 0.2126f + rgb.g * 0.7152f + rgb.b * 0.0722f) / 1.00000f;
+	float z = (rgb.r * 0.0193f + rgb.g * 0.1192f + rgb.b * 0.9505f) / 1.08883f;
+
+	x = (x > 0.008856f) ? powf(x, 1/3.f) : (7.787f * x) + 16/116.f;
+	y = (y > 0.008856f) ? powf(y, 1/3.f) : (7.787f * y) + 16/116.f;
+	z = (z > 0.008856f) ? powf(z, 1/3.f) : (7.787f * z) + 16/116.f;
+
+	return {
+		(1.16f * y) - .16f,
+		1.25f * (x - y) + 0.5f,
+		0.5f * (y - z) + 0.5f, rgb.a };
 }
 
 ///////////////////////////////////////////

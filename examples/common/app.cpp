@@ -40,6 +40,7 @@ app_shader_inst_t app_shader_inst[100]   = {};
 app_mesh_t        app_mesh_cube          = {};
 app_mesh_t        app_mesh_pyramid       = {};
 app_mesh_t        app_mesh_tri           = {};
+app_mesh_t        app_mesh_quad          = {};
 app_mesh_t        app_mesh_wave          = {};
 app_mesh_t        app_mesh_model         = {};
 skg_buffer_t      app_shader_data_buffer = {};
@@ -49,6 +50,23 @@ skg_tex_t         app_tex_white          = {};
 skg_tex_t         app_target             = {};
 skg_tex_t         app_target_depth       = {};
 skg_tex_t         app_cubemap            = {};
+
+skg_tex_t         app_tex_colspace[4];
+skg_color32_t   (*app_col_func[4])(float h, float s, float v, float a) = {
+	skg_col_hsl32,
+	skg_col_helix32,
+	skg_col_jsl32,
+	skg_col_lch32 };
+skg_color128_t   (*app_col_func128[4])(float h, float s, float v, float a) = {
+	skg_col_hsl128,
+	skg_col_helix128,
+	skg_col_jsl128,
+	skg_col_lch128 };
+const char *app_col_name[4] = {
+	"hsl.tga",
+	"helix.tga",
+	"jsl.tga",
+	"lch.tga" };
 
 skg_shader_t      app_sh_default           = {};
 skg_bind_t        app_sh_default_tex_bind  = {};
@@ -92,6 +110,15 @@ skg_vert_t app_tri_verts[] = {
 uint32_t app_tri_inds[] = {
 	0,1,2, 2,1,0 };
 
+// make a double-sided quad
+skg_vert_t app_quad_verts[] = {
+	skg_vert_t{ {-.5f, .5f,0}, {0,1,0}, {0,0}, {255,255,255,255}},
+	skg_vert_t{ { .5f, .5f,0}, {0,1,0}, {1,0}, {255,255,255,255}},
+	skg_vert_t{ { .5f,-.5f,0}, {0,1,0}, {1,1}, {255,255,255,255}},
+	skg_vert_t{ {-.5f,-.5f,0}, {0,1,0}, {0,1}, {255,255,255,255}},};
+uint32_t app_quad_inds[] = {
+	0,1,2, 2,1,0, 0,2,3, 3,2,0 };
+
 ///////////////////////////////////////////
 
 app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count);
@@ -127,7 +154,7 @@ bool app_init() {
 			  (nx || nz ? (v?1:-1) : neg), 
 			  (nx ? (u?-1:1)*neg : ny ? (v?1:-1) : neg) },
 			{ nx*neg, ny*neg, nz*neg }, 
-			{ u, v },
+			{ (float)u, (float)v },
 			{ 255, 255, 255, 255 } };
 		app_cube_verts[i] = vert;
 	}
@@ -135,6 +162,7 @@ bool app_init() {
 	app_mesh_cube    = app_mesh_create(app_cube_verts,    sizeof(app_cube_verts   )/sizeof(skg_vert_t), false, app_cube_inds,    sizeof(app_cube_inds   )/sizeof(uint32_t));
 	app_mesh_pyramid = app_mesh_create(app_pyramid_verts, sizeof(app_pyramid_verts)/sizeof(skg_vert_t), false, app_pyramid_inds, sizeof(app_pyramid_inds)/sizeof(uint32_t));
 	app_mesh_tri     = app_mesh_create(app_tri_verts,     sizeof(app_tri_verts    )/sizeof(skg_vert_t), false, app_tri_inds,     sizeof(app_tri_inds    )/sizeof(uint32_t));
+	app_mesh_quad    = app_mesh_create(app_quad_verts,    sizeof(app_quad_verts   )/sizeof(skg_vert_t), false, app_quad_inds,    sizeof(app_quad_inds   )/sizeof(uint32_t));
 
 	// Make wave indices
 	uint32_t inds_wave[(app_wave_size - 1) * (app_wave_size - 1) * 6];
@@ -159,27 +187,57 @@ bool app_init() {
 		for (int32_t x = 0; x < w; x++) {
 			int32_t i = x + y*w;
 			float   c = (x/4 + y/4) % 2 == 0 ? 1 : y/(float)h;
-			colors[i] = skg_hsv32(0, 0, c, 1);
+			colors[i] = skg_col_hsv32(0, 0, c, 1);
 		}
 	}
-	void *color_arr[1] = { colors };
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
 	skg_tex_settings    (&app_tex, skg_tex_address_repeat, skg_tex_sample_point, 0);
-	skg_tex_set_contents(&app_tex, color_arr, 1, w, h);
+	skg_tex_set_contents(&app_tex, colors, w, h);
 
 	// Make a plain white texture
 	skg_color32_t colors_wht[2*2];
 	for (int32_t i = 0; i < sizeof(colors_wht)/sizeof(skg_color32_t); i++) {
 		colors_wht[i].hex = 0xFFFFFFFF;
 	}
-	void *color_wht_arr[1] = { colors };
 	app_tex_white = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
-	skg_tex_set_contents(&app_tex_white, color_wht_arr, 1, 2, 2);
+	skg_tex_set_contents(&app_tex_white, colors_wht, 2, 2);
+
+	// make color space gradients
+	const int32_t grad_size = 128;
+	skg_color32_t *space_colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)*grad_size*grad_size);
+	for (int32_t c = 0; c < sizeof(app_tex_colspace) / sizeof(app_tex_colspace[0]); c++) {
+		skg_color128_t grad_lab_start = skg_col_rgb_to_lab128(app_col_func128[c](0.5f, 0.8f, 0.8f, 1));
+		skg_color128_t grad_lab_end   = skg_col_rgb_to_lab128(app_col_func128[c](1.f,  0.8f, 0.2f, 1));
+
+		for (int32_t y = 0; y < grad_size; y++) {
+			for (int32_t x = 0; x < grad_size; x++) {
+				float dx = (grad_size-1) / 2.0f - x;
+				float dy = (grad_size-1) / 2.0f - y;
+				float d = sqrtf(dx*dx+dy*dy);
+				float a = d==0?0:atan2f(dy/d, dx/d)/(3.14159f*2);
+				d = 1 - d / (grad_size / 2);
+				//space_colors[x+y*grad_size] = app_col_func[c](a, .8f, fmaxf(0,fmin(1,d)), fmaxf(0,fmin(1,d*grad_size)));
+
+				space_colors[x+y*grad_size] = app_col_func[c](x/(float)grad_size, 1-y/(float)grad_size, 0.5f, 1);
+
+				/*float pct = x / (float)grad_size;
+				skg_color128_t lab = {};
+				for (int32_t h = 0; h < 3; h++)
+					lab.arr[h] = grad_lab_start.arr[h] + (grad_lab_end.arr[h] - grad_lab_start.arr[h]) * pct;
+				space_colors[x + y * grad_size] = skg_col_lab32(lab.r, lab.g, lab.b, 1); */
+			}
+		}
+		app_tex_colspace[c] = skg_tex_create(skg_tex_type_image, skg_use_dynamic, skg_tex_fmt_rgba32, skg_mip_none);
+		skg_tex_settings    (&app_tex_colspace[c], skg_tex_address_clamp, skg_tex_sample_linear, 1);
+		skg_tex_set_contents(&app_tex_colspace[c], space_colors, grad_size, grad_size);
+		tga_write(app_col_name[c], grad_size, grad_size, (uint8_t*)space_colors, 4, 4);
+	}
+	free(space_colors);
 
 	app_target       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	app_target_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depth16,       skg_mip_none);
-	skg_tex_set_contents(&app_target,       nullptr, 1, 512, 512);
-	skg_tex_set_contents(&app_target_depth, nullptr, 1, 512, 512);
+	skg_tex_set_contents(&app_target,       nullptr, 512, 512);
+	skg_tex_set_contents(&app_target_depth, nullptr, 512, 512);
 	skg_tex_attach_depth(&app_target, &app_target_depth);
 
 	app_cubemap = skg_tex_create(skg_tex_type_cubemap, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
@@ -190,14 +248,14 @@ bool app_init() {
 		for (size_t p = 0; p < cube_face_size*cube_face_size; p++) {
 			skg_color32_t col;
 			switch ((f/2) % 3) {
-			case 0: col = skg_hsv32(.09f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
-			case 1: col = skg_hsv32(.45f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
-			case 2: col = skg_hsv32(.78f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
+			case 0: col = skg_col_hsv32(.09f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
+			case 1: col = skg_col_hsv32(.45f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
+			case 2: col = skg_col_hsv32(.78f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
 			}
 			cube_cols[f][p] = col;
 		}
 	}
-	skg_tex_set_contents(&app_cubemap, (void**)&cube_cols, 6, cube_face_size, cube_face_size);
+	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, cube_face_size, cube_face_size);
 
 	app_sh_cube              = skg_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
 	app_sh_cube_tex_bind     = skg_shader_get_tex_bind   (&app_sh_cube, "tex");
@@ -260,7 +318,7 @@ void app_test_dyn_update(double time) {
 
 ///////////////////////////////////////////
 
-void app_test_colors() {
+void app_test_colors(double t) {
 	// Here's how this triangle should look:
 	// https://medium.com/@heypete/hello-triangle-meet-swift-and-wide-color-6f9e246616d9
 
@@ -273,6 +331,18 @@ void app_test_colors() {
 	skg_pipeline_bind(&app_mat_default);
 	skg_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
 	skg_draw(0, 0, app_mesh_tri.ind_count, 1);
+
+	for (int32_t i = 0; i < sizeof(app_tex_colspace) / sizeof(app_tex_colspace[0]); i++) {
+		world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(i/2+1) * (i%2==0?-2.0f:2.0f),2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));
+		memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+		skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
+		skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+
+		skg_mesh_bind    (&app_mesh_quad.mesh);
+		skg_pipeline_bind(&app_mat_default);
+		skg_tex_bind     (&app_tex_colspace[i], app_sh_default_tex_bind);
+		skg_draw(0, 0, app_mesh_quad.ind_count, 1);
+	}
 }
 
 ///////////////////////////////////////////
@@ -294,6 +364,8 @@ void app_test_cubemap() {
 
 void app_test_rendertarget(double t) {
 	skg_tex_t *old_target = skg_tex_target_get();
+	int32_t old_view[4];
+	skg_viewport_get(old_view);
 
 	float color[4] = { 1,1,1,1 };
 	skg_tex_target_bind(&app_target, true, color);
@@ -319,6 +391,7 @@ void app_test_rendertarget(double t) {
 	skg_draw         (0, 0, app_mesh_tri.ind_count, 1);
 
 	skg_tex_target_bind(old_target, false, color);
+	skg_viewport(old_view);
 
 	static bool has_saved = false;
 	if (!has_saved) {
@@ -362,7 +435,7 @@ void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
 	skg_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
 	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
-	app_test_colors();
+	app_test_colors(t);
 	app_test_instancing();
 	app_test_cubemap();
 	app_test_dyn_update(t);
@@ -447,7 +520,7 @@ bool ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_ver
 
 ///////////////////////////////////////////
 
-void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataBGRA, uint8_t dataChannels, uint8_t fileChannels) {
+void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA, uint8_t dataChannels, uint8_t fileChannels) {
 #ifndef __EMSCRIPTEN__
 	FILE *fp = NULL;
 	fopen_s(&fp, filename, "wb");
@@ -458,9 +531,10 @@ void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *d
 	fwrite(&header, 18, 1, fp);
 
 	for (uint32_t i = 0; i < width*height; i++) {
-		for (uint32_t b = 0; b < fileChannels; b++) {
-			fputc(dataBGRA[(i*dataChannels) + (b%dataChannels)], fp);
-		}
+		if (fileChannels > 0) fputc(dataRGBA[(i*dataChannels) + (2%dataChannels)], fp);
+		if (fileChannels > 1) fputc(dataRGBA[(i*dataChannels) + (1%dataChannels)], fp);
+		if (fileChannels > 2) fputc(dataRGBA[(i*dataChannels) + (0%dataChannels)], fp);
+		if (fileChannels > 3) fputc(dataRGBA[(i*dataChannels) + (3%dataChannels)], fp);
 	}
 	fclose(fp);
 #endif

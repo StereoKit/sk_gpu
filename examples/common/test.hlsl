@@ -28,11 +28,13 @@ Texture2D    tex         : register(t0);
 SamplerState tex_sampler : register(s0);
 
 psIn vs(vsIn input, uint id : SV_InstanceID) {
+	const float3 light_dir = normalize(float3(1, 4, 2));
+
 	psIn output;
 	output.pos = mul(float4(input.pos.xyz, 1), inst[id].world);
 	output.pos = mul(output.pos, viewproj);
 	float3 normal = normalize(mul(float4(input.norm, 0), inst[id].world).xyz);
-	output.color = saturate(dot(normal, float3(0,1,0))).xxx * input.color.rgb;
+	output.color = (float3(.05,.05,.1) + saturate(dot(normal, light_dir)*0.8).xxx) * input.color.rgb;
 	output.uv = input.uv;
 	return output;
 }

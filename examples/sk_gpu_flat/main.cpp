@@ -9,6 +9,7 @@
 #include <emscripten/html5.h>
 #define _countof(a) (sizeof(a)/sizeof(*(a)))
 #endif
+#include "../common/webxr.h"
 
 // When using single file header like normal, do this
 //#define SKG_OPENGL
@@ -37,6 +38,7 @@ bool            app_resize    = false;
 int             app_width     = 1280;
 int             app_height    = 720;
 bool            app_run       = true;
+bool            app_stereo    = false;
 const char     *app_name      = "sk_gpu.h";
 
 ///////////////////////////////////////////
@@ -44,6 +46,7 @@ const char     *app_name      = "sk_gpu.h";
 bool main_init    ();
 void main_shutdown();
 int  main_step    (double t, void *);
+void main_step_stereo(void *userData, int, float[16], WebXRView *views);
 
 ///////////////////////////////////////////
 
@@ -53,6 +56,12 @@ int main() {
 
 #if __EMSCRIPTEN__
 	emscripten_request_animation_frame_loop(&main_step, 0);
+	webxr_init(WEBXR_SESSION_MODE_IMMERSIVE_VR,
+		main_step_stereo,
+		[](void *user_data) { app_stereo = true; },
+		[](void *user_data) { app_stereo = false; emscripten_request_animation_frame_loop(&main_step, 0); },
+		[](void *user_data, int err) {printf("WebXR err: %d\n", err);},
+		nullptr);
 #else
 	double t = 0;
 	while (app_run) { main_step(t, nullptr); t += 16; }
@@ -126,6 +135,9 @@ void main_shutdown() {
 ///////////////////////////////////////////
 
 int main_step(double t, void *) {
+	if (app_stereo)
+		return 0; // Cancel the emscripten animation loop
+
 #ifndef __EMSCRIPTEN__
 	MSG msg = {};
 	if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
@@ -139,7 +151,7 @@ int main_step(double t, void *) {
 	skg_swapchain_bind(&app_swapchain, true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(
-		HMM_Vec3(sinf(t*0.001) * 5, 3, cosf(t*0.001) * 5),
+		HMM_Vec3(sinf(t*0.001) * 5, 2, cosf(t*0.001) * 5),
 		HMM_Vec3(0, 0, 0),
 		HMM_Vec3(0, 1, 0));
 	hmm_mat4 proj = HMM_Perspective(90, app_swapchain.width / (float)app_swapchain.height, 0.01f, 1000);
@@ -151,3 +163,30 @@ int main_step(double t, void *) {
 }
 
 ///////////////////////////////////////////
+
+void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
+	skg_draw_begin();
+	float clear_color[4] = { 0,0,0,1 };
+	skg_swapchain_bind(&app_swapchain, true, clear_color);
+
+	for (size_t i = 0; i < 2; i++) {
+		skg_viewport(views[i].viewport);
+		
+		hmm_mat4 view, proj;
+		memcpy(&view, views[i].viewMatrix,       sizeof(hmm_mat4));
+		memcpy(&proj, views[i].projectionMatrix, sizeof(hmm_mat4));
+		app_render(0, view, proj);
+	}
+
+	skg_swapchain_present(&app_swapchain);
+}
+
+///////////////////////////////////////////
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+extern "C" void start_xr() {
+	skg_log(skg_log_warning, "Starting XR??");
+	webxr_request_session();
+}
+#endif

@@ -159,11 +159,30 @@ typedef enum skg_cap_ {
 	skg_cap_wireframe,
 } skg_cap_;
 
+typedef struct {
+	union {
+		struct {
+			uint8_t r, g, b, a;
+		};
+		uint32_t hex;
+		uint8_t  arr[4];
+	};
+} skg_color32_t;
+
+typedef struct {
+	union {
+		struct {
+			float r, g, b, a;
+		};
+		float arr[4];
+	};
+} skg_color128_t;
+
 typedef struct skg_vert_t {
-	float   pos [3];
-	float   norm[3];
-	float   uv  [2];
-	uint8_t col [4];
+	float         pos [3];
+	float         norm[3];
+	float         uv  [2];
+	skg_color32_t col;
 } skg_vert_t;
 
 typedef struct skg_bind_t {
@@ -388,6 +407,8 @@ bool                skg_capability               (skg_cap_ capability);
 
 void                skg_draw_begin               ();
 void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
+void                skg_viewport                 (const int32_t *xywh);
+void                skg_viewport_get             (int32_t *out_xywh);
 
 skg_buffer_t        skg_buffer_create            (const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use);
 bool                skg_buffer_is_valid          (const skg_buffer_t *buffer);
@@ -443,7 +464,8 @@ skg_tex_t           skg_tex_create               (skg_tex_type_ type, skg_use_ u
 bool                skg_tex_is_valid             (const skg_tex_t *tex);
 void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
 void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
-void                skg_tex_set_contents         (      skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
+void                skg_tex_set_contents         (      skg_tex_t *tex, const void *data, int32_t width, int32_t height);
+void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
 bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 void                skg_tex_target_bind          (      skg_tex_t *render_target, bool clear, const float *clear_color_4);
@@ -458,21 +480,21 @@ uint32_t            skg_tex_fmt_size             (skg_tex_fmt_ format);
 // API independant functions             //
 ///////////////////////////////////////////
 
-typedef enum skg_shader_lang_ {
+typedef enum {
 	skg_shader_lang_hlsl,
 	skg_shader_lang_spirv,
 	skg_shader_lang_glsl,
 	skg_shader_lang_glsl_web,
 } skg_shader_lang_;
 
-typedef struct skg_shader_file_stage_t {
+typedef struct {
 	skg_shader_lang_ language;
 	skg_stage_       stage;
 	uint32_t         code_size;
 	void            *code;
 } skg_shader_file_stage_t;
 
-typedef struct skg_shader_file_t {
+typedef struct {
 	skg_shader_meta_t       *meta;
 	uint32_t                 stage_count;
 	skg_shader_file_stage_t *stages;
@@ -483,6 +505,24 @@ typedef struct skg_shader_file_t {
 void               skg_log                     (skg_log_ level, const char *text);
 bool               skg_read_file               (const char *filename, void **out_data, size_t *out_size);
 uint64_t           skg_hash                    (const char *string);
+
+skg_color32_t      skg_col_hsv32               (float hue, float saturation, float value, float alpha);
+skg_color128_t     skg_col_hsv128              (float hue, float saturation, float value, float alpha);
+skg_color32_t      skg_col_hsl32               (float hue, float saturation, float lightness, float alpha);
+skg_color128_t     skg_col_hsl128              (float hue, float saturation, float lightness, float alpha);
+skg_color32_t      skg_col_hcy32               (float hue, float chroma, float lightness, float alpha);
+skg_color128_t     skg_col_hcy128              (float hue, float chroma, float lightness, float alpha);
+skg_color32_t      skg_col_lch32               (float hue, float chroma, float lightness, float alpha);
+skg_color128_t     skg_col_lch128              (float hue, float chroma, float lightness, float alpha);
+skg_color32_t      skg_col_helix32             (float hue, float saturation, float lightness, float alpha);
+skg_color128_t     skg_col_helix128            (float hue, float saturation, float lightness, float alpha);
+skg_color32_t      skg_col_jab32               (float j, float a, float b, float alpha);
+skg_color128_t     skg_col_jab128              (float j, float a, float b, float alpha);
+skg_color32_t      skg_col_jsl32               (float hue, float saturation, float lightness, float alpha);
+skg_color128_t     skg_col_jsl128              (float hue, float saturation, float lightness, float alpha);
+skg_color32_t      skg_col_lab32               (float l, float a, float b, float alpha);
+skg_color128_t     skg_col_lab128              (float l, float a, float b, float alpha);
+skg_color128_t     skg_col_rgb_to_lab128       (skg_color128_t rgb);
 
 bool               skg_shader_file_verify      (const void *file_memory, size_t file_size, uint16_t *out_version, char *out_name, size_t out_name_size);
 bool               skg_shader_file_load_memory (const void *file_memory, size_t file_size, skg_shader_file_t *out_file);
@@ -699,6 +739,25 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_viewport(const int32_t *xywh) {
+	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT((float)xywh[0], (float)xywh[1], (float)xywh[2], (float)xywh[3]);
+	d3d_context->RSSetViewports(1, &viewport);
+}
+
+///////////////////////////////////////////
+
+void skg_viewport_get(int32_t *out_xywh) {
+	uint32_t       count = 1;
+	D3D11_VIEWPORT viewport;
+	d3d_context->RSGetViewports(&count, &viewport);
+	out_xywh[0] = viewport.TopLeftX;
+	out_xywh[1] = viewport.TopLeftY;
+	out_xywh[2] = viewport.Width;
+	out_xywh[3] = viewport.Height;
+}
+
+///////////////////////////////////////////
+
 skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use) {
 	skg_buffer_t result = {};
 	result.use    = use;
@@ -715,7 +774,6 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 		buffer_desc.Usage          = D3D11_USAGE_DYNAMIC;
 		buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	}break;
-	default: throw "Not implemented yet!";
 	}
 	switch (type) {
 	case skg_buffer_type_vertex:   buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;   break;
@@ -726,7 +784,6 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 		buffer_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED; 
 		buffer_desc.Usage     = D3D11_USAGE_DEFAULT;
 	} break;
-	default: throw "Not implemented yet!";
 	}
 	d3d_device->CreateBuffer(&buffer_desc, data==nullptr ? nullptr : &buffer_data, &result._buffer);
 	return result;
@@ -758,14 +815,29 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 /////////////////////////////////////////// 
 
 void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size) {
+	ID3D11Buffer* cpu_buff = nullptr;
+
+	D3D11_BUFFER_DESC desc = {};
+	buffer->_buffer->GetDesc( &desc );
+	desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	desc.Usage          = D3D11_USAGE_STAGING;
+	desc.BindFlags      = 0;
+	desc.MiscFlags      = 0;
+	if (FAILED(d3d_device->CreateBuffer(&desc, nullptr, &cpu_buff)) ) {
+		skg_log(skg_log_critical, "Couldn't create a tep buffer for copy!");
+		return;
+	}
+	d3d_context->CopyResource( cpu_buff, buffer->_buffer );
+
 	D3D11_MAPPED_SUBRESOURCE resource;
-	if (SUCCEEDED(d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_READ, 0, &resource))) {
+	if (SUCCEEDED(d3d_context->Map(cpu_buff, 0, D3D11_MAP_READ, 0, &resource))) {
 		memcpy(ref_buffer, resource.pData, min(resource.DepthPitch * resource.DepthPitch, buffer_size));
 		d3d_context->Unmap(buffer->_buffer, 0);
 	} else {
 		memset(ref_buffer, 0, buffer_size);
-		skg_log(skg_log_critical, "Failed to get contents of buffer, may not be using a readable buffer type?");
+		skg_log(skg_log_critical, "Failed to get contents of buffer!");
 	}
+	cpu_buff->Release();
 }
 
 /////////////////////////////////////////// 
@@ -1173,7 +1245,7 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	result._target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, result.width, result.height, 1);
 	result._depth  = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
-	skg_tex_set_contents(&result._depth, nullptr, 1, result.width, result.height);
+	skg_tex_set_contents(&result._depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._target, &result._depth);
 	back_buffer->Release();
 
@@ -1203,7 +1275,7 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	swapchain->_target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, width, height, 1);
 	swapchain->_depth  = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_fmt, skg_mip_none);
-	skg_tex_set_contents(&swapchain->_depth, nullptr, 1, width, height);
+	skg_tex_set_contents(&swapchain->_depth, nullptr, width, height);
 	skg_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
 	back_buffer->Release();
 }
@@ -1343,10 +1415,10 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 ///////////////////////////////////////////
 
-void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, void *curr_data, skg_tex_fmt_ format, int32_t width, int32_t height, uint32_t mip_levels) {
-	void    *mip_data = curr_data;
-	int32_t  mip_w    = width;
-	int32_t  mip_h    = height;
+void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_tex_fmt_ format, int32_t width, int32_t height, uint32_t mip_levels) {
+	const void *mip_data = curr_data;
+	int32_t     mip_w    = width;
+	int32_t     mip_h    = height;
 	for (uint32_t m = 1; m < mip_levels; m++) {
 		tex_mem[m] = {};
 		switch (format) {
@@ -1439,7 +1511,14 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
+	const void *data_arr[1] = { data };
+	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
+}
+
+///////////////////////////////////////////
+
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	// Some warning messages
 	if (tex->use != skg_use_dynamic && tex->_texture) {
 		skg_log(skg_log_warning, "Only dynamic textures can be updated!");
@@ -2418,6 +2497,18 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_viewport(const int32_t *xywh) {
+	glViewport(xywh[0], xywh[1], xywh[2], xywh[3]);
+}
+
+///////////////////////////////////////////
+
+void skg_viewport_get(int32_t *out_xywh) {
+	glGetIntegerv(GL_VIEWPORT, out_xywh);
+}
+
+///////////////////////////////////////////
+
 skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use) {
 	skg_buffer_t result = {};
 	result.use     = use;
@@ -2913,10 +3004,10 @@ void main() {
 	result._convert_pipe   = skg_pipeline_create(&result._convert_shader);
 
 	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_dynamic, skg_tex_fmt_rgba32, skg_mip_none);
-	skg_tex_set_contents(&result._surface, nullptr, 1, result.width, result.height);
+	skg_tex_set_contents(&result._surface, nullptr, result.width, result.height);
 
 	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_dynamic, depth_format, skg_mip_none);
-	skg_tex_set_contents(&result._surface_depth, nullptr, 1, result.width, result.height);
+	skg_tex_set_contents(&result._surface_depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._surface, &result._surface_depth);
 
 	skg_vert_t quad_verts[] = { 
@@ -3141,9 +3232,16 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 #endif
 }
 
+///////////////////////////////////////////
+
+void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
+	const void *data_arr[1] = { data };
+	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
+}
+
 /////////////////////////////////////////// 
 
-void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	tex->width       = width;
 	tex->height      = height;
 	tex->array_count = data_frame_count;
@@ -3186,6 +3284,9 @@ void skg_tex_set_contents(skg_tex_t *tex, void **data_frames, int32_t data_frame
 /////////////////////////////////////////// 
 
 bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
+#ifdef __EMSCRIPTEN__
+	return false;
+#else
 	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
 	glBindTexture (tex->_target, tex->_texture);
 	glGetnTexImage(tex->_target, 0, format, skg_tex_fmt_to_gl_type(tex->format), data_size, ref_data);
@@ -3206,6 +3307,7 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 	}
 
 	return result;
+#endif
 }
 
 /////////////////////////////////////////// 
@@ -3329,6 +3431,7 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 #include <malloc.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #if __ANDROID__
 #include <android/asset_manager.h>
@@ -3379,6 +3482,348 @@ uint64_t skg_hash(const char *string) {
 	while ((c = *string++))
 		hash = (hash ^ c) * 1099511628211;
 	return hash;
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_hsv32(float h, float s, float v, float a) {
+	skg_color128_t col = skg_col_hsv128(h,s,v,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+// Reference from here: http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
+skg_color128_t skg_col_hsv128(float h, float s, float v, float a) {
+	const float K[4] = { 1.0f, 2.0f/3.0f, 1.0f/3.0f, 3.0f };
+	float p[3] = {
+		fabsf(((h + K[0]) - floorf(h + K[0])) * 6.0f - K[3]),
+		fabsf(((h + K[1]) - floorf(h + K[1])) * 6.0f - K[3]),
+		fabsf(((h + K[2]) - floorf(h + K[2])) * 6.0f - K[3]) };
+
+	// lerp: a + (b - a) * t
+	return skg_color128_t {
+		(K[0] + (fmaxf(0,fminf(p[0] - K[0], 1.0f)) - K[0]) * s) * v,
+		(K[0] + (fmaxf(0,fminf(p[1] - K[0], 1.0f)) - K[0]) * s) * v,
+		(K[0] + (fmaxf(0,fminf(p[2] - K[0], 1.0f)) - K[0]) * s) * v,
+		a };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_hsl32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_hsl128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+skg_color128_t skg_col_hsl128(float h, float s, float l, float a) {
+	if (h < 0) h -= floorf(h);
+	float r = fabsf(h * 6 - 3) - 1;
+	float g = 2 - fabsf(h * 6 - 2);
+	float b = 2 - fabsf(h * 6 - 4);
+	r = fmaxf(0, fminf(1, r));
+	g = fmaxf(0, fminf(1, g));
+	b = fmaxf(0, fminf(1, b));
+
+	float C = (1 - fabsf(2 * l - 1)) * s;
+	return {
+		(r - 0.5f) * C + l,
+		(g - 0.5f) * C + l,
+		(b - 0.5f) * C + l, a };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_hcy32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_hcy128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+// Reference from here https://www.chilliant.com/rgb2hsv.html
+skg_color128_t skg_col_hcy128(float h, float c, float y, float a) {
+	if (h < 0) h -= floorf(h);
+	float r = fabsf(h * 6 - 3) - 1;
+	float g = 2 - fabsf(h * 6 - 2);
+	float b = 2 - fabsf(h * 6 - 4);
+	r = fmaxf(0, fminf(1, r));
+	g = fmaxf(0, fminf(1, g));
+	b = fmaxf(0, fminf(1, b));
+
+	float Z = r*0.299f + g*0.587f + b*0.114f;
+	if (y < Z) {
+		c *= y / Z;
+	} else if (Z < 1) {
+		c *= (1 - y) / (1 - Z);
+	}
+	return skg_color128_t { 
+		(r - Z) * c + y,
+		(g - Z) * c + y,
+		(b - Z) * c + y,
+		a };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_lch32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_lch128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+// Reference from here: https://www.easyrgb.com/en/math.php
+skg_color128_t skg_col_lch128(float h, float c, float l, float alpha) {
+	const float tau = 6.283185307179586476925286766559f;
+	c = c * 200;
+	l = l * 100;
+	float a = cosf( h*tau ) * c;
+	float b = sinf( h*tau ) * c;
+	
+	float
+		y = (l + 16.f) / 116.f,
+		x = (a / 500.f) + y,
+		z = y - (b / 200.f);
+
+	x = 0.95047f * ((x*x*x > 0.008856f) ? x*x*x : (x - 16/116.f) / 7.787f);
+	y = 1.00000f * ((y*y*y > 0.008856f) ? y*y*y : (y - 16/116.f) / 7.787f);
+	z = 1.08883f * ((z*z*z > 0.008856f) ? z*z*z : (z - 16/116.f) / 7.787f);
+
+	float r = x *  3.2406f + y * -1.5372f + z * -0.4986f;
+	float g = x * -0.9689f + y *  1.8758f + z *  0.0415f;
+	      b = x *  0.0557f + y * -0.2040f + z *  1.0570f;
+
+	r = (r > 0.0031308f) ? (1.055f * powf(r, 1/2.4f) - 0.055f) : 12.92f * r;
+	g = (g > 0.0031308f) ? (1.055f * powf(g, 1/2.4f) - 0.055f) : 12.92f * g;
+	b = (b > 0.0031308f) ? (1.055f * powf(b, 1/2.4f) - 0.055f) : 12.92f * b;
+
+	return skg_color128_t { 
+		fmaxf(0, fminf(1, r)),
+		fmaxf(0, fminf(1, g)),
+		fmaxf(0, fminf(1, b)), alpha };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_helix32(float h, float c, float l, float a) {
+	skg_color128_t col = skg_col_helix128(h,c,l,a);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+// Reference here: http://www.mrao.cam.ac.uk/~dag/CUBEHELIX/
+skg_color128_t skg_col_helix128(float h, float s, float l, float alpha) {
+	const float tau = 6.28318f;
+	l = fminf(1,l);
+	float angle = tau * (h+(1/3.f));
+	float amp   = s * l * (1.f - l); // Helix in some implementations will 
+	// divide this by 2.0f and go at half s, but if we clamp rgb at the end, 
+	// we can get full s at the cost of a bit of artifacting at high 
+	// s+lightness values.
+
+	float a_cos = cosf(angle);
+	float a_sin = sinf(angle);
+	float r = l + amp * (-0.14861f * a_cos + 1.78277f * a_sin);
+	float g = l + amp * (-0.29227f * a_cos - 0.90649f * a_sin);
+	float b = l + amp * ( 1.97294f * a_cos);
+	r = fmax(0,fminf(1, r));
+	g = fmax(0,fminf(1, g));
+	b = fmax(0,fminf(1, b));
+	return { r, g, b, alpha };
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_jab32(float j, float a, float b, float alpha) {
+	skg_color128_t col = skg_col_jab128(j, a, b, alpha);
+	return skg_color32_t{ (uint8_t)(col.r*255), (uint8_t)(col.g*255), (uint8_t)(col.b*255), (uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+float lms(float t) {
+	if (t > 0.) {
+		float r = powf(t, 0.007460772656268214f);
+		float s = (0.8359375f - r) / (18.6875*r + -18.8515625f);
+		return powf(s, 6.277394636015326f);
+	} else {
+		return 0.f;
+	}
+}
+
+float srgb(float c) {
+	if (c <= 0.0031308049535603713f) {
+		return c * 12.92;
+	} else {
+		float c_ = powf(c, 0.41666666666666666f);
+		return c_ * 1.055f + -0.055f;
+	}
+}
+
+// ref : https://thebookofshaders.com/edit.php?log=180722032925
+skg_color128_t jchz2srgb(float h, float s, float l, float alpha) {
+	float jz = l*0.16717463120366200f + 1.6295499532821566e-11f;
+	float cz = s*0.16717463120366200f;
+	float hz = h*6.28318530717958647f;
+
+	float iz = jz / (0.56f*jz + 0.44f);
+	float az = cz * cosf(hz);
+	float bz = cz * sinf(hz);
+
+	float l_ = iz + az* +0.13860504327153930f + bz* +0.058047316156118830f;
+	float m_ = iz + az* -0.13860504327153927f + bz* -0.058047316156118904f;
+	float s_ = iz + az* -0.09601924202631895f + bz* -0.811891896056039000f;
+
+	      l = lms(l_);
+	float m = lms(m_);
+	      s = lms(s_);
+
+	float lr = l* +0.0592896375540425100e4f + m* -0.052239474257975140e4f + s* +0.003259644233339027e4f;
+	float lg = l* -0.0222329579044572220e4f + m* +0.038215274736946150e4f + s* -0.005703433147128812e4f;
+	float lb = l* +0.0006270913830078808e4f + m* -0.007021906556220012e4f + s* +0.016669756032437408e4f;
+
+	lr = fmax(0,fminf(1, srgb(lr)));
+	lg = fmax(0,fminf(1, srgb(lg)));
+	lb = fmax(0,fminf(1, srgb(lb)));
+	return skg_color128_t{lr, lg, lb, alpha };
+}
+
+// Reference here: https://observablehq.com/@jrus/jzazbz
+float pqi(float x) {
+	x = powf(x, .007460772656268214f);
+	return x <= 0 ? 0 : powf(
+		(0.8359375f - x) / (18.6875f*x - 18.8515625f),
+		6.277394636015326f); 
+};
+skg_color128_t skg_col_jab128(float j, float a, float b, float alpha) {
+	// JAB to XYZ
+	j = j + 1.6295499532821566e-11f;
+	float iz = j / (0.44f + 0.56f * j);
+	float l  = pqi(iz + .1386050432715393f*a + .0580473161561187f*b);
+	float m  = pqi(iz - .1386050432715393f*a - .0580473161561189f*b);
+	float s  = pqi(iz - .0960192420263189f*a - .8118918960560390f*b);
+
+	float r = l* +0.0592896375540425100e4 + m* -0.052239474257975140e4 + s* +0.003259644233339027e4;
+	float g = l* -0.0222329579044572220e4 + m* +0.038215274736946150e4 + s* -0.005703433147128812e4;
+	      b = l* +0.0006270913830078808e4 + m* -0.007021906556220012e4 + s* +0.016669756032437408e4;
+
+	/*float x = +1.661373055774069e+00f * L - 9.145230923250668e-01f * M + 2.313620767186147e-01f * S;
+	float y = -3.250758740427037e-01f * L + 1.571847038366936e+00f * M - 2.182538318672940e-01f * S;
+	float z = -9.098281098284756e-02f * L - 3.127282905230740e-01f * M + 1.522766561305260e+00f * S;
+
+	// XYZ to sRGB
+	float r = x *  3.2406f + y * -1.5372f + z * -0.4986f;
+	float g = x * -0.9689f + y *  1.8758f + z *  0.0415f;
+	      b = x *  0.0557f + y * -0.2040f + z *  1.0570f;*/
+
+	// to sRGB
+	r = (r > 0.0031308f) ? (1.055f * powf(r, 1/2.4f) - 0.055f) : 12.92f * r;
+	g = (g > 0.0031308f) ? (1.055f * powf(g, 1/2.4f) - 0.055f) : 12.92f * g;
+	b = (b > 0.0031308f) ? (1.055f * powf(b, 1/2.4f) - 0.055f) : 12.92f * b;
+
+	return skg_color128_t { 
+		fmaxf(0, fminf(1, r)),
+		fmaxf(0, fminf(1, g)),
+		fmaxf(0, fminf(1, b)), alpha };
+}
+
+skg_color32_t skg_col_jsl32(float h, float s, float l, float alpha) {
+	skg_color128_t col = skg_col_jsl128(h, s, l, alpha);
+	return skg_color32_t{ (uint8_t)(col.r*255), (uint8_t)(col.g*255), (uint8_t)(col.b*255), (uint8_t)(col.a*255)};
+}
+skg_color128_t skg_col_jsl128(float h, float s, float l, float alpha) {
+	return jchz2srgb(h, s, l, alpha);/*
+	const float tau = 6.28318f;
+	h = h * tau - tau/2;
+	s = s * 0.16717463120366200f;
+	l = l * 0.16717463120366200f;
+	return skg_col_jab128(fmaxf(0,l), s * cosf(h), s * sinf(h), alpha);*/
+}
+
+///////////////////////////////////////////
+
+skg_color32_t skg_col_lab32(float l, float a, float b, float alpha) {
+	skg_color128_t col = skg_col_lab128(l,a,b,alpha);
+	return skg_color32_t{
+		(uint8_t)(col.r*255),
+		(uint8_t)(col.g*255),
+		(uint8_t)(col.b*255),
+		(uint8_t)(col.a*255)};
+}
+
+///////////////////////////////////////////
+
+skg_color128_t skg_col_lab128(float l, float a, float b, float alpha) {
+	l = l * 100;
+	a = a * 400 - 200;
+	b = b * 400 - 200;
+	float
+		y = (l + 16.f) / 116.f,
+		x = (a / 500.f) + y,
+		z = y - (b / 200.f);
+
+	x = 0.95047f * ((x * x * x > 0.008856f) ? x * x * x : (x - 16/116.f) / 7.787f);
+	y = 1.00000f * ((y * y * y > 0.008856f) ? y * y * y : (y - 16/116.f) / 7.787f);
+	z = 1.08883f * ((z * z * z > 0.008856f) ? z * z * z : (z - 16/116.f) / 7.787f);
+
+	float r = x *  3.2406f + y * -1.5372f + z * -0.4986f;
+	float g = x * -0.9689f + y *  1.8758f + z *  0.0415f;
+	      b = x *  0.0557f + y * -0.2040f + z *  1.0570f;
+
+	r = (r > 0.0031308f) ? (1.055f * powf(r, 1/2.4f) - 0.055f) : 12.92f * r;
+	g = (g > 0.0031308f) ? (1.055f * powf(g, 1/2.4f) - 0.055f) : 12.92f * g;
+	b = (b > 0.0031308f) ? (1.055f * powf(b, 1/2.4f) - 0.055f) : 12.92f * b;
+
+	return skg_color128_t { 
+		fmaxf(0, fminf(1, r)),
+		fmaxf(0, fminf(1, g)),
+		fmaxf(0, fminf(1, b)), alpha };
+}
+
+///////////////////////////////////////////
+
+skg_color128_t skg_col_rgb_to_lab128(skg_color128_t rgb) {
+	rgb.r = (rgb.r > 0.04045f) ? powf((rgb.r + 0.055f) / 1.055f, 2.4f) : rgb.r / 12.92f;
+	rgb.g = (rgb.g > 0.04045f) ? powf((rgb.g + 0.055f) / 1.055f, 2.4f) : rgb.g / 12.92f;
+	rgb.b = (rgb.b > 0.04045f) ? powf((rgb.b + 0.055f) / 1.055f, 2.4f) : rgb.b / 12.92f;
+
+	// D65, Daylight, sRGB, aRGB
+	float x = (rgb.r * 0.4124f + rgb.g * 0.3576f + rgb.b * 0.1805f) / 0.95047f;
+	float y = (rgb.r * 0.2126f + rgb.g * 0.7152f + rgb.b * 0.0722f) / 1.00000f;
+	float z = (rgb.r * 0.0193f + rgb.g * 0.1192f + rgb.b * 0.9505f) / 1.08883f;
+
+	x = (x > 0.008856f) ? powf(x, 1/3.f) : (7.787f * x) + 16/116.f;
+	y = (y > 0.008856f) ? powf(y, 1/3.f) : (7.787f * y) + 16/116.f;
+	z = (z > 0.008856f) ? powf(z, 1/3.f) : (7.787f * z) + 16/116.f;
+
+	return {
+		(1.16f * y) - .16f,
+		1.25f * (x - y) + 0.5f,
+		0.5f * (y - z) + 0.5f, rgb.a };
 }
 
 ///////////////////////////////////////////

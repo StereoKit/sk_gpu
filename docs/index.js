@@ -1079,9 +1079,9 @@ function updateGlobalBufferAndViews(buf) {
   Module['HEAPF64'] = HEAPF64 = new Float64Array(buf);
 }
 
-var STACK_BASE = 5319776,
+var STACK_BASE = 5319792,
     STACKTOP = STACK_BASE,
-    STACK_MAX = 76896;
+    STACK_MAX = 76912;
 
 var TOTAL_STACK = 5242880;
 
@@ -2040,6 +2040,17 @@ var ASM_CONSTS = {
 
   function _glCullFace(x0) { GLctx['cullFace'](x0) }
 
+  function _glDeleteFramebuffers(n, framebuffers) {
+      for (var i = 0; i < n; ++i) {
+        var id = HEAP32[(((framebuffers)+(i*4))>>2)];
+        var framebuffer = GL.framebuffers[id];
+        if (!framebuffer) continue; // GL spec: "glDeleteFramebuffers silently ignores 0s and names that do not correspond to existing framebuffer objects".
+        GLctx.deleteFramebuffer(framebuffer);
+        framebuffer.name = 0;
+        GL.framebuffers[id] = null;
+      }
+    }
+
   function _glDeleteProgram(id) {
       if (!id) return;
       var program = GL.programs[id];
@@ -2051,6 +2062,17 @@ var ASM_CONSTS = {
       program.name = 0;
       GL.programs[id] = null;
       GL.programInfos[id] = null;
+    }
+
+  function _glDeleteTextures(n, textures) {
+      for (var i = 0; i < n; i++) {
+        var id = HEAP32[(((textures)+(i*4))>>2)];
+        var texture = GL.textures[id];
+        if (!texture) continue; // GL spec: "glDeleteTextures silently ignores 0s and names that do not correspond to existing textures".
+        GLctx.deleteTexture(texture);
+        texture.name = 0;
+        GL.textures[id] = null;
+      }
     }
 
   function _glDeleteVertexArrays(n, vaos) {
@@ -2571,12 +2593,12 @@ var ASM_CONSTS = {
           return offset + 16*4;
       },_nativize_input_source:function(offset, inputSource, id) {
           var handedness = -1;
-          if(inputSource.handedness == "left") handedness = 0;
+          if     (inputSource.handedness == "left" ) handedness = 0;
           else if(inputSource.handedness == "right") handedness = 1;
   
           var targetRayMode = 0;
-          if(inputSource.targetRayMode == "tracked-pointer") targetRayMode = 1;
-          else if(inputSource.targetRayMode == "screen") targetRayMode = 2;
+          if     (inputSource.targetRayMode == "tracked-pointer") targetRayMode = 1;
+          else if(inputSource.targetRayMode == "screen"         ) targetRayMode = 2;
   
           setValue(offset, id, 'i32');
           offset +=4;
@@ -2641,16 +2663,16 @@ var ASM_CONSTS = {
   
           const glLayer = session.renderState.baseLayer;
           pose.views.forEach(function(view) {
-              const viewport = glLayer.getViewport(view);
+              const viewport   = glLayer.getViewport(view);
               const viewMatrix = view.transform.inverse.matrix;
               let offset = views + SIZE_OF_WEBXR_VIEW*(view.eye == 'left' ? 0 : 1);
   
               offset = WebXR._nativize_matrix(offset, viewMatrix);
               offset = WebXR._nativize_matrix(offset, view.projectionMatrix);
   
-              setValue(offset + 0, viewport.x, 'i32');
-              setValue(offset + 4, viewport.y, 'i32');
-              setValue(offset + 8, viewport.width, 'i32');
+              setValue(offset + 0,  viewport.x,      'i32');
+              setValue(offset + 4,  viewport.y,      'i32');
+              setValue(offset + 8,  viewport.width,  'i32');
               setValue(offset + 12, viewport.height, 'i32');
           });
   
@@ -2658,8 +2680,9 @@ var ASM_CONSTS = {
           const modelMatrix = views + SIZE_OF_WEBXR_VIEW*2;
           WebXR._nativize_matrix(modelMatrix, pose.transform.matrix);
   
-          Module.ctx.bindFramebuffer(Module.ctx.FRAMEBUFFER,
-              glLayer.framebuffer);
+          Module.ctx.bindFramebuffer(Module.ctx.FRAMEBUFFER, glLayer.framebuffer);
+          Module.ctx.viewport(0, 0, glLayer.framebufferWidth, glLayer.framebufferHeight);
+  
           /* HACK: This is not generally necessary, but chrome seems to detect whether the
            * page is sending frames by waiting for depth buffer clear or something */
           // TODO still necessary?
@@ -2780,7 +2803,9 @@ var asmLibraryArg = {
   "glCreateProgram": _glCreateProgram,
   "glCreateShader": _glCreateShader,
   "glCullFace": _glCullFace,
+  "glDeleteFramebuffers": _glDeleteFramebuffers,
   "glDeleteProgram": _glDeleteProgram,
+  "glDeleteTextures": _glDeleteTextures,
   "glDeleteVertexArrays": _glDeleteVertexArrays,
   "glDepthFunc": _glDepthFunc,
   "glDepthMask": _glDepthMask,
@@ -2826,6 +2851,11 @@ var ___wasm_call_ctors = Module["___wasm_call_ctors"] = function() {
 /** @type {function(...*):?} */
 var _start_xr = Module["_start_xr"] = function() {
   return (_start_xr = Module["_start_xr"] = Module["asm"]["start_xr"]).apply(null, arguments);
+};
+
+/** @type {function(...*):?} */
+var _web_canvas_resize = Module["_web_canvas_resize"] = function() {
+  return (_web_canvas_resize = Module["_web_canvas_resize"] = Module["asm"]["web_canvas_resize"]).apply(null, arguments);
 };
 
 /** @type {function(...*):?} */

@@ -22,12 +22,12 @@ $WebXR: {
     /* Sets input source values to offset and returns pointer after struct */
     _nativize_input_source: function(offset, inputSource, id) {
         var handedness = -1;
-        if(inputSource.handedness == "left") handedness = 0;
+        if     (inputSource.handedness == "left" ) handedness = 0;
         else if(inputSource.handedness == "right") handedness = 1;
 
         var targetRayMode = 0;
-        if(inputSource.targetRayMode == "tracked-pointer") targetRayMode = 1;
-        else if(inputSource.targetRayMode == "screen") targetRayMode = 2;
+        if     (inputSource.targetRayMode == "tracked-pointer") targetRayMode = 1;
+        else if(inputSource.targetRayMode == "screen"         ) targetRayMode = 2;
 
         setValue(offset, id, 'i32');
         offset +=4;
@@ -98,16 +98,16 @@ webxr_init: function(mode, frameCallback, startSessionCallback, endSessionCallba
 
         const glLayer = session.renderState.baseLayer;
         pose.views.forEach(function(view) {
-            const viewport = glLayer.getViewport(view);
+            const viewport   = glLayer.getViewport(view);
             const viewMatrix = view.transform.inverse.matrix;
             let offset = views + SIZE_OF_WEBXR_VIEW*(view.eye == 'left' ? 0 : 1);
 
             offset = WebXR._nativize_matrix(offset, viewMatrix);
             offset = WebXR._nativize_matrix(offset, view.projectionMatrix);
 
-            setValue(offset + 0, viewport.x, 'i32');
-            setValue(offset + 4, viewport.y, 'i32');
-            setValue(offset + 8, viewport.width, 'i32');
+            setValue(offset + 0,  viewport.x,      'i32');
+            setValue(offset + 4,  viewport.y,      'i32');
+            setValue(offset + 8,  viewport.width,  'i32');
             setValue(offset + 12, viewport.height, 'i32');
         });
 
@@ -115,8 +115,9 @@ webxr_init: function(mode, frameCallback, startSessionCallback, endSessionCallba
         const modelMatrix = views + SIZE_OF_WEBXR_VIEW*2;
         WebXR._nativize_matrix(modelMatrix, pose.transform.matrix);
 
-        Module.ctx.bindFramebuffer(Module.ctx.FRAMEBUFFER,
-            glLayer.framebuffer);
+        Module.ctx.bindFramebuffer(Module.ctx.FRAMEBUFFER, glLayer.framebuffer);
+        Module.ctx.viewport(0, 0, glLayer.framebufferWidth, glLayer.framebufferHeight);
+
         /* HACK: This is not generally necessary, but chrome seems to detect whether the
          * page is sending frames by waiting for depth buffer clear or something */
         // TODO still necessary?

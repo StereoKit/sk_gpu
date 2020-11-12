@@ -166,8 +166,6 @@ int main_step(double t, void *) {
 
 void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 	skg_draw_begin();
-	float clear_color[4] = { 0,0,0,1 };
-	skg_swapchain_bind(&app_swapchain, true, clear_color);
 
 	static uint64_t frame = 0;
 	frame++;
@@ -179,8 +177,6 @@ void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 		memcpy(&proj, views[i].projectionMatrix, sizeof(hmm_mat4));
 		app_render(frame, view, proj);
 	}
-
-	skg_swapchain_present(&app_swapchain);
 }
 
 ///////////////////////////////////////////
@@ -188,7 +184,10 @@ void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 extern "C" void start_xr() {
-	skg_log(skg_log_warning, "Starting XR??");
 	webxr_request_session();
+}
+EMSCRIPTEN_KEEPALIVE
+extern "C" void web_canvas_resize(int32_t width, int32_t height) {
+	skg_swapchain_resize(&app_swapchain, width, height);
 }
 #endif

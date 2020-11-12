@@ -136,6 +136,7 @@ HGLRC gl_hrc;
 #define GL_TEXTURE_MAX_ANISOTROPY 0x84FE
 #define GL_TEXTURE0 0x84C0
 #define GL_FRAMEBUFFER 0x8D40
+#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
@@ -1214,8 +1215,26 @@ void main() {
 /////////////////////////////////////////// 
 
 void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t height) {
+	if (width == swapchain->width && height == swapchain->height)
+		return;
+
 	swapchain->width  = width;
 	swapchain->height = height;
+
+#ifdef __EMSCRIPTEN__
+	skg_tex_fmt_ color_fmt = swapchain->_surface.format;
+	skg_tex_fmt_ depth_fmt = swapchain->_surface_depth.format;
+
+	skg_tex_destroy(&swapchain->_surface);
+	skg_tex_destroy(&swapchain->_surface_depth);
+
+	swapchain->_surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_dynamic, color_fmt, skg_mip_none);
+	skg_tex_set_contents(&swapchain->_surface, nullptr, swapchain->width, swapchain->height);
+
+	swapchain->_surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_dynamic, depth_fmt, skg_mip_none);
+	skg_tex_set_contents(&swapchain->_surface_depth, nullptr, swapchain->width, swapchain->height);
+	skg_tex_attach_depth(&swapchain->_surface, &swapchain->_surface_depth);
+#endif
 }
 
 /////////////////////////////////////////// 

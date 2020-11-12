@@ -181,18 +181,19 @@ bool app_init() {
 	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skg_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t));
 
 	// Make a checkered texture
-	const int w = 64, h = 64;
-	skg_color32_t colors[w * h];
+	const int w = 512, h = 512;
+	skg_color32_t *colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* w * h);
 	for (int32_t y = 0; y < h; y++) {
 		for (int32_t x = 0; x < w; x++) {
 			int32_t i = x + y*w;
-			float   c = (x/4 + y/4) % 2 == 0 ? 1 : y/(float)h;
+			float   c = (x/32 + y/32) % 2 == 0 ? 1 : y/(float)h;
 			colors[i] = skg_col_hsv32(0, 0, c, 1);
 		}
 	}
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
-	skg_tex_settings    (&app_tex, skg_tex_address_repeat, skg_tex_sample_point, 0);
+	skg_tex_settings    (&app_tex, skg_tex_address_repeat, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_tex, colors, w, h);
+	free(colors);
 
 	// Make a plain white texture
 	skg_color32_t colors_wht[2*2];
@@ -248,9 +249,9 @@ bool app_init() {
 		for (size_t p = 0; p < cube_face_size*cube_face_size; p++) {
 			skg_color32_t col;
 			switch ((f/2) % 3) {
-			case 0: col = skg_col_hsv32(.09f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
-			case 1: col = skg_col_hsv32(.45f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
-			case 2: col = skg_col_hsv32(.78f, f%2==0?0.6f:.6f, f%2==0?0.5f:1, 1); break;
+			case 0: col = skg_col_helix32(.09f, f%2==0?0.6f:.6f, f%2==0?0.7f:.4f, 1); break;
+			case 1: col = skg_col_helix32(.45f, f%2==0?0.6f:.6f, f%2==0?0.7f:.4f, 1); break;
+			case 2: col = skg_col_helix32(.78f, f%2==0?0.6f:.6f, f%2==0?0.7f:.4f, 1); break;
 			}
 			cube_cols[f][p] = col;
 		}
@@ -439,7 +440,6 @@ void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
 	app_test_instancing();
 	app_test_cubemap();
 	app_test_dyn_update(t);
-	
 }
 
 ///////////////////////////////////////////

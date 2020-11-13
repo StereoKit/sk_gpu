@@ -51,7 +51,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	sksc_settings_t result = {};
 	result.debug         = false;
 	result.optimize      = 3;
-	result.replace_ext   = true;
+	result.replace_ext   = false;
 	result.output_header = false;
 	result.row_major     = false;
 	result.silent_err    = false;

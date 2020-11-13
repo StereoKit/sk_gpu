@@ -246,7 +246,7 @@ HGLRC gl_hrc;
 	#define gl_get_function(x) eglGetProcAddress(x)
 #endif // _WIN32
 
-typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char* message, const void* userParam);
+typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int32_t length, const char* message, const void* userParam);
 
 #define GL_API \
 GLE(void,     glLinkProgram,             uint32_t program) \
@@ -558,7 +558,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
+	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int32_t length, const char *message, const void *userParam) {
 		switch (severity) {
 		case GL_DEBUG_SEVERITY_NOTIFICATION: break;
 		case GL_DEBUG_SEVERITY_LOW:    skg_log(skg_log_info,     message); break;

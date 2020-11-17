@@ -94,8 +94,16 @@ static int engine_init_display(struct engine* engine) {
 	if (engine->swapchain_created)
 		skg_swapchain_destroy(&engine->swapchain);
 
+	int32_t width  = ANativeWindow_getWidth (engine->app->window);
+	int32_t height = ANativeWindow_getHeight(engine->app->window);
+	if (AConfiguration_getOrientation(engine->app->config) == ACONFIGURATION_ORIENTATION_PORT) {
+		int32_t tmp = width;
+		width  = height;
+		height = tmp;
+	}
+
 	engine->swapchain_created = true;
-	engine->swapchain         = skg_swapchain_create(engine->app->window, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32);
+	engine->swapchain         = skg_swapchain_create(engine->app->window, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, width, height);
 	LOGI("Created swapchain");
 
 	return 1;
@@ -121,7 +129,7 @@ static void engine_draw_frame(struct engine* engine) {
 		return;
 
 	skg_draw_begin();
-	float clear_color[4] = { 0,1,0,1 };
+	float clear_color[4] = { 0,0,0,1 };
 	skg_swapchain_bind(&engine->swapchain, true, clear_color);
 
 	static int32_t frame = 0;

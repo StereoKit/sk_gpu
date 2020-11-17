@@ -187,11 +187,12 @@ bool app_init() {
 		for (int32_t x = 0; x < w; x++) {
 			int32_t i = x + y*w;
 			float   c = (x/32 + y/32) % 2 == 0 ? 1 : y/(float)h;
-			colors[i] = skg_col_hsv32(0, 0, c, 1);
+			uint8_t c8 = c * 255;
+			colors[i] = { c8,c8,c8,255 };
 		}
 	}
-	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
-	skg_tex_settings    (&app_tex, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
+	skg_tex_settings    (&app_tex, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_tex, colors, w, h);
 	free(colors);
 
@@ -315,6 +316,7 @@ void app_test_dyn_update(double time) {
 	skg_pipeline_bind(&app_mat_default);
 	skg_tex_bind     (&app_target, app_sh_default_tex_bind);
 	skg_draw(0, 0, app_mesh_wave.ind_count, 1);
+	skg_tex_bind     (nullptr, app_sh_default_tex_bind);
 }
 
 ///////////////////////////////////////////
@@ -523,7 +525,11 @@ bool ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_ver
 void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA, uint8_t dataChannels, uint8_t fileChannels) {
 #ifndef __EMSCRIPTEN__
 	FILE *fp = NULL;
+#ifdef __ANDROID__
+	fp = fopen(filename, "wb");
+#else
 	fopen_s(&fp, filename, "wb");
+#endif
 	if (fp == NULL) return;
 
 	// You can find details about TGA headers here: http://www.paulbourke.net/dataformats/tga/

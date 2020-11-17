@@ -535,6 +535,8 @@ skg_shader_stage_t skg_shader_file_create_stage(const skg_shader_file_t *file, s
 #elif defined(SKG_OPENGL)
 	#ifdef __EMSCRIPTEN__
 		language = skg_shader_lang_glsl_web;
+	#elif defined(__ANDROID__)
+		language = skg_shader_lang_glsl_es;
 	#else
 		language = skg_shader_lang_glsl;
 	#endif

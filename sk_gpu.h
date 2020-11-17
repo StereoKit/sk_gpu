@@ -484,6 +484,7 @@ typedef enum {
 	skg_shader_lang_hlsl,
 	skg_shader_lang_spirv,
 	skg_shader_lang_glsl,
+	skg_shader_lang_glsl_es,
 	skg_shader_lang_glsl_web,
 } skg_shader_lang_;
 
@@ -1948,12 +1949,14 @@ HGLRC gl_hrc;
 #define GL_TEXTURE_MAX_ANISOTROPY 0x84FE
 #define GL_TEXTURE0 0x84C0
 #define GL_FRAMEBUFFER 0x8D40
+#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
 
 #define GL_RED 0x1903
 #define GL_RGBA 0x1908
+#define GL_SRGB_ALPHA 0x8C42
 #define GL_DEPTH_COMPONENT 0x1902
 #define GL_DEPTH_STENCIL 0x84F9
 #define GL_R8_SNORM 0x8F94
@@ -2057,7 +2060,7 @@ HGLRC gl_hrc;
 	#define gl_get_function(x) eglGetProcAddress(x)
 #endif // _WIN32
 
-typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char* message, const void* userParam);
+typedef void (GLDECL *GLDEBUGPROC)(uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int32_t length, const char* message, const void* userParam);
 
 #define GL_API \
 GLE(void,     glLinkProgram,             uint32_t program) \
@@ -2153,6 +2156,7 @@ uint32_t   gl_current_framebuffer = 0;
 uint32_t skg_buffer_type_to_gl   (skg_buffer_type_ type);
 uint32_t skg_tex_fmt_to_gl_type  (skg_tex_fmt_ format);
 uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format);
+uint32_t skg_tex_fmt_to_gl_format(skg_tex_fmt_ format);
 
 ///////////////////////////////////////////
 
@@ -2315,24 +2319,28 @@ int32_t gl_init_egl() {
 		EGL_NONE
 	};
 	EGLint context_attribs[] = { 
-		EGL_CONTEXT_CLIENT_VERSION, 3, 
-		EGL_NONE, EGL_NONE };
+		EGL_CONTEXT_CLIENT_VERSION, 3,
+		EGL_NONE };
 	EGLint format;
 	EGLint numConfigs;
 
 	egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-	if (eglGetError() != EGL_SUCCESS) skg_log(skg_log_critical, "Err eglGetDisplay");
+	if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglGetDisplay"); return 0; }
 
-	int32_t major, minor;
-	eglInitialize     (egl_display, &major, &minor);
-	if (eglGetError() != EGL_SUCCESS) skg_log(skg_log_critical, "Err eglInitialize");
+	int32_t major=0, minor=0;
+	eglInitialize(egl_display, &major, &minor);
+	if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglInitialize"); return 0; }
+	char version[128];
+	snprintf(version, sizeof(version), "EGL version %d.%d", major, minor);
+	skg_log(skg_log_info, version);
+
 	eglChooseConfig   (egl_display, attribs, &egl_config, 1, &numConfigs);
-	if (eglGetError() != EGL_SUCCESS) skg_log(skg_log_critical, "Err eglChooseConfig");
+	if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglChooseConfig"   ); return 0; }
 	eglGetConfigAttrib(egl_display, egl_config, EGL_NATIVE_VISUAL_ID, &format);
-	if (eglGetError() != EGL_SUCCESS) skg_log(skg_log_critical, "Err eglGetConfigAttrib");
-	
+	if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglGetConfigAttrib"); return 0; }
+
 	egl_context = eglCreateContext      (egl_display, egl_config, nullptr, context_attribs);
-	if (eglGetError() != EGL_SUCCESS) skg_log(skg_log_critical, "Err eglCreateContext");
+	if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglCreateContext"  ); return 0; }
 
 	if (eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, egl_context) == EGL_FALSE) {
 		skg_log(skg_log_critical, "Unable to eglMakeCurrent");
@@ -2369,7 +2377,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, int32_t severity, int32_t length, const char *message, const void *userParam) {
+	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int32_t length, const char *message, const void *userParam) {
 		switch (severity) {
 		case GL_DEBUG_SEVERITY_NOTIFICATION: break;
 		case GL_DEBUG_SEVERITY_LOW:    skg_log(skg_log_info,     message); break;
@@ -2644,10 +2652,10 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	}
 
 	// Convert the prefix if it doesn't match the GL version we're using
-#if _WIN32
-	const char   *prefix_gl      = "#version 450";
-#elif defined(__ANDROID__) || defined(__linux__)
+#if defined(__ANDROID__) 
 	const char   *prefix_gl      = "#version 320 es";
+#elif defined(_WIN32) || defined(__linux__)
+	const char   *prefix_gl      = "#version 450";
 #elif __EMSCRIPTEN__
 	const char   *prefix_gl      = "#version 300 es";
 #endif
@@ -2951,7 +2959,10 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 		return {};
 	}
 #elif defined(__ANDROID__) || defined(__linux__)
-	result._egl_surface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)hwnd, nullptr);
+	EGLint attribs[] = { 
+		EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_SRGB_KHR,
+		EGL_NONE };
+	result._egl_surface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)hwnd, attribs);
 	if (eglGetError() != EGL_SUCCESS) skg_log(skg_log_critical, "Err eglCreateWindowSurface");
 
 	eglQuerySurface(egl_display, result._egl_surface, EGL_WIDTH,  &result.width );
@@ -3026,8 +3037,26 @@ void main() {
 /////////////////////////////////////////// 
 
 void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t height) {
+	if (width == swapchain->width && height == swapchain->height)
+		return;
+
 	swapchain->width  = width;
 	swapchain->height = height;
+
+#ifdef __EMSCRIPTEN__
+	skg_tex_fmt_ color_fmt = swapchain->_surface.format;
+	skg_tex_fmt_ depth_fmt = swapchain->_surface_depth.format;
+
+	skg_tex_destroy(&swapchain->_surface);
+	skg_tex_destroy(&swapchain->_surface_depth);
+
+	swapchain->_surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_dynamic, color_fmt, skg_mip_none);
+	skg_tex_set_contents(&swapchain->_surface, nullptr, swapchain->width, swapchain->height);
+
+	swapchain->_surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_dynamic, depth_fmt, skg_mip_none);
+	skg_tex_set_contents(&swapchain->_surface_depth, nullptr, swapchain->width, swapchain->height);
+	skg_tex_attach_depth(&swapchain->_surface, &swapchain->_surface_depth);
+#endif
 }
 
 /////////////////////////////////////////// 
@@ -3250,9 +3279,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 
 	glBindTexture(tex->_target, tex->_texture);
 
-	uint32_t format = (uint32_t)skg_tex_fmt_to_native(tex->format);
-	uint32_t type   = skg_tex_fmt_to_gl_type         (tex->format);
-	uint32_t layout = skg_tex_fmt_to_gl_layout       (tex->format);
+	uint32_t format = skg_tex_fmt_to_native(tex->format);//skg_tex_fmt_to_gl_format(tex->format);
+	uint32_t layout = skg_tex_fmt_to_gl_layout(tex->format);
+	uint32_t type   = skg_tex_fmt_to_gl_type  (tex->format);
 	if (tex->type == skg_tex_type_cubemap) {
 		if (data_frame_count != 6) {
 			skg_log(skg_log_warning, "Cubemaps need 6 data frames");
@@ -3379,6 +3408,26 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case GL_R16UI:              return skg_tex_fmt_r16;
 	case GL_R32F:               return skg_tex_fmt_r32;
 	default: return skg_tex_fmt_none;
+	}
+}
+
+/////////////////////////////////////////// 
+
+uint32_t skg_tex_fmt_to_gl_format(skg_tex_fmt_ format) {
+	switch (format) {
+	case skg_tex_fmt_rgba32:        return GL_SRGB8_ALPHA8;
+	case skg_tex_fmt_rgba32_linear:
+	case skg_tex_fmt_rgba64:
+	case skg_tex_fmt_rgba128:       return GL_RGBA;
+	case skg_tex_fmt_bgra32:
+	case skg_tex_fmt_bgra32_linear: return GL_BGRA;
+	case skg_tex_fmt_depth16:       return GL_DEPTH_COMPONENT16;
+	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT32F;
+	case skg_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;
+	case skg_tex_fmt_r8:
+	case skg_tex_fmt_r16:
+	case skg_tex_fmt_r32:           return GL_RED;
+	default: return 0;
 	}
 }
 
@@ -3960,6 +4009,8 @@ skg_shader_stage_t skg_shader_file_create_stage(const skg_shader_file_t *file, s
 #elif defined(SKG_OPENGL)
 	#ifdef __EMSCRIPTEN__
 		language = skg_shader_lang_glsl_web;
+	#elif defined(__ANDROID__)
+		language = skg_shader_lang_glsl_es;
 	#else
 		language = skg_shader_lang_glsl;
 	#endif

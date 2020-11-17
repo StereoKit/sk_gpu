@@ -51,17 +51,19 @@ void main_step_stereo(void *userData, int, float[16], WebXRView *views);
 ///////////////////////////////////////////
 
 int main() {
-	if (!main_init())
-		return -1;
-
 #if __EMSCRIPTEN__
-	emscripten_request_animation_frame_loop(&main_step, 0);
 	webxr_init(WEBXR_SESSION_MODE_IMMERSIVE_VR,
 		main_step_stereo,
 		[](void *user_data) { app_stereo = true; },
 		[](void *user_data) { app_stereo = false; emscripten_request_animation_frame_loop(&main_step, 0); },
 		[](void *user_data, int err) {printf("WebXR err: %d\n", err);},
 		nullptr);
+#endif
+	if (!main_init())
+		return -1;
+
+#if __EMSCRIPTEN__
+	emscripten_request_animation_frame_loop(&main_step, 0);
 #else
 	double t = 0;
 	while (app_run) { main_step(t, nullptr); t += 16; }
@@ -165,6 +167,9 @@ int main_step(double t, void *) {
 ///////////////////////////////////////////
 
 void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
+	int32_t old_viewport[4];
+	skg_viewport_get(old_viewport);
+
 	skg_draw_begin();
 
 	static uint64_t frame = 0;
@@ -177,6 +182,8 @@ void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 		memcpy(&proj, views[i].projectionMatrix, sizeof(hmm_mat4));
 		app_render(frame, view, proj);
 	}
+
+	skg_viewport(old_viewport);
 }
 
 ///////////////////////////////////////////

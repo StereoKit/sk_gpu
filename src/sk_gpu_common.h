@@ -7,6 +7,7 @@ typedef enum {
 	skg_shader_lang_hlsl,
 	skg_shader_lang_spirv,
 	skg_shader_lang_glsl,
+	skg_shader_lang_glsl_es,
 	skg_shader_lang_glsl_web,
 } skg_shader_lang_;
 

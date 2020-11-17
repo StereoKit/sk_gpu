@@ -195,6 +195,18 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute) {
 			stages.add({});
+			if (!sksc_spvc_compile_stage(&stages[spirv_stage], skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
+				include_handler->Release();
+				source         ->Release();
+
+				sksc_log(log_level_err, "GLES shader compile failed\n");
+				sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
+				return false;
+			}
+		}
+
+		if (compile_stages[i] != skg_stage_compute) {
+			stages.add({});
 			if (!sksc_spvc_compile_stage(&stages[spirv_stage], skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
 				include_handler->Release();
 				source         ->Release();
@@ -275,6 +287,14 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 	}
 
 	sksc_log(log_level_info, "|________________\n\n");
+
+	for (size_t i = 0; i < out_file->stage_count; i++) {
+		if (out_file->stages[i].language == skg_shader_lang_glsl_es && 
+			(out_file->stages[i].stage == skg_stage_pixel ||
+			 out_file->stages[i].stage == skg_stage_vertex)) {
+			sksc_log(log_level_info, "OpenGL pixel shader stage:\n%s", out_file->stages[i].code);
+		}
+	}
 
 	return true;
 }
@@ -954,12 +974,13 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 	if (lang == skg_shader_lang_glsl_web) {
 		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 300);
 		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
-	} else if (lang == skg_shader_lang_glsl) {
+	} else if (lang == skg_shader_lang_glsl_es) {
 		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 320);
 		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+	} else if (lang == skg_shader_lang_glsl) {
+		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
+		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	}
-	//spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
-	//spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	spvc_compiler_install_compiler_options(compiler_glsl, options);
 	if (src_stage->stage == skg_stage_vertex) {
 

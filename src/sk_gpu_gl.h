@@ -56,18 +56,18 @@ typedef struct skg_swapchain_t {
 	int32_t  width;
 	int32_t  height;
 
-#ifdef _WIN32
+#if   defined(_SKG_GL_LOAD_WGL)
 	void *_hdc;
 	void *_hwnd;
-#elif defined(__ANDROID__)
+#elif defined(_SKG_GL_LOAD_EGL)
 	void *_egl_surface;
-#elif defined(__linux__)
+#elif defined(_SKG_GL_LOAD_GLX)
 	void *_x_display;
 	void *_visual_id;
 	void *_glx_fb_config;
 	void *_glx_drawable;
 	void *_glx_context;
-#elif defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
+#elif defined(_SKG_GL_LOAD_EMSCRIPTEN) && defined(SKG_MANUAL_SRGB)
 	skg_tex_t      _surface;
 	skg_tex_t      _surface_depth;
 	skg_shader_t   _convert_shader;
@@ -79,11 +79,11 @@ typedef struct skg_swapchain_t {
 } skg_swapchain_t;
 
 typedef struct skg_platform_data_t {
-#if defined(__ANDROID__) || defined(__linux__)
+#if   defined(_SKG_GL_LOAD_EGL)
 	void *_egl_display;
 	void *_egl_config;
 	void *_egl_context;
-#elif _WIN32
+#elif defined(_SKG_GL_LOAD_WGL)
 	void *_gl_hdc;
 	void *_gl_hrc;
 #endif

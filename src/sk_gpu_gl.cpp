@@ -10,47 +10,33 @@
 
 ///////////////////////////////////////////
 
-#ifdef __EMSCRIPTEN__
-#define _SKG_GL_WEB
-#define _SKG_GL_LOAD_EMSCRIPTEN
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#include <GLES3/gl32.h>
+#if   defined(_SKG_GL_LOAD_EMSCRIPTEN)
+	#include <emscripten.h>
+	#include <emscripten/html5.h>
+	#include <GLES3/gl32.h>
+#elif defined(_SKG_GL_LOAD_EGL)
+	#include <EGL/egl.h>
+	#include <EGL/eglext.h>
 
-#elif defined(__ANDROID__)
-#define _SKG_GL_ES
-#define _SKG_GL_LOAD_EGL
-#define _SKG_GL_MAKE_FUNCTIONS
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
+	EGLDisplay egl_display;
+	EGLContext egl_context;
+	EGLConfig  egl_config;
+#elif defined(_SKG_GL_LOAD_GLX)
+	#include <GL/glxew.h>
 
-EGLDisplay egl_display;
-EGLContext egl_context;
-EGLConfig  egl_config;
+	Display     *xDisplay;
+	XVisualInfo *visualInfo;
+	GLXFBConfig  glxFBConfig;
+	GLXDrawable  glxDrawable;
+	GLXContext   glxContext;
+#elif defined(_SKG_GL_LOAD_WGL)
+	#pragma comment(lib, "opengl32.lib")
+	#define WIN32_LEAN_AND_MEAN
+	#include <windows.h>
 
-#elif defined(__linux__)
-#define _SKG_GL_DESKTOP
-#define _SKG_GL_LOAD_GLX
-#include <GL/glxew.h>
-
-Display *xDisplay;
-XVisualInfo *visualInfo;
-GLXFBConfig glxFBConfig;
-GLXDrawable glxDrawable;
-GLXContext glxContext;
-
-#elif defined(_WIN32)
-#define _SKG_GL_DESKTOP
-#define _SKG_GL_LOAD_WGL
-#define _SKG_GL_MAKE_FUNCTIONS
-#pragma comment(lib, "opengl32.lib")
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-HWND  gl_hwnd;
-HDC   gl_hdc;
-HGLRC gl_hrc;
+	HWND  gl_hwnd;
+	HDC   gl_hdc;
+	HGLRC gl_hrc;
 #endif
 
 ///////////////////////////////////////////

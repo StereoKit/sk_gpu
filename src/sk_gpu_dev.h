@@ -30,6 +30,26 @@ sk_gpu.h
 #define SKG_OPENGL
 #endif
 
+// If we're using OpenGL, set up some additional defines so we know what
+// flavor of GL is being used, and how to load it.
+#ifdef SKG_OPENGL
+	#if   defined(__EMSCRIPTEN__)
+		#define _SKG_GL_WEB
+		#define _SKG_GL_LOAD_EMSCRIPTEN
+	#elif defined(__ANDROID__)
+		#define _SKG_GL_ES
+		#define _SKG_GL_LOAD_EGL
+		#define _SKG_GL_MAKE_FUNCTIONS
+	#elif defined(__linux__)
+		#define _SKG_GL_DESKTOP
+		#define _SKG_GL_LOAD_GLX
+	#elif defined(_WIN32)
+		#define _SKG_GL_DESKTOP
+		#define _SKG_GL_LOAD_WGL
+		#define _SKG_GL_MAKE_FUNCTIONS
+	#endif
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -218,7 +238,7 @@ typedef struct skg_shader_meta_t {
 
 ///////////////////////////////////////////
 
-#if defined(SKG_DIRECT3D11)
+#if   defined(SKG_DIRECT3D11)
 #include "sk_gpu_dx11.h"
 #elif defined(SKG_DIRECT3D12)
 #include "sk_gpu_dx12.h"

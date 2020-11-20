@@ -30,6 +30,26 @@ sk_gpu.h
 #define SKG_OPENGL
 #endif
 
+// If we're using OpenGL, set up some additional defines so we know what
+// flavor of GL is being used, and how to load it.
+#ifdef SKG_OPENGL
+	#if   defined(__EMSCRIPTEN__)
+		#define _SKG_GL_WEB
+		#define _SKG_GL_LOAD_EMSCRIPTEN
+	#elif defined(__ANDROID__)
+		#define _SKG_GL_ES
+		#define _SKG_GL_LOAD_EGL
+		#define _SKG_GL_MAKE_FUNCTIONS
+	#elif defined(__linux__)
+		#define _SKG_GL_DESKTOP
+		#define _SKG_GL_LOAD_GLX
+	#elif defined(_WIN32)
+		#define _SKG_GL_DESKTOP
+		#define _SKG_GL_LOAD_WGL
+		#define _SKG_GL_MAKE_FUNCTIONS
+	#endif
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -218,7 +238,7 @@ typedef struct skg_shader_meta_t {
 
 ///////////////////////////////////////////
 
-#if defined(SKG_DIRECT3D11)
+#if   defined(SKG_DIRECT3D11)
 
 
 #include <d3d11.h>
@@ -357,18 +377,18 @@ typedef struct skg_swapchain_t {
 	int32_t  width;
 	int32_t  height;
 
-#ifdef _WIN32
+#if   defined(_SKG_GL_LOAD_WGL)
 	void *_hdc;
 	void *_hwnd;
-#elif defined(__ANDROID__)
+#elif defined(_SKG_GL_LOAD_EGL)
 	void *_egl_surface;
-#elif defined(__linux__)
+#elif defined(_SKG_GL_LOAD_GLX)
 	void *_x_display;
 	void *_visual_id;
 	void *_glx_fb_config;
 	void *_glx_drawable;
 	void *_glx_context;
-#elif defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
+#elif defined(_SKG_GL_LOAD_EMSCRIPTEN) && defined(SKG_MANUAL_SRGB)
 	skg_tex_t      _surface;
 	skg_tex_t      _surface_depth;
 	skg_shader_t   _convert_shader;
@@ -380,11 +400,11 @@ typedef struct skg_swapchain_t {
 } skg_swapchain_t;
 
 typedef struct skg_platform_data_t {
-#if defined(__ANDROID__) || defined(__linux__)
+#if   defined(_SKG_GL_LOAD_EGL)
 	void *_egl_display;
 	void *_egl_config;
 	void *_egl_context;
-#elif _WIN32
+#elif defined(_SKG_GL_LOAD_WGL)
 	void *_gl_hdc;
 	void *_gl_hrc;
 #endif
@@ -1820,47 +1840,33 @@ const char *skg_semantic_to_d3d(skg_el_semantic_ semantic) {
 
 ///////////////////////////////////////////
 
-#ifdef __EMSCRIPTEN__
-#define _SKG_GL_WEB
-#define _SKG_GL_LOAD_EMSCIPTEN
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#include <GLES3/gl32.h>
+#if   defined(_SKG_GL_LOAD_EMSCRIPTEN)
+	#include <emscripten.h>
+	#include <emscripten/html5.h>
+	#include <GLES3/gl32.h>
+#elif defined(_SKG_GL_LOAD_EGL)
+	#include <EGL/egl.h>
+	#include <EGL/eglext.h>
 
-#elif defined(__ANDROID__)
-#define _SKG_GL_ES
-#define _SKG_GL_LOAD_EGL
-#define _SKG_GL_MAKE_FUNCTIONS
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
+	EGLDisplay egl_display;
+	EGLContext egl_context;
+	EGLConfig  egl_config;
+#elif defined(_SKG_GL_LOAD_GLX)
+	#include <GL/glxew.h>
 
-EGLDisplay egl_display;
-EGLContext egl_context;
-EGLConfig  egl_config;
+	Display     *xDisplay;
+	XVisualInfo *visualInfo;
+	GLXFBConfig  glxFBConfig;
+	GLXDrawable  glxDrawable;
+	GLXContext   glxContext;
+#elif defined(_SKG_GL_LOAD_WGL)
+	#pragma comment(lib, "opengl32.lib")
+	#define WIN32_LEAN_AND_MEAN
+	#include <windows.h>
 
-#elif defined(__linux__)
-#define _SKG_GL_DESKTOP
-#define _SKG_GL_LOAD_GLX
-#include <GL/glxew.h>
-
-Display *xDisplay;
-XVisualInfo *visualInfo;
-GLXFBConfig glxFBConfig;
-GLXDrawable glxDrawable;
-GLXContext glxContext;
-
-#elif defined(_WIN32)
-#define _SKG_GL_DESKTOP
-#define _SKG_GL_LOAD_WGL
-#define _SKG_GL_MAKE_FUNCTIONS
-#pragma comment(lib, "opengl32.lib")
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-HWND  gl_hwnd;
-HDC   gl_hdc;
-HGLRC gl_hrc;
+	HWND  gl_hwnd;
+	HDC   gl_hdc;
+	HGLRC gl_hrc;
 #endif
 
 ///////////////////////////////////////////
@@ -3519,7 +3525,12 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba64:
 	case skg_tex_fmt_rgba128:       return GL_RGBA;
 	case skg_tex_fmt_bgra32:
-	case skg_tex_fmt_bgra32_linear: return GL_BGRA;
+	case skg_tex_fmt_bgra32_linear:
+		#ifdef _SKG_GL_WEB // WebGL has no GL_BGRA?
+		return GL_RGBA;
+		#else
+		return GL_BGRA;
+		#endif
 	case skg_tex_fmt_depth16:
 	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT;
 	case skg_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;

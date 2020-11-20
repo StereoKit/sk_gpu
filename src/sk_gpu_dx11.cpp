@@ -691,7 +691,8 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 
 	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
 		skg_log(skg_log_critical, "sk_gpu couldn't create swapchain!");
-		return {};
+		result = {};
+		return result;
 	}
 
 	// Set the target view to an sRGB format for proper presentation of 

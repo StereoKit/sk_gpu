@@ -159,23 +159,19 @@ typedef enum skg_cap_ {
 	skg_cap_wireframe,
 } skg_cap_;
 
-typedef struct {
-	union {
-		struct {
-			uint8_t r, g, b, a;
-		};
-		uint32_t hex;
-		uint8_t  arr[4];
+typedef union {
+	struct {
+		uint8_t r, g, b, a;
 	};
+	uint32_t hex;
+	uint8_t  arr[4];
 } skg_color32_t;
 
-typedef struct {
-	union {
-		struct {
-			float r, g, b, a;
-		};
-		float arr[4];
+typedef union {
+	struct {
+		float r, g, b, a;
 	};
+	float arr[4];
 } skg_color128_t;
 
 typedef struct skg_vert_t {
@@ -1238,7 +1234,8 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 
 	if (FAILED(dxgi_factory->CreateSwapChainForHwnd(d3d_device, (HWND)hwnd, &swapchain_desc, nullptr, nullptr, &result._swapchain))) {
 		skg_log(skg_log_critical, "sk_gpu couldn't create swapchain!");
-		return {};
+		result = {};
+		return result;
 	}
 
 	// Set the target view to an sRGB format for proper presentation of 
@@ -2174,7 +2171,6 @@ uint32_t   gl_current_framebuffer = 0;
 uint32_t skg_buffer_type_to_gl   (skg_buffer_type_ type);
 uint32_t skg_tex_fmt_to_gl_type  (skg_tex_fmt_ format);
 uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format);
-uint32_t skg_tex_fmt_to_gl_format(skg_tex_fmt_ format);
 
 ///////////////////////////////////////////
 
@@ -3033,14 +3029,16 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	UINT num_formats  = 0;
 	if (!wglChoosePixelFormatARB((HDC)result._hdc, format_attribs, nullptr, 1, &pixel_format, &num_formats)) {
 		skg_log(skg_log_critical, "Couldn't find pixel format!");
-		return {};
+		result = {};
+		return result;
 	}
 
 	PIXELFORMATDESCRIPTOR format_desc = { sizeof(PIXELFORMATDESCRIPTOR) };
 	DescribePixelFormat((HDC)result._hdc, pixel_format, sizeof(format_desc), &format_desc);
 	if (!SetPixelFormat((HDC)result._hdc, pixel_format, &format_desc)) {
 		skg_log(skg_log_critical, "Couldn't set pixel format!");
-		return {};
+		result = {};
+		return result;
 	}
 #elif defined(__ANDROID__)
 	EGLint attribs[] = { 
@@ -3372,9 +3370,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 
 	glBindTexture(tex->_target, tex->_texture);
 
-	uint32_t format = skg_tex_fmt_to_native(tex->format);//skg_tex_fmt_to_gl_format(tex->format);
-	uint32_t layout = skg_tex_fmt_to_gl_layout(tex->format);
-	uint32_t type   = skg_tex_fmt_to_gl_type  (tex->format);
+	uint32_t format = (uint32_t)skg_tex_fmt_to_native   (tex->format);
+	uint32_t layout =           skg_tex_fmt_to_gl_layout(tex->format);
+	uint32_t type   =           skg_tex_fmt_to_gl_type  (tex->format);
 	if (tex->type == skg_tex_type_cubemap) {
 		if (data_frame_count != 6) {
 			skg_log(skg_log_warning, "Cubemaps need 6 data frames");
@@ -3411,7 +3409,7 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 #else
 	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
 	glBindTexture (tex->_target, tex->_texture);
-	glGetnTexImage(tex->_target, 0, format, skg_tex_fmt_to_gl_type(tex->format), data_size, ref_data);
+	glGetnTexImage(tex->_target, 0, (uint32_t)format, skg_tex_fmt_to_gl_type(tex->format), (uint32_t)data_size, ref_data);
 	bool result = glGetError() == 0;
 
 	// This is OpenGL, and textures are upside-down
@@ -3501,26 +3499,6 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case GL_R16UI:              return skg_tex_fmt_r16;
 	case GL_R32F:               return skg_tex_fmt_r32;
 	default: return skg_tex_fmt_none;
-	}
-}
-
-/////////////////////////////////////////// 
-
-uint32_t skg_tex_fmt_to_gl_format(skg_tex_fmt_ format) {
-	switch (format) {
-	case skg_tex_fmt_rgba32:        return GL_SRGB8_ALPHA8;
-	case skg_tex_fmt_rgba32_linear:
-	case skg_tex_fmt_rgba64:
-	case skg_tex_fmt_rgba128:       return GL_RGBA;
-	case skg_tex_fmt_bgra32:
-	case skg_tex_fmt_bgra32_linear: return GL_BGRA;
-	case skg_tex_fmt_depth16:       return GL_DEPTH_COMPONENT16;
-	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT32F;
-	case skg_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;
-	case skg_tex_fmt_r8:
-	case skg_tex_fmt_r16:
-	case skg_tex_fmt_r32:           return GL_RED;
-	default: return 0;
 	}
 }
 
@@ -3792,9 +3770,9 @@ skg_color128_t skg_col_helix128(float h, float s, float l, float alpha) {
 	float r = l + amp * (-0.14861f * a_cos + 1.78277f * a_sin);
 	float g = l + amp * (-0.29227f * a_cos - 0.90649f * a_sin);
 	float b = l + amp * ( 1.97294f * a_cos);
-	r = fmax(0,fminf(1, r));
-	g = fmax(0,fminf(1, g));
-	b = fmax(0,fminf(1, b));
+	r = fmaxf(0,fminf(1, r));
+	g = fmaxf(0,fminf(1, g));
+	b = fmaxf(0,fminf(1, b));
 	return { r, g, b, alpha };
 }
 
@@ -3810,7 +3788,7 @@ skg_color32_t skg_col_jab32(float j, float a, float b, float alpha) {
 float lms(float t) {
 	if (t > 0.) {
 		float r = powf(t, 0.007460772656268214f);
-		float s = (0.8359375f - r) / (18.6875*r + -18.8515625f);
+		float s = (0.8359375f - r) / (18.6875f*r + -18.8515625f);
 		return powf(s, 6.277394636015326f);
 	} else {
 		return 0.f;
@@ -3819,7 +3797,7 @@ float lms(float t) {
 
 float srgb(float c) {
 	if (c <= 0.0031308049535603713f) {
-		return c * 12.92;
+		return c * 12.92f;
 	} else {
 		float c_ = powf(c, 0.41666666666666666f);
 		return c_ * 1.055f + -0.055f;
@@ -3848,9 +3826,9 @@ skg_color128_t jchz2srgb(float h, float s, float l, float alpha) {
 	float lg = l* -0.0222329579044572220e4f + m* +0.038215274736946150e4f + s* -0.005703433147128812e4f;
 	float lb = l* +0.0006270913830078808e4f + m* -0.007021906556220012e4f + s* +0.016669756032437408e4f;
 
-	lr = fmax(0,fminf(1, srgb(lr)));
-	lg = fmax(0,fminf(1, srgb(lg)));
-	lb = fmax(0,fminf(1, srgb(lb)));
+	lr = fmaxf(0,fminf(1, srgb(lr)));
+	lg = fmaxf(0,fminf(1, srgb(lg)));
+	lb = fmaxf(0,fminf(1, srgb(lb)));
 	return skg_color128_t{lr, lg, lb, alpha };
 }
 
@@ -3869,9 +3847,9 @@ skg_color128_t skg_col_jab128(float j, float a, float b, float alpha) {
 	float m  = pqi(iz - .1386050432715393f*a - .0580473161561189f*b);
 	float s  = pqi(iz - .0960192420263189f*a - .8118918960560390f*b);
 
-	float r = l* +0.0592896375540425100e4 + m* -0.052239474257975140e4 + s* +0.003259644233339027e4;
-	float g = l* -0.0222329579044572220e4 + m* +0.038215274736946150e4 + s* -0.005703433147128812e4;
-	      b = l* +0.0006270913830078808e4 + m* -0.007021906556220012e4 + s* +0.016669756032437408e4;
+	float r = l* +0.0592896375540425100e4f + m* -0.052239474257975140e4f + s* +0.003259644233339027e4f;
+	float g = l* -0.0222329579044572220e4f + m* +0.038215274736946150e4f + s* -0.005703433147128812e4f;
+	      b = l* +0.0006270913830078808e4f + m* -0.007021906556220012e4f + s* +0.016669756032437408e4f;
 
 	/*float x = +1.661373055774069e+00f * L - 9.145230923250668e-01f * M + 2.313620767186147e-01f * S;
 	float y = -3.250758740427037e-01f * L + 1.571847038366936e+00f * M - 2.182538318672940e-01f * S;
@@ -4115,7 +4093,8 @@ skg_shader_stage_t skg_shader_file_create_stage(const skg_shader_file_t *file, s
 		if (file->stages[i].language == language && file->stages[i].stage == stage)
 			return skg_shader_stage_create(file->stages[i].code, file->stages[i].code_size, stage);
 	}
-	return {};
+	skg_shader_stage_t empty = {};
+	return empty;
 }
 
 ///////////////////////////////////////////
@@ -4157,8 +4136,10 @@ void skg_shader_meta_release(skg_shader_meta_t *meta) {
 
 skg_shader_t skg_shader_create_file(const char *sks_filename) {
 	skg_shader_file_t file;
-	if (!skg_shader_file_load(sks_filename, &file))
-		return {};
+	if (!skg_shader_file_load(sks_filename, &file)) {
+		skg_shader_t empty = {};
+		return empty;
+	}
 
 	skg_shader_stage_t vs     = skg_shader_file_create_stage(&file, skg_stage_vertex);
 	skg_shader_stage_t ps     = skg_shader_file_create_stage(&file, skg_stage_pixel);
@@ -4177,8 +4158,10 @@ skg_shader_t skg_shader_create_file(const char *sks_filename) {
 
 skg_shader_t skg_shader_create_memory(const void *sks_data, size_t sks_data_size) {
 	skg_shader_file_t file;
-	if (!skg_shader_file_load_memory(sks_data, sks_data_size, &file))
-		return {};
+	if (!skg_shader_file_load_memory(sks_data, sks_data_size, &file)) {
+		skg_shader_t empty = {};
+		return empty;
+	}
 
 	skg_shader_stage_t vs     = skg_shader_file_create_stage(&file, skg_stage_vertex);
 	skg_shader_stage_t ps     = skg_shader_file_create_stage(&file, skg_stage_pixel);
@@ -4200,7 +4183,8 @@ skg_bind_t skg_shader_get_tex_bind(const skg_shader_t *shader, const char *name)
 		if (strcmp(name, shader->meta->textures[i].name) == 0)
 			return shader->meta->textures[i].bind;
 	}
-	return {};
+	skg_bind_t empty = {};
+	return empty;
 }
 
 ///////////////////////////////////////////
@@ -4210,7 +4194,8 @@ skg_bind_t skg_shader_get_buffer_bind(const skg_shader_t *shader, const char *na
 		if (strcmp(name, shader->meta->buffers[i].name) == 0)
 			return shader->meta->buffers[i].bind;
 	}
-	return {};
+	skg_bind_t empty = {};
+	return empty;
 }
 
 ///////////////////////////////////////////

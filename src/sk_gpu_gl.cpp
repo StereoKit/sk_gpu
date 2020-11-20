@@ -354,7 +354,6 @@ uint32_t   gl_current_framebuffer = 0;
 uint32_t skg_buffer_type_to_gl   (skg_buffer_type_ type);
 uint32_t skg_tex_fmt_to_gl_type  (skg_tex_fmt_ format);
 uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format);
-uint32_t skg_tex_fmt_to_gl_format(skg_tex_fmt_ format);
 
 ///////////////////////////////////////////
 
@@ -1213,14 +1212,16 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	UINT num_formats  = 0;
 	if (!wglChoosePixelFormatARB((HDC)result._hdc, format_attribs, nullptr, 1, &pixel_format, &num_formats)) {
 		skg_log(skg_log_critical, "Couldn't find pixel format!");
-		return {};
+		result = {};
+		return result;
 	}
 
 	PIXELFORMATDESCRIPTOR format_desc = { sizeof(PIXELFORMATDESCRIPTOR) };
 	DescribePixelFormat((HDC)result._hdc, pixel_format, sizeof(format_desc), &format_desc);
 	if (!SetPixelFormat((HDC)result._hdc, pixel_format, &format_desc)) {
 		skg_log(skg_log_critical, "Couldn't set pixel format!");
-		return {};
+		result = {};
+		return result;
 	}
 #elif defined(__ANDROID__)
 	EGLint attribs[] = { 
@@ -1552,9 +1553,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 
 	glBindTexture(tex->_target, tex->_texture);
 
-	uint32_t format = skg_tex_fmt_to_native(tex->format);//skg_tex_fmt_to_gl_format(tex->format);
-	uint32_t layout = skg_tex_fmt_to_gl_layout(tex->format);
-	uint32_t type   = skg_tex_fmt_to_gl_type  (tex->format);
+	uint32_t format = (uint32_t)skg_tex_fmt_to_native   (tex->format);
+	uint32_t layout =           skg_tex_fmt_to_gl_layout(tex->format);
+	uint32_t type   =           skg_tex_fmt_to_gl_type  (tex->format);
 	if (tex->type == skg_tex_type_cubemap) {
 		if (data_frame_count != 6) {
 			skg_log(skg_log_warning, "Cubemaps need 6 data frames");
@@ -1591,7 +1592,7 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 #else
 	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
 	glBindTexture (tex->_target, tex->_texture);
-	glGetnTexImage(tex->_target, 0, format, skg_tex_fmt_to_gl_type(tex->format), data_size, ref_data);
+	glGetnTexImage(tex->_target, 0, (uint32_t)format, skg_tex_fmt_to_gl_type(tex->format), (uint32_t)data_size, ref_data);
 	bool result = glGetError() == 0;
 
 	// This is OpenGL, and textures are upside-down
@@ -1681,26 +1682,6 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case GL_R16UI:              return skg_tex_fmt_r16;
 	case GL_R32F:               return skg_tex_fmt_r32;
 	default: return skg_tex_fmt_none;
-	}
-}
-
-/////////////////////////////////////////// 
-
-uint32_t skg_tex_fmt_to_gl_format(skg_tex_fmt_ format) {
-	switch (format) {
-	case skg_tex_fmt_rgba32:        return GL_SRGB8_ALPHA8;
-	case skg_tex_fmt_rgba32_linear:
-	case skg_tex_fmt_rgba64:
-	case skg_tex_fmt_rgba128:       return GL_RGBA;
-	case skg_tex_fmt_bgra32:
-	case skg_tex_fmt_bgra32_linear: return GL_BGRA;
-	case skg_tex_fmt_depth16:       return GL_DEPTH_COMPONENT16;
-	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT32F;
-	case skg_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;
-	case skg_tex_fmt_r8:
-	case skg_tex_fmt_r16:
-	case skg_tex_fmt_r32:           return GL_RED;
-	default: return 0;
 	}
 }
 

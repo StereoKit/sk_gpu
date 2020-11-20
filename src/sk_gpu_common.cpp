@@ -225,9 +225,9 @@ skg_color128_t skg_col_helix128(float h, float s, float l, float alpha) {
 	float r = l + amp * (-0.14861f * a_cos + 1.78277f * a_sin);
 	float g = l + amp * (-0.29227f * a_cos - 0.90649f * a_sin);
 	float b = l + amp * ( 1.97294f * a_cos);
-	r = fmax(0,fminf(1, r));
-	g = fmax(0,fminf(1, g));
-	b = fmax(0,fminf(1, b));
+	r = fmaxf(0,fminf(1, r));
+	g = fmaxf(0,fminf(1, g));
+	b = fmaxf(0,fminf(1, b));
 	return { r, g, b, alpha };
 }
 
@@ -243,7 +243,7 @@ skg_color32_t skg_col_jab32(float j, float a, float b, float alpha) {
 float lms(float t) {
 	if (t > 0.) {
 		float r = powf(t, 0.007460772656268214f);
-		float s = (0.8359375f - r) / (18.6875*r + -18.8515625f);
+		float s = (0.8359375f - r) / (18.6875f*r + -18.8515625f);
 		return powf(s, 6.277394636015326f);
 	} else {
 		return 0.f;
@@ -252,7 +252,7 @@ float lms(float t) {
 
 float srgb(float c) {
 	if (c <= 0.0031308049535603713f) {
-		return c * 12.92;
+		return c * 12.92f;
 	} else {
 		float c_ = powf(c, 0.41666666666666666f);
 		return c_ * 1.055f + -0.055f;
@@ -281,9 +281,9 @@ skg_color128_t jchz2srgb(float h, float s, float l, float alpha) {
 	float lg = l* -0.0222329579044572220e4f + m* +0.038215274736946150e4f + s* -0.005703433147128812e4f;
 	float lb = l* +0.0006270913830078808e4f + m* -0.007021906556220012e4f + s* +0.016669756032437408e4f;
 
-	lr = fmax(0,fminf(1, srgb(lr)));
-	lg = fmax(0,fminf(1, srgb(lg)));
-	lb = fmax(0,fminf(1, srgb(lb)));
+	lr = fmaxf(0,fminf(1, srgb(lr)));
+	lg = fmaxf(0,fminf(1, srgb(lg)));
+	lb = fmaxf(0,fminf(1, srgb(lb)));
 	return skg_color128_t{lr, lg, lb, alpha };
 }
 
@@ -302,9 +302,9 @@ skg_color128_t skg_col_jab128(float j, float a, float b, float alpha) {
 	float m  = pqi(iz - .1386050432715393f*a - .0580473161561189f*b);
 	float s  = pqi(iz - .0960192420263189f*a - .8118918960560390f*b);
 
-	float r = l* +0.0592896375540425100e4 + m* -0.052239474257975140e4 + s* +0.003259644233339027e4;
-	float g = l* -0.0222329579044572220e4 + m* +0.038215274736946150e4 + s* -0.005703433147128812e4;
-	      b = l* +0.0006270913830078808e4 + m* -0.007021906556220012e4 + s* +0.016669756032437408e4;
+	float r = l* +0.0592896375540425100e4f + m* -0.052239474257975140e4f + s* +0.003259644233339027e4f;
+	float g = l* -0.0222329579044572220e4f + m* +0.038215274736946150e4f + s* -0.005703433147128812e4f;
+	      b = l* +0.0006270913830078808e4f + m* -0.007021906556220012e4f + s* +0.016669756032437408e4f;
 
 	/*float x = +1.661373055774069e+00f * L - 9.145230923250668e-01f * M + 2.313620767186147e-01f * S;
 	float y = -3.250758740427037e-01f * L + 1.571847038366936e+00f * M - 2.182538318672940e-01f * S;
@@ -548,7 +548,8 @@ skg_shader_stage_t skg_shader_file_create_stage(const skg_shader_file_t *file, s
 		if (file->stages[i].language == language && file->stages[i].stage == stage)
 			return skg_shader_stage_create(file->stages[i].code, file->stages[i].code_size, stage);
 	}
-	return {};
+	skg_shader_stage_t empty = {};
+	return empty;
 }
 
 ///////////////////////////////////////////
@@ -590,8 +591,10 @@ void skg_shader_meta_release(skg_shader_meta_t *meta) {
 
 skg_shader_t skg_shader_create_file(const char *sks_filename) {
 	skg_shader_file_t file;
-	if (!skg_shader_file_load(sks_filename, &file))
-		return {};
+	if (!skg_shader_file_load(sks_filename, &file)) {
+		skg_shader_t empty = {};
+		return empty;
+	}
 
 	skg_shader_stage_t vs     = skg_shader_file_create_stage(&file, skg_stage_vertex);
 	skg_shader_stage_t ps     = skg_shader_file_create_stage(&file, skg_stage_pixel);
@@ -610,8 +613,10 @@ skg_shader_t skg_shader_create_file(const char *sks_filename) {
 
 skg_shader_t skg_shader_create_memory(const void *sks_data, size_t sks_data_size) {
 	skg_shader_file_t file;
-	if (!skg_shader_file_load_memory(sks_data, sks_data_size, &file))
-		return {};
+	if (!skg_shader_file_load_memory(sks_data, sks_data_size, &file)) {
+		skg_shader_t empty = {};
+		return empty;
+	}
 
 	skg_shader_stage_t vs     = skg_shader_file_create_stage(&file, skg_stage_vertex);
 	skg_shader_stage_t ps     = skg_shader_file_create_stage(&file, skg_stage_pixel);
@@ -633,7 +638,8 @@ skg_bind_t skg_shader_get_tex_bind(const skg_shader_t *shader, const char *name)
 		if (strcmp(name, shader->meta->textures[i].name) == 0)
 			return shader->meta->textures[i].bind;
 	}
-	return {};
+	skg_bind_t empty = {};
+	return empty;
 }
 
 ///////////////////////////////////////////
@@ -643,7 +649,8 @@ skg_bind_t skg_shader_get_buffer_bind(const skg_shader_t *shader, const char *na
 		if (strcmp(name, shader->meta->buffers[i].name) == 0)
 			return shader->meta->buffers[i].bind;
 	}
-	return {};
+	skg_bind_t empty = {};
+	return empty;
 }
 
 ///////////////////////////////////////////

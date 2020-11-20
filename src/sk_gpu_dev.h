@@ -241,6 +241,7 @@ typedef struct skg_shader_meta_t {
 
 ///////////////////////////////////////////
 
+void                skg_setup_xlib               (void *dpy, void *vi, void *drawable);
 int32_t             skg_init                     (const char *app_name, void *adapter_id);
 void                skg_shutdown                 ();
 void                skg_callback_log             (void (*callback)(skg_log_ level, const char *text));

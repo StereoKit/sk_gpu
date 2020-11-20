@@ -59,8 +59,14 @@ typedef struct skg_swapchain_t {
 #ifdef _WIN32
 	void *_hdc;
 	void *_hwnd;
-#elif defined(__ANDROID__) || defined(__linux__)
+#elif defined(__ANDROID__)
 	void *_egl_surface;
+#elif defined(__linux__)
+	void *_x_display;
+	void *_visual_id;
+	void *_glx_fb_config;
+	void *_glx_drawable;
+	void *_glx_context;
 #elif defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
 	skg_tex_t      _surface;
 	skg_tex_t      _surface_depth;

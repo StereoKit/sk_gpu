@@ -14,14 +14,25 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <GLES3/gl32.h>
-#elif defined(__ANDROID__) || defined(__linux__)
+
+#elif defined(__ANDROID__)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
 EGLDisplay egl_display;
 EGLContext egl_context;
 EGLConfig  egl_config;
-#elif _WIN32
+
+#elif defined(__linux__)
+#include <GL/glxew.h>
+
+Display *xDisplay;
+XVisualInfo *visualInfo;
+GLXFBConfig glxFBConfig;
+GLXDrawable glxDrawable;
+GLXContext glxContext;
+
+#elif defined(_WIN32)
 #pragma comment(lib, "opengl32.lib")
 
 #define WIN32_LEAN_AND_MEAN
@@ -221,7 +232,7 @@ HGLRC gl_hrc;
 #define GL_DEBUG_SEVERITY_MEDIUM       0x9147
 #define GL_DEBUG_SEVERITY_LOW          0x9148
 
-#if defined(_WIN32) || defined(__ANDROID__) || defined(__linux__)
+#if defined(_WIN32) || defined(__ANDROID__)
 
 #ifdef _WIN32
 	// Function pointers we need to actually initialize OpenGL
@@ -494,7 +505,7 @@ int32_t gl_init_emscripten() {
 ///////////////////////////////////////////
 
 int32_t gl_init_egl() {
-#if defined(__ANDROID__) || defined(__linux__)
+#if defined(__ANDROID__)
 	const EGLint attribs[] = {
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
 		EGL_CONFORMANT,   EGL_OPENGL_ES3_BIT_KHR,
@@ -533,18 +544,76 @@ int32_t gl_init_egl() {
 		skg_log(skg_log_critical, "Unable to eglMakeCurrent");
 		return -1;
 	}
-#endif // defined(__ANDROID__) || defined(__linux__)
+#endif // defined(__ANDROID__)
 	return 1;
 }
 
 ///////////////////////////////////////////
 
+int32_t gl_init_glx() {
+#if defined(__linux__)
+
+	GLXContext old_ctx = glXCreateContext(xDisplay, visualInfo, NULL, GL_TRUE);
+	glXMakeCurrent(xDisplay, glxDrawable, old_ctx);
+
+	glewExperimental=true; // Needed in core profile
+	if (glewInit() != GLEW_OK) {
+		skg_log(skg_log_critical, "Failed to initialize GLEW");
+		return -1;
+	}
+
+	int fb_attribute_list[] = {
+		GLX_DOUBLEBUFFER,  true,
+		GLX_RED_SIZE,      8,
+		GLX_GREEN_SIZE,    8,
+		GLX_BLUE_SIZE,     8,
+		GLX_ALPHA_SIZE,    8,
+		GLX_DEPTH_SIZE,    16,
+		GLX_RENDER_TYPE,   GLX_RGBA_BIT,
+		GLX_DRAWABLE_TYPE, GLX_PBUFFER_BIT,
+		GLX_X_RENDERABLE,  true,
+		GLX_NONE
+	};
+
+	int fbConfigNumber = 0;
+	GLXFBConfig *FBConfig = glXChooseFBConfig(xDisplay, 0, fb_attribute_list, &fbConfigNumber);
+	glxFBConfig = *FBConfig;
+
+	int ctx_attribute_list[] = {
+		GLX_RENDER_TYPE,               GLX_RGBA_TYPE,
+		GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
+		GLX_CONTEXT_MINOR_VERSION_ARB, 5,
+		GLX_CONTEXT_FLAGS_ARB,         GLX_CONTEXT_DEBUG_BIT_ARB,
+		GLX_CONTEXT_PROFILE_MASK_ARB,  GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
+		0
+	};
+	glxContext = glXCreateContextAttribsARB(xDisplay, *FBConfig, NULL, GL_TRUE, ctx_attribute_list);
+	glXDestroyContext(xDisplay, old_ctx);
+	glXMakeCurrent(xDisplay, glxDrawable, glxContext);
+
+#endif
+	return 1;
+}
+
+///////////////////////////////////////////
+
+void skg_setup_xlib(void *dpy, void *vi, void *drawable) {
+#if defined(__linux__)
+	xDisplay    =  (Display    *) dpy;
+	visualInfo  =  (XVisualInfo*) vi;
+	glxDrawable = *(Drawable   *) drawable;
+#endif
+}
+
+///////////////////////////////////////////
 
 int32_t skg_init(const char *app_name, void *adapter_id) {
 #if defined(_WIN32)
 	int32_t result = gl_init_win32();
-#elif defined(__ANDROID__) || defined(__linux__)
+#elif defined(__ANDROID__)
 	int32_t result = gl_init_egl();
+#elif defined(__linux__)
+	int32_t result = gl_init_glx();
 #elif defined(__EMSCRIPTEN__)
 	int32_t result = gl_init_emscripten();
 #endif
@@ -552,7 +621,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 		return result;
 
 	// Load OpenGL function pointers
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__) && !defined(__linux__)
 	gl_load_extensions();
 #endif
 
@@ -593,7 +662,7 @@ void skg_shutdown() {
 	wglMakeCurrent(NULL, NULL);
 	ReleaseDC(gl_hwnd, gl_hdc);
 	wglDeleteContext(gl_hrc);
-#elif defined(__ANDROID__) || defined(__linux__)
+#elif defined(__ANDROID__)
 	if (egl_display != EGL_NO_DISPLAY) {
 		eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 		if (egl_context != EGL_NO_CONTEXT) eglDestroyContext(egl_display, egl_context);
@@ -649,10 +718,16 @@ skg_platform_data_t skg_get_platform_data() {
 #ifdef _WIN32
 	result._gl_hdc = gl_hdc;
 	result._gl_hrc = gl_hrc;
-#elif defined(__ANDROID__) || defined(__linux__)
+#elif defined(__ANDROID__)
 	result._egl_display = egl_display;
 	result._egl_config  = egl_config;
 	result._egl_context = egl_context;
+#elif defined(__linux__)
+	result._x_display     = xDisplay;
+	result._visual_id     = &visualInfo->visualid;
+	result._glx_fb_config = glxFBConfig;
+	result._glx_drawable  = &glxDrawable;
+	result._glx_context   = glxContext;
 #endif
 	return result;
 }
@@ -1147,7 +1222,7 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 		skg_log(skg_log_critical, "Couldn't set pixel format!");
 		return {};
 	}
-#elif defined(__ANDROID__) || defined(__linux__)
+#elif defined(__ANDROID__)
 	EGLint attribs[] = { 
 		EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_SRGB_KHR,
 		EGL_NONE };
@@ -1156,6 +1231,10 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 
 	eglQuerySurface(egl_display, result._egl_surface, EGL_WIDTH,  &result.width );
 	eglQuerySurface(egl_display, result._egl_surface, EGL_HEIGHT, &result.height);
+#elif defined(__linux__)
+	result._x_window = hwnd;
+	result.width  = requested_width;
+	result.height = requested_height;
 #else
 	int32_t viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
@@ -1253,8 +1332,10 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 void skg_swapchain_present(skg_swapchain_t *swapchain) {
 #ifdef _WIN32
 	SwapBuffers((HDC)swapchain->_hdc);
-#elif defined(__ANDROID__) || defined(__linux__)
+#elif defined(__ANDROID__)
 	eglSwapBuffers(egl_display, swapchain->_egl_surface);
+#elif defined(__linux__)
+	glXSwapBuffers(xDisplay, *(Drawable *) swapchain->_x_window);
 #elif defined(__EMSCRIPTEN__) && defined(SKG_MANUAL_SRGB)
 	float clear[4] = { 0,0,0,1 };
 	skg_tex_target_bind(nullptr, true, clear);
@@ -1275,8 +1356,11 @@ void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *cle
 #elif _WIN32
 	wglMakeCurrent((HDC)swapchain->_hdc, gl_hrc);
 	skg_tex_target_bind(nullptr, clear, clear_color_4);
-#elif defined(__ANDROID__) || defined(__linux__)
+#elif defined(__ANDROID__)
 	eglMakeCurrent(egl_display, swapchain->_egl_surface, swapchain->_egl_surface, egl_context);
+	skg_tex_target_bind(nullptr, clear, clear_color_4);
+#elif defined(__linux__)
+	glXMakeCurrent(xDisplay, *(Drawable *) swapchain->_x_window, glxContext);
 	skg_tex_target_bind(nullptr, clear, clear_color_4);
 #endif
 }
@@ -1291,7 +1375,7 @@ void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 		swapchain->_hwnd = nullptr;
 		swapchain->_hdc  = nullptr;
 	}
-#elif defined(__ANDOIRD__) || defined(__linux__)
+#elif defined(__ANDOIRD__)
 	eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 	if (swapchain->_egl_surface != EGL_NO_SURFACE) eglDestroySurface(egl_display, swapchain->_egl_surface);
 	swapchain->_egl_surface = EGL_NO_SURFACE;
@@ -1548,8 +1632,8 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 void skg_tex_destroy(skg_tex_t *tex) {
 	uint32_t tex_list[] = { tex->_texture     };
 	uint32_t fb_list [] = { tex->_framebuffer };
-	glDeleteTextures    (1, tex_list);
-	glDeleteFramebuffers(1, fb_list );  
+	if (tex->_texture    ) glDeleteTextures    (1, tex_list);
+	if (tex->_framebuffer) glDeleteFramebuffers(1, fb_list );  
 	*tex = {};
 }
 

@@ -292,7 +292,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (out_file->stages[i].language == skg_shader_lang_glsl_es && 
 			(out_file->stages[i].stage == skg_stage_pixel ||
 			 out_file->stages[i].stage == skg_stage_vertex)) {
-			sksc_log(log_level_info, "OpenGL pixel shader stage:\n%s", out_file->stages[i].code);
+			//sksc_log(log_level_info, "OpenGL pixel shader stage:\n%s", out_file->stages[i].code);
 		}
 	}
 

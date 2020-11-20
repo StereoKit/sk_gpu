@@ -299,7 +299,7 @@ bool app_init() {
 
 ///////////////////////////////////////////
 
-void app_test_dyn_update(double time) {
+void app_test_dyn_update(float time) {
 
 	for (int32_t y = 0; y < app_wave_size; y++) {
 		for (int32_t x = 0; x < app_wave_size; x++) {
@@ -339,7 +339,7 @@ void app_test_dyn_update(double time) {
 
 ///////////////////////////////////////////
 
-void app_test_colors(double t) {
+void app_test_colors(float t) {
 	// Here's how this triangle should look:
 	// https://medium.com/@heypete/hello-triangle-meet-swift-and-wide-color-6f9e246616d9
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));
@@ -405,7 +405,7 @@ void app_test_cubemap() {
 
 ///////////////////////////////////////////
 
-void app_test_rendertarget(double t) {
+void app_test_rendertarget(float t) {
 	skg_tex_t *old_target = skg_tex_target_get();
 	int32_t old_view[4];
 	skg_viewport_get(old_view);
@@ -470,7 +470,7 @@ void app_test_instancing() {
 
 ///////////////////////////////////////////
 
-void app_render(double t, hmm_mat4 view, hmm_mat4 proj) {
+void app_render(float t, hmm_mat4 view, hmm_mat4 proj) {
 	app_test_rendertarget(t);
 
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );

@@ -47,6 +47,8 @@ skg_buffer_t      app_shader_data_buffer = {};
 skg_buffer_t      app_shader_inst_buffer = {};
 skg_tex_t         app_tex                = {};
 skg_tex_t         app_tex_white          = {};
+skg_tex_t         app_tex_gradient_srgb  = {};
+skg_tex_t         app_tex_gradient_linear= {};
 skg_tex_t         app_target             = {};
 skg_tex_t         app_target_depth       = {};
 skg_tex_t         app_cubemap            = {};
@@ -181,16 +183,15 @@ bool app_init() {
 	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skg_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t));
 
 	// Make a checkered texture
-	const int w = 512, h = 512;
+	const int32_t w = 512, h = 512;
 	skg_color32_t *colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* w * h);
 	for (int32_t y = 0; y < h; y++) {
-		for (int32_t x = 0; x < w; x++) {
-			int32_t i = x + y*w;
-			float   c = (x/32 + y/32) % 2 == 0 ? 1 : y/(float)h;
-			uint8_t c8 = c * 255;
-			colors[i] = { c8,c8,c8,255 };
-		}
-	}
+	for (int32_t x = 0; x < w; x++) {
+		int32_t i = x + y*w;
+		float   c = (x/32 + y/32) % 2 == 0 ? 1 : y/(float)h;
+		uint8_t c8 = c * 255;
+		colors[i] = { c8,c8,c8,255 };
+	} }
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
 	skg_tex_settings    (&app_tex, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_tex, colors, w, h);
@@ -203,6 +204,23 @@ bool app_init() {
 	}
 	app_tex_white = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
 	skg_tex_set_contents(&app_tex_white, colors_wht, 2, 2);
+
+	// Make srgb and linear gradients
+	const int32_t gw = 64, gh = 16;
+	colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* gw * gh);
+	for (int32_t y = 0; y < gh; y++) {
+	for (int32_t x = 0; x < gw; x++) {
+		int32_t i = x + y*gw;
+		uint8_t c8 = (x/(float)gw) * 255;
+		colors[i] = { c8,c8,c8,255 };
+	} }
+	app_tex_gradient_srgb   = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
+	app_tex_gradient_linear = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
+	skg_tex_settings    (&app_tex_gradient_srgb,   skg_tex_address_clamp, skg_tex_sample_linear, 0);
+	skg_tex_settings    (&app_tex_gradient_linear, skg_tex_address_clamp, skg_tex_sample_linear, 0);
+	skg_tex_set_contents(&app_tex_gradient_srgb,   colors, gw, gh);
+	skg_tex_set_contents(&app_tex_gradient_linear, colors, gw, gh);
+	free(colors);
 
 	// make color space gradients
 	const int32_t grad_size = 128;
@@ -324,7 +342,6 @@ void app_test_dyn_update(double time) {
 void app_test_colors(double t) {
 	// Here's how this triangle should look:
 	// https://medium.com/@heypete/hello-triangle-meet-swift-and-wide-color-6f9e246616d9
-
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
@@ -334,6 +351,29 @@ void app_test_colors(double t) {
 	skg_pipeline_bind(&app_mat_default);
 	skg_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
 	skg_draw(0, 0, app_mesh_tri.ind_count, 1);
+
+	// Just to make sure, here's a pair of gradient strips, srgb and linear
+	// sRGB
+	world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,3,0} }) * HMM_Scale(hmm_vec3{ {1,.25f,1} }));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+
+	skg_mesh_bind    (&app_mesh_quad.mesh);
+	skg_pipeline_bind(&app_mat_default);
+	skg_tex_bind     (&app_tex_gradient_srgb, app_sh_default_tex_bind);
+	skg_draw(0, 0, app_mesh_quad.ind_count, 1);
+
+	// and linear
+	world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,2.75f,0} }) * HMM_Scale(hmm_vec3{ {1,.25f,1} }));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+
+	skg_mesh_bind    (&app_mesh_quad.mesh);
+	skg_pipeline_bind(&app_mat_default);
+	skg_tex_bind     (&app_tex_gradient_linear, app_sh_default_tex_bind);
+	skg_draw(0, 0, app_mesh_quad.ind_count, 1);
 
 	for (int32_t i = 0; i < sizeof(app_tex_colspace) / sizeof(app_tex_colspace[0]); i++) {
 		world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(i/2+1) * (i%2==0?-2.0f:2.0f),2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));

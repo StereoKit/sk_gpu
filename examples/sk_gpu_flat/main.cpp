@@ -153,7 +153,7 @@ int main_step(double t, void *) {
 	skg_swapchain_bind(&app_swapchain, true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(
-		HMM_Vec3(sinf(t*0.001) * 5, 2, cosf(t*0.001) * 5),
+		HMM_Vec3(sinf((float)t*0.001f) * 5, 2, cosf((float)t*0.001f) * 5),
 		HMM_Vec3(0, 0, 0),
 		HMM_Vec3(0, 1, 0));
 	hmm_mat4 proj = HMM_Perspective(90, app_swapchain.width / (float)app_swapchain.height, 0.01f, 1000);
@@ -180,7 +180,7 @@ void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 		hmm_mat4 view, proj;
 		memcpy(&view, views[i].viewMatrix,       sizeof(hmm_mat4));
 		memcpy(&proj, views[i].projectionMatrix, sizeof(hmm_mat4));
-		app_render(frame, view, proj);
+		app_render((double)frame, view, proj);
 	}
 
 	skg_viewport(old_viewport);

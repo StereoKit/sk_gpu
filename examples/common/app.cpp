@@ -131,7 +131,7 @@ void       tga_write(const char *filename, uint32_t width, uint32_t height, uint
 ///////////////////////////////////////////
 
 bool app_init() {
-	app_compute_buffer = skg_buffer_create(app_wave_verts, app_wave_size * app_wave_size, sizeof(skg_vert_t), skg_buffer_type_compute, skg_use_dynamic);
+	//app_compute_buffer = skg_buffer_create(app_wave_verts, app_wave_size * app_wave_size, sizeof(skg_vert_t), skg_buffer_type_compute, skg_use_dynamic);
 	skg_vert_t *platform_verts;
 	uint32_t   *platform_inds;
 	int32_t     platform_v_count, platform_i_count;
@@ -187,9 +187,9 @@ bool app_init() {
 	skg_color32_t *colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* w * h);
 	for (int32_t y = 0; y < h; y++) {
 	for (int32_t x = 0; x < w; x++) {
-		int32_t i = x + y*w;
-		float   c = (x/32 + y/32) % 2 == 0 ? 1 : y/(float)h;
-		uint8_t c8 = c * 255;
+		int32_t i  = x + y*w;
+		float   c  = (x/32 + y/32) % 2 == 0 ? 1 : y/(float)h;
+		uint8_t c8 = (uint8_t)(c * 255);
 		colors[i] = { c8,c8,c8,255 };
 	} }
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
@@ -200,7 +200,7 @@ bool app_init() {
 	// Make a plain white texture
 	skg_color32_t colors_wht[2*2];
 	for (int32_t i = 0; i < sizeof(colors_wht)/sizeof(skg_color32_t); i++) {
-		colors_wht[i].hex = 0xFFFFFFFF;
+		colors_wht[i] = {255,255,255,255};
 	}
 	app_tex_white = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
 	skg_tex_set_contents(&app_tex_white, colors_wht, 2, 2);
@@ -210,8 +210,8 @@ bool app_init() {
 	colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* gw * gh);
 	for (int32_t y = 0; y < gh; y++) {
 	for (int32_t x = 0; x < gw; x++) {
-		int32_t i = x + y*gw;
-		uint8_t c8 = (x/(float)gw) * 255;
+		int32_t  i = x + y*gw;
+		uint8_t c8 = (uint8_t)((x/(float)gw) * 255);
 		colors[i] = { c8,c8,c8,255 };
 	} }
 	app_tex_gradient_srgb   = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
@@ -306,7 +306,7 @@ void app_test_dyn_update(double time) {
 			int32_t i  = x + y * app_wave_size;
 			float   xp = x/(float)(app_wave_size-1);
 			float   yp = y/(float)(app_wave_size-1);
-			float   t  = ((xp + yp)*8 + (time*0.005f)) * 0.7f;
+			float   t  = ((xp + yp)*8 + ((float)time*0.005f)) * 0.7f;
 			app_wave_verts[i].pos[0] = x/(float)app_wave_size-0.5f;
 			app_wave_verts[i].pos[1] = sinf(t)*0.1f;
 			app_wave_verts[i].pos[2] = y/(float)app_wave_size-0.5f;
@@ -317,7 +317,7 @@ void app_test_dyn_update(double time) {
 			app_wave_verts[i].norm[1] = .6f/mag;
 			app_wave_verts[i].norm[2] = c/mag;
 
-			app_wave_verts[i].col.hex = 0xFFFFFF;
+			app_wave_verts[i].col = {255,255,255,255};
 
 			app_wave_verts[i].uv[0] = xp;
 			app_wave_verts[i].uv[1] = yp;
@@ -423,7 +423,7 @@ void app_test_rendertarget(double t) {
 	skg_buffer_set_contents(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
 	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
-	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) *HMM_Rotate(t * 0.05f, hmm_vec3{ {0,1,0} }));
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) *HMM_Rotate((float)t * 0.05f, hmm_vec3{ {0,1,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst_t));
 	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);

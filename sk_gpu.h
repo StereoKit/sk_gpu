@@ -159,19 +159,12 @@ typedef enum skg_cap_ {
 	skg_cap_wireframe,
 } skg_cap_;
 
-typedef union {
-	struct {
-		uint8_t r, g, b, a;
-	};
-	uint32_t hex;
-	uint8_t  arr[4];
+typedef struct {
+	uint8_t r, g, b, a;
 } skg_color32_t;
 
-typedef union {
-	struct {
-		float r, g, b, a;
-	};
-	float arr[4];
+typedef struct {
+	float r, g, b, a;
 } skg_color128_t;
 
 typedef struct skg_vert_t {
@@ -754,10 +747,10 @@ void skg_viewport_get(int32_t *out_xywh) {
 	uint32_t       count = 1;
 	D3D11_VIEWPORT viewport;
 	d3d_context->RSGetViewports(&count, &viewport);
-	out_xywh[0] = viewport.TopLeftX;
-	out_xywh[1] = viewport.TopLeftY;
-	out_xywh[2] = viewport.Width;
-	out_xywh[3] = viewport.Height;
+	out_xywh[0] = (int32_t)viewport.TopLeftX;
+	out_xywh[1] = (int32_t)viewport.TopLeftY;
+	out_xywh[2] = (int32_t)viewport.Width;
+	out_xywh[3] = (int32_t)viewport.Height;
 }
 
 ///////////////////////////////////////////

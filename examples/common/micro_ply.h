@@ -445,12 +445,14 @@ void ply_convert(const ply_file_t *file, const char *element_name, const ply_map
 ///////////////////////////////////////////
 
 void ply_free(ply_file_t *file) {
+	if (!file || !file->elements) return;
 	for (int32_t i = 0; i < file->count; i++) {
 		free(file->elements[i].data);
 		free(file->elements[i].list_data);
 		free(file->elements[i].properties);
 	}
 	free(file->elements);
+	*file = {};
 }
 
 #endif

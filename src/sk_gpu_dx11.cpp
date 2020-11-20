@@ -211,10 +211,10 @@ void skg_viewport_get(int32_t *out_xywh) {
 	uint32_t       count = 1;
 	D3D11_VIEWPORT viewport;
 	d3d_context->RSGetViewports(&count, &viewport);
-	out_xywh[0] = viewport.TopLeftX;
-	out_xywh[1] = viewport.TopLeftY;
-	out_xywh[2] = viewport.Width;
-	out_xywh[3] = viewport.Height;
+	out_xywh[0] = (int32_t)viewport.TopLeftX;
+	out_xywh[1] = (int32_t)viewport.TopLeftY;
+	out_xywh[2] = (int32_t)viewport.Width;
+	out_xywh[3] = (int32_t)viewport.Height;
 }
 
 ///////////////////////////////////////////

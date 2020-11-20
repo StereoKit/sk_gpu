@@ -794,13 +794,13 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_buffer_is_valid(const skg_buffer_t *buffer) {
 	return buffer->_buffer != 0;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skg_use_dynamic) {
@@ -812,7 +812,7 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 	glBufferSubData(buffer->_target, 0, size_bytes, data);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
 	if (buffer->type == skg_buffer_type_constant)
@@ -827,7 +827,7 @@ void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offse
 		glBindBuffer(buffer->_target, buffer->_buffer);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_buffer_destroy(skg_buffer_t *buffer) {
 	uint32_t buffer_list[] = { buffer->_buffer };
@@ -835,7 +835,7 @@ void skg_buffer_destroy(skg_buffer_t *buffer) {
 	*buffer = {};
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
 	skg_mesh_t result = {};
@@ -845,7 +845,7 @@ skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 	mesh->_vert_buffer = vert_buffer ? vert_buffer->_buffer : 0;
@@ -873,13 +873,13 @@ void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
 	mesh->_ind_buffer = ind_buffer ? ind_buffer->_buffer : 0;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_bind(const skg_mesh_t *mesh) {
 	glBindVertexArray(mesh->_layout);
@@ -887,7 +887,7 @@ void skg_mesh_bind(const skg_mesh_t *mesh) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer );
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_destroy(skg_mesh_t *mesh) {
 	uint32_t vao_list[] = {mesh->_layout};
@@ -895,7 +895,7 @@ void skg_mesh_destroy(skg_mesh_t *mesh) {
 	*mesh = {};
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_size, skg_stage_ type) {
 	const char *file_chars = (const char *)file_data;
@@ -962,7 +962,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 	//glDeleteShader(shader->shader);
@@ -1063,7 +1063,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	glUseProgram(pipeline->_shader._program);
@@ -1116,61 +1116,61 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 #endif
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_transparency(skg_pipeline_t *pipeline, skg_transparency_ transparency) {
 	pipeline->transparency = transparency;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_cull(skg_pipeline_t *pipeline, skg_cull_ cull) {
 	pipeline->cull = cull;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_wireframe(skg_pipeline_t *pipeline, bool wireframe) {
 	pipeline->wireframe = wireframe;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 	pipeline->depth_write = write;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test) {
 	pipeline->depth_test = test;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_transparency_ skg_pipeline_get_transparency(const skg_pipeline_t *pipeline) {
 	return pipeline->transparency;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_cull_ skg_pipeline_get_cull(const skg_pipeline_t *pipeline) {
 	return pipeline->cull;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 	return pipeline->wireframe;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_depth_test_ skg_pipeline_get_depth_test(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_test;
@@ -1303,7 +1303,7 @@ void main() {
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t height) {
 	if (width == swapchain->width && height == swapchain->height)
@@ -1328,7 +1328,7 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 #endif
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_present(skg_swapchain_t *swapchain) {
 #ifdef _WIN32
@@ -1347,7 +1347,7 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 #endif
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *clear_color_4) {
 	gl_active_width  = swapchain->width;
@@ -1366,7 +1366,7 @@ void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *cle
 #endif
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 #ifdef _WIN32
@@ -1383,7 +1383,7 @@ void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 #endif
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count) {
 	skg_tex_t result = {};
@@ -1420,7 +1420,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_layer) {
 	skg_tex_t result = {};
@@ -1447,7 +1447,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, skg_mip_ mip_maps) {
 	skg_tex_t result = {};
@@ -1469,13 +1469,13 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_tex_is_valid(const skg_tex_t *tex) {
 	return tex->_texture != 0;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 	if (tex->type == skg_tex_type_rendertarget) {
@@ -1502,7 +1502,7 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
 	glBindTexture(tex->_target, tex->_texture);
@@ -1542,7 +1542,7 @@ void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32
 	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
 	tex->width       = width;
@@ -1584,7 +1584,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 #if defined(__EMSCRIPTEN__ ) || defined(__ANDROID__)
@@ -1613,7 +1613,7 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 #endif
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	// Added this in to fix textures initially? Removed it after I switched to
@@ -1628,7 +1628,7 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_destroy(skg_tex_t *tex) {
 	uint32_t tex_list[] = { tex->_texture     };
@@ -1638,7 +1638,7 @@ void skg_tex_destroy(skg_tex_t *tex) {
 	*tex = {};
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 uint32_t skg_buffer_type_to_gl(skg_buffer_type_ type) {
 	switch (type) {
@@ -1649,7 +1649,7 @@ uint32_t skg_buffer_type_to_gl(skg_buffer_type_ type) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	switch (format) {
@@ -1667,7 +1667,7 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	switch (format) {
@@ -1685,7 +1685,7 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	switch (format) {
@@ -1705,7 +1705,7 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	switch (format) {

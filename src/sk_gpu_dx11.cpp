@@ -250,13 +250,13 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_buffer_is_valid(const skg_buffer_t *buffer) {
 	return buffer->_buffer != nullptr;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t size_bytes) {
 	if (buffer->use != skg_use_dynamic) {
@@ -273,7 +273,7 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size) {
 	ID3D11Buffer* cpu_buff = nullptr;
@@ -301,7 +301,7 @@ void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint3
 	cpu_buff->Release();
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
 	switch (buffer->type) {
@@ -316,14 +316,14 @@ void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offse
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_buffer_destroy(skg_buffer_t *buffer) {
 	if (buffer->_buffer) buffer->_buffer->Release();
 	*buffer = {};
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
 	skg_mesh_t result = {};
@@ -335,7 +335,7 @@ skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 	if (mesh->_vert_buffer) mesh->_vert_buffer->Release();
@@ -343,7 +343,7 @@ void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 	if (mesh->_vert_buffer) mesh->_vert_buffer->AddRef();
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
 	if (mesh->_ind_buffer) mesh->_ind_buffer->Release();
@@ -351,7 +351,7 @@ void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
 	if (mesh->_ind_buffer) mesh->_ind_buffer->AddRef();
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_bind(const skg_mesh_t *mesh) {
 	UINT strides[] = { sizeof(skg_vert_t) };
@@ -360,7 +360,7 @@ void skg_mesh_bind(const skg_mesh_t *mesh) {
 	d3d_context->IASetIndexBuffer  (mesh->_ind_buffer, DXGI_FORMAT_R32_UINT, 0);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_mesh_destroy(skg_mesh_t *mesh) {
 	if (mesh->_ind_buffer ) mesh->_ind_buffer ->Release();
@@ -368,7 +368,7 @@ void skg_mesh_destroy(skg_mesh_t *mesh) {
 	*mesh = {};
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 #include <stdio.h>
 skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_size, skg_stage_ type) {
@@ -425,7 +425,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 	switch(shader->type) {
@@ -475,7 +475,7 @@ void skg_shader_destroy(skg_shader_t *shader) {
 
 ///////////////////////////////////////////
 // skg_pipeline                          //
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 	if (pipeline->_blend) pipeline->_blend->Release();
@@ -494,7 +494,7 @@ void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 	d3d_device->CreateBlendState(&desc_blend, &pipeline->_blend);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_update_rasterizer(skg_pipeline_t *pipeline) {
 	if (pipeline->_rasterize) pipeline->_rasterize->Release();
@@ -510,7 +510,7 @@ void skg_pipeline_update_rasterizer(skg_pipeline_t *pipeline) {
 	d3d_device->CreateRasterizerState(&desc_rasterizer, &pipeline->_rasterize);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_update_depth(skg_pipeline_t *pipeline) {
 	if (pipeline->_depth) pipeline->_depth->Release();
@@ -545,7 +545,7 @@ void skg_pipeline_update_depth(skg_pipeline_t *pipeline) {
 	d3d_device->CreateDepthStencilState(&desc_depthstate, &pipeline->_depth);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	skg_pipeline_t result = {};
@@ -568,7 +568,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	d3d_context->OMSetBlendState       (pipeline->_blend,  nullptr, 0xFFFFFFFF);
@@ -579,7 +579,7 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	d3d_context->IASetInputLayout      (pipeline->_layout);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_transparency(skg_pipeline_t *pipeline, skg_transparency_ transparency) {
 	if (pipeline->transparency != transparency) {
@@ -597,7 +597,7 @@ void skg_pipeline_set_cull(skg_pipeline_t *pipeline, skg_cull_ cull) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 	if (pipeline->depth_write != write) {
@@ -606,7 +606,7 @@ void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test) {
 	if (pipeline->depth_test != test) {
@@ -615,7 +615,7 @@ void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_pipeline_set_wireframe(skg_pipeline_t *pipeline, bool wireframe) {
 	if (pipeline->wireframe != wireframe) {
@@ -624,31 +624,31 @@ void skg_pipeline_set_wireframe(skg_pipeline_t *pipeline, bool wireframe) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_transparency_ skg_pipeline_get_transparency(const skg_pipeline_t *pipeline) {
 	return pipeline->transparency;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_cull_ skg_pipeline_get_cull(const skg_pipeline_t *pipeline) {
 	return pipeline->cull;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 	return pipeline->wireframe;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_depth_test_ skg_pipeline_get_depth_test(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_test;
@@ -718,7 +718,7 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t height) {
 	if (swapchain->_swapchain == nullptr || (width == swapchain->width && height == swapchain->height))
@@ -742,19 +742,19 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	back_buffer->Release();
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_present(skg_swapchain_t *swapchain) {
 	swapchain->_swapchain->Present(1, 0);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *clear_color_4) {
 	skg_tex_target_bind(swapchain->_target.format != 0 ? &swapchain->_target : nullptr, clear, clear_color_4);
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 	skg_tex_destroy(&swapchain->_target);
@@ -763,7 +763,7 @@ void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 	*swapchain = {};
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_count) {
 	skg_tex_t result = {};
@@ -784,7 +784,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_tex_fmt_ override_format, int32_t width, int32_t height, int32_t array_layer) {
 	skg_tex_t result = {};
@@ -805,7 +805,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, skg_mip_ mip_maps) {
 	skg_tex_t result = {};
@@ -820,13 +820,13 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	return result;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_tex_is_valid(const skg_tex_t *tex) {
 	return tex->_texture != nullptr;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 	if (depth->type == skg_tex_type_depth) {
@@ -838,7 +838,7 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
 	if (tex->_sampler)
@@ -1067,7 +1067,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 	// Make sure we've been provided enough memory to hold this texture
@@ -1129,7 +1129,7 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 	return true;
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	if (texture != nullptr) {
@@ -1151,7 +1151,7 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 void skg_tex_destroy(skg_tex_t *tex) {
 	if (tex->_target_view) tex->_target_view->Release();
@@ -1161,7 +1161,7 @@ void skg_tex_destroy(skg_tex_t *tex) {
 	if (tex->_texture    ) tex->_texture    ->Release();
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 template <typename T>
 void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
@@ -1192,7 +1192,7 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
@@ -1217,7 +1217,7 @@ void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	switch (format) {
@@ -1237,7 +1237,7 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	switch (format) {
@@ -1257,7 +1257,7 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	}
 }
 
-/////////////////////////////////////////// 
+///////////////////////////////////////////
 
 const char *skg_semantic_to_d3d(skg_el_semantic_ semantic) {
 	switch (semantic) {

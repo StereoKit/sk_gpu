@@ -533,11 +533,11 @@ skg_shader_stage_t skg_shader_file_create_stage(const skg_shader_file_t *file, s
 #if defined(SKG_DIRECT3D11) || defined(SKG_DIRECT3D12)
 	language = skg_shader_lang_hlsl;
 #elif defined(SKG_OPENGL)
-	#ifdef __EMSCRIPTEN__
+	#if   defined(_SKG_GL_WEB)
 		language = skg_shader_lang_glsl_web;
-	#elif defined(__ANDROID__)
+	#elif defined(_SKG_GL_ES)
 		language = skg_shader_lang_glsl_es;
-	#else
+	#elif defined(_SKG_GL_DESKTOP)
 		language = skg_shader_lang_glsl;
 	#endif
 #elif defined(SKG_VULKAN)

@@ -989,7 +989,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 		spvc_compiler_add_header_line(compiler_glsl, "#elif defined(GL_NV_viewport_array2)");
 		spvc_compiler_add_header_line(compiler_glsl, "#extension GL_NV_viewport_array2 : enable");
 		spvc_compiler_add_header_line(compiler_glsl, "#else");
-		spvc_compiler_add_header_line(compiler_glsl, "#define gl_Layer int __gl_Layer");
+		spvc_compiler_add_header_line(compiler_glsl, "#define gl_Layer int _dummy_gl_layer_var");
 		spvc_compiler_add_header_line(compiler_glsl, "#endif");
 	}
 

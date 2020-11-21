@@ -3,7 +3,7 @@
 
 #pragma comment(lib,"dxcompiler.lib")
 #pragma comment(lib,"d3dcompiler.lib")
-#ifdef _DEBUG
+#if defined(_DEBUG) && false
 #pragma comment(lib,"spirv-cross-cd.lib")
 #pragma comment(lib,"spirv-cross-cored.lib")
 #pragma comment(lib,"spirv-cross-cppd.lib")
@@ -993,9 +993,6 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 		spvc_compiler_add_header_line(compiler_glsl, "#endif");
 	}
 
-	spvc_variable_id id;
-	spvc_compiler_build_dummy_sampler_for_combined_images(compiler_glsl, &id);
-
 	// combiner samplers/textures for OpenGL/ES
 	spvc_compiler_build_combined_image_samplers(compiler_glsl);
 
@@ -1004,8 +1001,10 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shade
 	spvc_compiler_get_combined_image_samplers(compiler_glsl, &samplers, &count);
 	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
 	for (size_t i = 0; i < count; i++) {
-		spvc_compiler_set_name      (compiler_glsl, samplers[i].combined_id, list[i].name);
-		spvc_compiler_set_decoration(compiler_glsl, samplers[i].combined_id, SpvDecorationBinding, spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding));
+		const char *name    = spvc_compiler_get_name      (compiler_glsl, samplers[i].image_id);
+		uint32_t    binding = spvc_compiler_get_decoration(compiler_glsl, samplers[i].image_id, SpvDecorationBinding);
+		spvc_compiler_set_name      (compiler_glsl, samplers[i].combined_id, name);
+		spvc_compiler_set_decoration(compiler_glsl, samplers[i].combined_id, SpvDecorationBinding, binding);
 	}
 
 	if (src_stage->stage == skg_stage_vertex || src_stage->stage == skg_stage_pixel) {

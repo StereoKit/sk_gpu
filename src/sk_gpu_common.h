@@ -29,6 +29,7 @@ typedef struct {
 void               skg_log                     (skg_log_ level, const char *text);
 bool               skg_read_file               (const char *filename, void **out_data, size_t *out_size);
 uint64_t           skg_hash                    (const char *string);
+uint32_t           skg_mip_count               (int32_t width, int32_t height);
 
 skg_color32_t      skg_col_hsv32               (float hue, float saturation, float value, float alpha);
 skg_color128_t     skg_col_hsv128              (float hue, float saturation, float value, float alpha);

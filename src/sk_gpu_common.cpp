@@ -61,6 +61,12 @@ uint64_t skg_hash(const char *string) {
 
 ///////////////////////////////////////////
 
+uint32_t skg_mip_count(int32_t width, int32_t height) {
+	return (uint32_t)log2f(fminf((float)width, (float)height)) + 1;
+}
+
+///////////////////////////////////////////
+
 skg_color32_t skg_col_hsv32(float h, float s, float v, float a) {
 	skg_color128_t col = skg_col_hsv128(h,s,v,a);
 	return skg_color32_t{

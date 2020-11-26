@@ -246,6 +246,7 @@ void write_file(char *filename, void *file_data, size_t file_size) {
 		return;
 	}
 	fwrite(file_data, file_size, 1, fp);
+	fflush(fp);
 	fclose(fp);
 }
 
@@ -281,6 +282,7 @@ void write_header(char *filename, void *file_data, size_t file_size) {
 		}
 	}
 	fprintf_s(fp, "};\n");
+	fflush(fp);
 	fclose(fp);
 }
 

@@ -22,6 +22,7 @@ void            write_header  (char *filename, void *file_data, size_t file_size
 void            iterate_files (char *input_name, sksc_settings_t *settings);
 sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
 void            show_usage    ();
+uint64_t        file_time     (char *file);
 
 ///////////////////////////////////////////
 
@@ -66,6 +67,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = false;
 		else if (strcmp(argv[i], "-r" ) == 0) result.row_major     = true;
 		else if (strcmp(argv[i], "-d" ) == 0) result.debug         = true;
+		else if (strcmp(argv[i], "-c" ) == 0) result.only_if_changed=true;
 		else if (strcmp(argv[i], "-si") == 0) result.silent_info   = true;
 		else if (strcmp(argv[i], "-sw") == 0) { result.silent_info = true; result.silent_warn = true; }
 		else if (strcmp(argv[i], "-s" ) == 0) { result.silent_err = true; result.silent_info = true; result.silent_warn = true;}
@@ -117,6 +119,7 @@ Options:
 			shaders.
 	-sw		No info or warnings are printed when compiling shaders.
 	-si		No info is printed when compiling shaders.
+	-c		Only compile if the source code is newer than the output file.
 	
 	-d		Compile shaders with debug info embedded. Enabling this will
 			disable shader optimizations.
@@ -157,25 +160,35 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 			char filename[1024];
 			sprintf_s(filename, "%s%s", folder, file_info.cFileName);
 
+			char new_filename[512];
+			char drive[16];
+			char dir  [512];
+			char name [128];
+			_splitpath_s(filename,
+				drive, sizeof(drive),
+				dir,   sizeof(dir),
+				name,  sizeof(name), nullptr, 0); 
+
+			if (settings->replace_ext) {
+				sprintf_s(new_filename, "%s%s%s.%s", drive, dir, name, settings->output_header?"h":"sks");
+			} else {
+				sprintf_s(new_filename, "%s.%s", filename, settings->output_header?"h":"sks");
+			}
+
+			// Skip this file if it hasn't changed
+			if (settings->only_if_changed && file_time(filename) < file_time(new_filename)) {
+				if (!settings->silent_info) {
+					printf("File '%s' is already up-to-date, skipping...\n", filename);
+				}
+				continue;
+			}
+
 			char  *file_text;
 			size_t file_size;
 			if (read_file(filename, &file_text, &file_size)) {
 				skg_shader_file_t file;
 				if (sksc_compile(filename, file_text, settings, &file)) {
-					char new_filename[512];
-					char drive[16];
-					char dir  [512];
-					char name [128];
-					_splitpath_s(filename,
-						drive, sizeof(drive),
-						dir,   sizeof(dir),
-						name,  sizeof(name), nullptr, 0); 
-
-					if (settings->replace_ext) {
-						sprintf_s(new_filename, "%s%s%s.sks", drive, dir, name);
-					} else {
-						sprintf_s(new_filename, "%s.sks", filename);
-					}
+					
 
 					void  *sks_data;
 					size_t sks_size;
@@ -239,7 +252,6 @@ void write_file(char *filename, void *file_data, size_t file_size) {
 ///////////////////////////////////////////
 
 void write_header(char *filename, void *file_data, size_t file_size) {
-	char new_filename[512];
 	char drive[16];
 	char dir  [512];
 	char name [128];
@@ -247,7 +259,6 @@ void write_header(char *filename, void *file_data, size_t file_size) {
 		drive, sizeof(drive),
 		dir,   sizeof(dir),
 		name,  sizeof(name), nullptr, 0);
-	sprintf_s(new_filename, "%s%s%s.h", drive, dir, name);
 
 	// '.' may be common, and will bork the variable name
 	size_t len = strlen(name);
@@ -256,7 +267,7 @@ void write_header(char *filename, void *file_data, size_t file_size) {
 	}
 
 	FILE *fp = nullptr;
-	if (fopen_s(&fp, new_filename, "w") != 0 || fp == nullptr) {
+	if (fopen_s(&fp, filename, "w") != 0 || fp == nullptr) {
 		return;
 	}
 	fprintf(fp, "#pragma once\n\n");
@@ -284,4 +295,16 @@ void get_folder(char *filename, char *out_dest, size_t dest_size) {
 		nullptr, 0, nullptr, 0); 
 
 	sprintf_s(out_dest, dest_size, "%s%s", drive, dir);
+}
+
+///////////////////////////////////////////
+
+uint64_t file_time(char *file) {
+	HANDLE   handle = CreateFileA(file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	FILETIME write_time;
+
+	if (!GetFileTime(handle, nullptr, nullptr, &write_time))
+		return 0;
+	CloseHandle(handle);
+	return (static_cast<uint64_t>(write_time.dwHighDateTime) << 32) | write_time.dwLowDateTime;
 }

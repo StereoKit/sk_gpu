@@ -16,6 +16,7 @@ typedef struct sksc_settings_t {
 	bool silent_info;
 	bool silent_err;
 	bool silent_warn;
+	bool only_if_changed;
 	int  optimize;
 	char folder[512];
 	char vs_entrypoint[64];

@@ -1004,7 +1004,7 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 		log = (char*)malloc(length);
 		glGetProgramInfoLog(result._program, length, &err, log);
 
-		char text[128];
+		char text[272];
 		snprintf(text, sizeof(text), "Unable to link %s:", meta->name);
 		skg_log(skg_log_warning, text);
 		skg_log(skg_log_warning, log);

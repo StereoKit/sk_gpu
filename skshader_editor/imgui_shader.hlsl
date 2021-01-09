@@ -17,10 +17,14 @@ struct PS_INPUT {
 sampler   sampler0 : register(s0);
 Texture2D texture0 : register(t0);
 
+float3 srgb_to_linear(float3 srgb) {
+	return srgb * (srgb * (srgb * 0.305306011 + 0.682171111) + 0.012522878);
+}
+
 PS_INPUT vs(VS_INPUT input) {
     PS_INPUT output;
     output.pos = mul( ProjectionMatrix, float4(input.pos.xy, 0.f, 1.f));
-    output.col = input.col;
+    output.col = float4(srgb_to_linear(input.col.rgb),1);
     output.uv  = input.uv;
     return output;
 }

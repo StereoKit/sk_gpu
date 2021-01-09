@@ -30,8 +30,8 @@ void window_preview_resize(int32_t width, int32_t height) {
 		skg_tex_destroy(&zbuffer);
 		surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
 		zbuffer = skg_tex_create(skg_tex_type_depth, skg_use_static, skg_tex_fmt_depth32, skg_mip_none);
-		skg_tex_set_contents(&surface, nullptr, 1, width, height);
-		skg_tex_set_contents(&zbuffer, nullptr, 1, width, height);
+		skg_tex_set_contents(&surface, nullptr, width, height);
+		skg_tex_set_contents(&zbuffer, nullptr, width, height);
 		skg_tex_attach_depth(&surface, &zbuffer);
 	}
 }
@@ -55,10 +55,10 @@ void window_preview_init() {
 		verts[i].pos[0] = (nx ? neg : ny ? (u?-1:1)*neg : (u?1:-1)*neg);
 		verts[i].pos[1] = (nx || nz ? (v?1:-1) : neg);
 		verts[i].pos[2] = (nx ? (u?-1:1)*neg : ny ? (v?1:-1) : neg);
-		verts[i].col[0] = 255;
-		verts[i].col[1] = 255;
-		verts[i].col[2] = 255;
-		verts[i].col[3] = 255;
+		verts[i].col.r = 255;
+		verts[i].col.g = 255;
+		verts[i].col.b = 255;
+		verts[i].col.a = 255;
 	}
 	for (size_t i = 0; i < 6; i++) {
 		inds[i*6+0] = i*4;
@@ -77,8 +77,7 @@ void window_preview_init() {
 	int32_t width, height, comp;
 	void *img_data = stbi_load("test.png", &width, &height, &comp, 4);
 	cube_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
-	void *frames[] = { img_data };
-	skg_tex_set_contents(&cube_tex, frames, 1, width, height);
+	skg_tex_set_contents(&cube_tex, img_data, width, height);
 }
 
 void window_preview_render() {

@@ -36,6 +36,7 @@ typedef struct skg_pipeline_t {
 	skg_cull_                cull;
 	bool                     wireframe;
 	bool                     depth_write;
+	bool                     scissor;
 	skg_depth_test_          depth_test;
 	skg_shader_meta_t       *meta;
 	ID3D11VertexShader      *_vertex;

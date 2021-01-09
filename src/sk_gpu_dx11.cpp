@@ -219,6 +219,13 @@ void skg_viewport_get(int32_t *out_xywh) {
 
 ///////////////////////////////////////////
 
+void skg_scissor(const int32_t *xywh) {
+	D3D11_RECT rect = {xywh[0], xywh[1], xywh[0]+xywh[2], xywh[1]+xywh[3]};
+	d3d_context->RSSetScissorRects(1, &rect);
+}
+
+///////////////////////////////////////////
+
 skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use) {
 	skg_buffer_t result = {};
 	result.use    = use;
@@ -502,6 +509,7 @@ void skg_pipeline_update_rasterizer(skg_pipeline_t *pipeline) {
 	D3D11_RASTERIZER_DESC desc_rasterizer = {};
 	desc_rasterizer.FillMode              = pipeline->wireframe ? D3D11_FILL_WIREFRAME : D3D11_FILL_SOLID;
 	desc_rasterizer.FrontCounterClockwise = true;
+	desc_rasterizer.ScissorEnable         = pipeline->scissor;
 	switch (pipeline->cull) {
 	case skg_cull_none:  desc_rasterizer.CullMode = D3D11_CULL_NONE;  break;
 	case skg_cull_front: desc_rasterizer.CullMode = D3D11_CULL_FRONT; break;
@@ -626,6 +634,15 @@ void skg_pipeline_set_wireframe(skg_pipeline_t *pipeline, bool wireframe) {
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_scissor(skg_pipeline_t *pipeline, bool enable) {
+	if (pipeline->scissor != enable) {
+		pipeline->scissor  = enable;
+		skg_pipeline_update_rasterizer(pipeline);
+	}
+}
+
+///////////////////////////////////////////
+
 skg_transparency_ skg_pipeline_get_transparency(const skg_pipeline_t *pipeline) {
 	return pipeline->transparency;
 }
@@ -652,6 +669,12 @@ bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 
 skg_depth_test_ skg_pipeline_get_depth_test(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_test;
+}
+
+///////////////////////////////////////////
+
+bool skg_pipeline_get_scissor(const skg_pipeline_t *pipeline) {
+	return pipeline->scissor;
 }
 
 ///////////////////////////////////////////

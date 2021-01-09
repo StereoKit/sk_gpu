@@ -262,6 +262,7 @@ void                skg_draw_begin               ();
 void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
 void                skg_viewport                 (const int32_t *xywh);
 void                skg_viewport_get             (int32_t *out_xywh);
+void                skg_scissor                  (const int32_t *xywh);
 
 skg_buffer_t        skg_buffer_create            (const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use);
 bool                skg_buffer_is_valid          (const skg_buffer_t *buffer);
@@ -303,6 +304,8 @@ void                skg_pipeline_set_depth_write (      skg_pipeline_t *pipeline
 bool                skg_pipeline_get_depth_write (const skg_pipeline_t *pipeline);
 void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline, skg_depth_test_ test);
 skg_depth_test_     skg_pipeline_get_depth_test  (const skg_pipeline_t *pipeline);
+void                skg_pipeline_set_scissor     (      skg_pipeline_t *pipeline, bool enable);
+bool                skg_pipeline_get_scissor     (const skg_pipeline_t *pipeline);
 void                skg_pipeline_destroy         (      skg_pipeline_t *pipeline);
 
 skg_swapchain_t     skg_swapchain_create         (void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t requested_width, int32_t requested_height);

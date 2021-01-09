@@ -113,6 +113,7 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_LINE 0x1B01
 #define GL_FILL 0x1B02
 #define GL_DEPTH_TEST 0x0B71
+#define GL_SCISSOR_TEST 0x0C11
 #define GL_TEXTURE_2D 0x0DE1
 #define GL_TEXTURE_2D_ARRAY 0x8C1A
 #define GL_TEXTURE_CUBE_MAP 0x8513
@@ -308,7 +309,8 @@ GLE(void,     glDrawElements,            uint32_t mode, int32_t count, uint32_t 
 GLE(void,     glDebugMessageCallback,    GLDEBUGPROC callback, const void *userParam) \
 GLE(void,     glBindBufferBase,          uint32_t target, uint32_t index, uint32_t buffer) \
 GLE(void,     glBufferSubData,           uint32_t target, int64_t offset, int32_t size, const void *data) \
-GLE(void,     glViewport,                int32_t x, int32_t y, int32_t width, int32_t height) \
+GLE(void,     glViewport,                int32_t x, int32_t y, uint32_t width, uint32_t height) \
+GLE(void,     glScissor,                 int32_t x, int32_t y, uint32_t width, uint32_t height) \
 GLE(void,     glCullFace,                uint32_t mode) \
 GLE(void,     glBlendFunc,               uint32_t sfactor, uint32_t dfactor) \
 GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
@@ -789,6 +791,14 @@ void skg_viewport_get(int32_t *out_xywh) {
 
 ///////////////////////////////////////////
 
+void skg_scissor(const int32_t *xywh) {
+	int32_t viewport[4];
+	skg_viewport_get(viewport);
+	glScissor(xywh[0], (viewport[3]-xywh[1])-xywh[3], xywh[2], xywh[3]);
+}
+
+///////////////////////////////////////////
+
 skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use) {
 	skg_buffer_t result = {};
 	result.use     = use;
@@ -1102,8 +1112,11 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	}
 
 	if (pipeline->depth_write || pipeline->depth_test != skg_depth_test_always)
-		glEnable(GL_DEPTH_TEST);
+		 glEnable (GL_DEPTH_TEST);
 	else glDisable(GL_DEPTH_TEST);
+
+	if (pipeline->scissor) glEnable (GL_SCISSOR_TEST);
+	else                   glDisable(GL_SCISSOR_TEST);
 
 	glDepthMask(pipeline->depth_write);
 	switch (pipeline->depth_test) {
@@ -1157,6 +1170,13 @@ void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_scissor(skg_pipeline_t *pipeline, bool enable) {
+	pipeline->scissor = enable;
+
+}
+
+///////////////////////////////////////////
+
 skg_transparency_ skg_pipeline_get_transparency(const skg_pipeline_t *pipeline) {
 	return pipeline->transparency;
 }
@@ -1183,6 +1203,12 @@ bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 
 skg_depth_test_ skg_pipeline_get_depth_test(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_test;
+}
+
+///////////////////////////////////////////
+
+bool skg_pipeline_get_scissor(const skg_pipeline_t *pipeline) {
+	return pipeline->scissor;
 }
 
 ///////////////////////////////////////////

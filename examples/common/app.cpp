@@ -285,6 +285,7 @@ bool app_init() {
 	app_mat_cube             = skg_pipeline_create(&app_sh_cube);
 	skg_pipeline_set_cull(&app_mat_cube, skg_cull_front);
 	skg_pipeline_set_depth_write(&app_mat_cube, false);
+	skg_pipeline_set_scissor    (&app_mat_cube, true);
 	
 	app_sh_default           = skg_shader_create_memory(sks_test_hlsl, sizeof(sks_test_hlsl));
 	app_sh_default_tex_bind  = skg_shader_get_tex_bind   (&app_sh_default, "tex");
@@ -471,6 +472,14 @@ void app_test_instancing() {
 ///////////////////////////////////////////
 
 void app_render(float t, hmm_mat4 view, hmm_mat4 proj) {
+	int32_t viewport[4];
+	skg_viewport_get(viewport);
+	viewport[0] += 40;
+	viewport[1] += 40;
+	viewport[2] -= 80;
+	viewport[3] -= 100;
+	skg_scissor(viewport);
+
 	app_test_rendertarget(t);
 
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );

@@ -1027,7 +1027,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 320);
 		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
 	} else if (lang == skg_shader_lang_glsl) {
-		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 450);
+		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, settings->gl_version);
 		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
 	}
 	spvc_compiler_install_compiler_options(compiler_glsl, options);

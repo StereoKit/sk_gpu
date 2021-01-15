@@ -24,6 +24,7 @@ typedef struct sksc_settings_t {
 	char cs_entrypoint[64];
 	char shader_model[64];
 	char shader_model_str[16];
+	int32_t gl_version;
 	char  **include_folders;
 	int32_t include_folder_ct;
 } sksc_settings_t;

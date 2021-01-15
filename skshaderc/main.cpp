@@ -84,6 +84,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-gl") == 0 && i<argc-1) { result.gl_version = atoi(argv[i+1]); i++; }
 		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shader_model,  argv[i+1], sizeof(result.shader_model )); i++; }
 		else if (strcmp(argv[i], "-i" ) == 0 && i<argc-1) {
 			size_t len = strlen(argv[i + 1]) + 1;
@@ -97,6 +98,9 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 
 	if (result.shader_model[0] == 0)
 		strncpy(result.shader_model, "5_0", sizeof(result.shader_model));
+
+	if (result.gl_version == 0)
+		result.gl_version = 430;
 
 	// If no entrypoints were provided, then these are the defaults!
 	if (result.ps_entrypoint[0] == 0 && result.vs_entrypoint[0] == 0 && result.cs_entrypoint[0] == 0) {
@@ -149,6 +153,8 @@ Options:
 
 	-i folder	Adds a folder to the include path when searching for #include
 			files.
+	-gl version	Sets the target GLSL version for generated desktop OpenGL 
+			shaders. By default this is '430'.
 
 	target_file	This can be any filename, and can use the wildcard '*' to 
 			compile multiple files in the same call.

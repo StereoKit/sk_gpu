@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 
 ///////////////////////////////////////////
 
@@ -97,7 +98,7 @@ void                  sksc_dxc_shader_meta       (IDxcResult *compile_result, sk
 bool                  sksc_dxc_compile_shader    (DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta);
 void                  sksc_dxc_errors_to_log     (const char *error_string);
 
-bool                  sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta);
+bool                  sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta);
 
 void                  sksc_line_col              (const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
 void                  sksc_log_at                (log_level_ level, int32_t line, int32_t column, const char *text, ...);
@@ -184,7 +185,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		}
 
 		stages.add({});
-		if (!sksc_spvc_compile_stage(&stages[spirv_stage], skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
+		if (!sksc_spvc_compile_stage(&stages[spirv_stage], settings, skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
 			include_handler->Release();
 			source         ->Release();
 
@@ -195,7 +196,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&stages[spirv_stage], skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
+			if (!sksc_spvc_compile_stage(&stages[spirv_stage], settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
 				include_handler->Release();
 				source         ->Release();
 
@@ -207,7 +208,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&stages[spirv_stage], skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
+			if (!sksc_spvc_compile_stage(&stages[spirv_stage], settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
 				include_handler->Release();
 				source         ->Release();
 
@@ -600,6 +601,49 @@ DWORD sksc_d3d11_build_flags(const sksc_settings_t *settings) {
 
 ///////////////////////////////////////////
 
+class SKSCInclude : public ID3DInclude
+{
+public:
+	const sksc_settings_t *settings;
+
+	SKSCInclude(const sksc_settings_t *settings) {
+		this->settings = settings;
+	}
+
+	HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* out_text, UINT* out_size) override
+	{
+		char path_filename[1024];
+		snprintf(path_filename, sizeof(path_filename), "%s/%s", settings->folder, pFileName);
+		FILE *fp = fopen(path_filename, "rb");
+		for (int32_t i = 0; fp == nullptr && i < settings->include_folder_ct; i++) {
+			snprintf(path_filename, sizeof(path_filename), "%s/%s", settings->include_folders[i], pFileName);
+			fp = fopen(path_filename, "rb");
+		}
+		if (fp == nullptr) {
+			return E_FAIL;
+		}
+
+		fseek(fp, 0L, SEEK_END);
+		*out_size = ftell(fp);
+		rewind(fp);
+
+		*out_text = (char*)malloc(*out_size+1);
+		if (*out_text == nullptr) { *out_size = 0; fclose(fp); return false; }
+		fread((void*)*out_text, 1, *out_size, fp);
+		fclose(fp);
+
+		((char*)*out_text)[*out_size] = 0;
+
+		return S_OK;
+	}
+
+	HRESULT Close(LPCVOID data) override
+	{
+		free((void*)data);
+		return S_OK;
+	}
+};
+
 bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
 	DWORD flags = sksc_d3d11_build_flags(settings);
 
@@ -616,9 +660,10 @@ bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc
 	case skg_stage_compute: snprintf(target, sizeof(target), "cs_%s", settings->shader_model); break;
 	}
 
+	SKSCInclude includer(settings);
 	ID3DBlob *errors, *compiled = nullptr;
-	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entrypoint, target, flags, 0, &compiled, &errors))) {
-		sksc_log(log_level_err, "D3DCompile failed: %s", (char *)errors->GetBufferPointer());
+	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, &includer, entrypoint, target, flags, 0, &compiled, &errors))) {
+		sksc_log(log_level_err, "D3DCompile failed: %s\n", (char *)errors->GetBufferPointer());
 		if (errors) errors->Release();
 		return false;
 	}
@@ -760,7 +805,7 @@ void sksc_dxc_errors_to_log(const char *error_string) {
 			int32_t line_id = atoi(line_num);
 			int32_t col_id  = atoi(col_num);
 
-			sksc_log_at(level, line_id, col_id, "%.*s", line_len(msg), msg);
+			sksc_log_at(level, line_id, col_id, "%.*s\n", line_len(msg), msg);
 		}
 		line = next_line(line);
 	}
@@ -930,16 +975,20 @@ array_t<const char *> sksc_dxc_build_flags(sksc_settings_t settings, skg_stage_ 
 	case skg_stage_compute: snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "cs_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
 	}
 
-	// Include folder
+	// Include folders
 	result.add("-I");
 	result.add(settings.folder);
+	for (size_t i = 0; i < settings.include_folder_ct; i++) {
+		result.add("-I");
+		result.add(settings.include_folders[i]);
+	}
 
 	return result;
 }
 
 ///////////////////////////////////////////
 
-bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta) {
+bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta) {
 	spvc_context context = nullptr;
 	spvc_context_create            (&context);
 	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {

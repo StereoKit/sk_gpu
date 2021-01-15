@@ -85,6 +85,13 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shader_model,  argv[i+1], sizeof(result.shader_model )); i++; }
+		else if (strcmp(argv[i], "-i" ) == 0 && i<argc-1) {
+			size_t len = strlen(argv[i + 1]) + 1;
+			result.include_folder_ct += 1;
+			result.include_folders    = (char**)realloc(result.include_folders, sizeof(result.include_folder_ct * sizeof(char *)));
+			result.include_folders[result.include_folder_ct-1] = (char*)malloc(len);
+			strncpy(result.include_folders[result.include_folder_ct-1], argv[i+1], len); 
+			i++; }
 		else { printf("Unrecognized option '%s'\n", argv[i]); *exit = true; }
 	}
 
@@ -139,6 +146,9 @@ Options:
 			names from vertex and pixel shader stages. Default is 'vs'.
 	-m		Lets you set the shader model used for compiling, default is
 			5_0. This may not be implemented yet.
+
+	-i folder	Adds a folder to the include path when searching for #include
+			files.
 
 	target_file	This can be any filename, and can use the wildcard '*' to 
 			compile multiple files in the same call.
@@ -220,8 +230,8 @@ bool read_file(char *filename, char **out_text, size_t *out_size) {
 	*out_text = nullptr;
 	*out_size = 0;
 
-	FILE *fp;
-	if (fopen_s(&fp, filename, "rb") != 0 || fp == nullptr) {
+	FILE *fp = fopen(filename, "rb");
+	if (fp == nullptr) {
 		return false;
 	}
 
@@ -241,8 +251,8 @@ bool read_file(char *filename, char **out_text, size_t *out_size) {
 ///////////////////////////////////////////
 
 void write_file(char *filename, void *file_data, size_t file_size) {
-	FILE *fp;
-	if (fopen_s(&fp, filename, "wb") != 0 || fp == nullptr) {
+	FILE *fp = fopen(filename, "wb");
+	if (fp == nullptr) {
 		return;
 	}
 	fwrite(file_data, file_size, 1, fp);
@@ -267,8 +277,8 @@ void write_header(char *filename, void *file_data, size_t file_size) {
 		if (name[i] == '.') name[i] = '_';
 	}
 
-	FILE *fp = nullptr;
-	if (fopen_s(&fp, filename, "w") != 0 || fp == nullptr) {
+	FILE *fp = fopen(filename, "w");
+	if (fp == nullptr) {
 		return;
 	}
 	fprintf(fp, "#pragma once\n\n");

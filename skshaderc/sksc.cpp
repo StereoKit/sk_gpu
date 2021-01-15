@@ -107,7 +107,7 @@ void                  sksc_log                   (log_level_ level, const char *
 
 ///////////////////////////////////////////
 
-IDxcCompiler3      *sksc_compiler;
+IDxcCompiler3           *sksc_compiler;
 IDxcUtils               *sksc_utils;
 array_t<sksc_log_item_t> sksc_log_list = {};
 
@@ -613,10 +613,10 @@ public:
 	HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* out_text, UINT* out_size) override
 	{
 		char path_filename[1024];
-		snprintf(path_filename, sizeof(path_filename), "%s/%s", settings->folder, pFileName);
+		snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->folder, pFileName);
 		FILE *fp = fopen(path_filename, "rb");
 		for (int32_t i = 0; fp == nullptr && i < settings->include_folder_ct; i++) {
-			snprintf(path_filename, sizeof(path_filename), "%s/%s", settings->include_folders[i], pFileName);
+			snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->include_folders[i], pFileName);
 			fp = fopen(path_filename, "rb");
 		}
 		if (fp == nullptr) {

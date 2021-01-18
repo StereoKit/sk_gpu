@@ -99,11 +99,11 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 			const char *targets = argv[i + 1];
 			size_t      len     = strlen(targets);
 			for (size_t i = 0; i < len; i++) {
-				if      (targets[i] == 'x') result.target_langs[skg_shader_lang_hlsl];
-				else if (targets[i] == 's') result.target_langs[skg_shader_lang_spirv];
-				else if (targets[i] == 'g') result.target_langs[skg_shader_lang_glsl];
-				else if (targets[i] == 'e') result.target_langs[skg_shader_lang_glsl_es];
-				else if (targets[i] == 'w') result.target_langs[skg_shader_lang_glsl_web];
+				if      (targets[i] == 'x') result.target_langs[skg_shader_lang_hlsl]     = true;
+				else if (targets[i] == 's') result.target_langs[skg_shader_lang_spirv]    = true;
+				else if (targets[i] == 'g') result.target_langs[skg_shader_lang_glsl]     = true;
+				else if (targets[i] == 'e') result.target_langs[skg_shader_lang_glsl_es]  = true;
+				else if (targets[i] == 'w') result.target_langs[skg_shader_lang_glsl_web] = true;
 				else { printf("Unrecognized shader language target '%c'\n", targets[i]); *exit = true; }
 			}
 			i++;

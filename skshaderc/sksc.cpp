@@ -180,8 +180,9 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		}
 
 		skg_shader_file_stage_t spirv_stage = {};
+		bool spirv_result = sksc_dxc_compile_shader(&source_buff, include_handler, settings, compile_stages[i], skg_shader_lang_spirv, &spirv_stage, nullptr);
 		if (settings->target_langs[skg_shader_lang_spirv]) {
-			if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, compile_stages[i], skg_shader_lang_spirv, &spirv_stage, nullptr)) {
+			if (!spirv_result) {
 				include_handler->Release();
 				source         ->Release();
 

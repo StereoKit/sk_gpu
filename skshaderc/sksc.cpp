@@ -163,9 +163,14 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 			continue;
 
 		skg_shader_file_stage_t d3d12_hlsl_stage = {};
+		if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, compile_stages[i], skg_shader_lang_hlsl, &d3d12_hlsl_stage, out_file->meta)) {
+			sksc_log(log_level_err, "DXC failed to compile shader information.\n");
+			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
+			return false;
+		}
+
 		stages.add({});
-		if (!sksc_dxc_compile_shader  (&source_buff, include_handler, settings, compile_stages[i], skg_shader_lang_hlsl, &d3d12_hlsl_stage, out_file->meta) ||
-			!sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
+		if (settings->target_langs[skg_shader_lang_hlsl] && !sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
 			include_handler->Release();
 			source         ->Release();
 
@@ -174,18 +179,21 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 			return false;
 		}
 
-		size_t spirv_stage = stages.add({});
-		if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, compile_stages[i], skg_shader_lang_spirv, &stages.last(), nullptr)) {
-			include_handler->Release();
-			source         ->Release();
+		skg_shader_file_stage_t spirv_stage = {};
+		if (settings->target_langs[skg_shader_lang_spirv]) {
+			if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, compile_stages[i], skg_shader_lang_spirv, &spirv_stage, nullptr)) {
+				include_handler->Release();
+				source         ->Release();
 
-			sksc_log(log_level_err, "SPIRV shader compile failed\n");
-			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
-			return false;
+				sksc_log(log_level_err, "SPIRV shader compile failed\n");
+				sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
+				return false;
+			}
+			stages.add(spirv_stage);
 		}
 
 		stages.add({});
-		if (!sksc_spvc_compile_stage(&stages[spirv_stage], settings, skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
+		if (settings->target_langs[skg_shader_lang_glsl] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
 			include_handler->Release();
 			source         ->Release();
 
@@ -196,7 +204,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&stages[spirv_stage], settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
+			if (settings->target_langs[skg_shader_lang_glsl_es] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
 				include_handler->Release();
 				source         ->Release();
 
@@ -208,7 +216,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&stages[spirv_stage], settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
+			if (settings->target_langs[skg_shader_lang_glsl_web] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
 				include_handler->Release();
 				source         ->Release();
 
@@ -218,6 +226,8 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 			}
 		}
 		free(d3d12_hlsl_stage.code);
+		if (!settings->target_langs[skg_shader_lang_spirv])
+			free(spirv_stage.code);
 	}
 	
 	// cleanup
@@ -1023,9 +1033,11 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 	if (lang == skg_shader_lang_glsl_web) {
 		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 300);
 		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_SUPPORT_NONZERO_BASE_INSTANCE, SPVC_FALSE);
 	} else if (lang == skg_shader_lang_glsl_es) {
 		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 320);
 		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
+		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_SUPPORT_NONZERO_BASE_INSTANCE, SPVC_FALSE);
 	} else if (lang == skg_shader_lang_glsl) {
 		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, settings->gl_version);
 		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);

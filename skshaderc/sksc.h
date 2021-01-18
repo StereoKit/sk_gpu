@@ -27,6 +27,7 @@ typedef struct sksc_settings_t {
 	int32_t gl_version;
 	char  **include_folders;
 	int32_t include_folder_ct;
+	bool target_langs[5];
 } sksc_settings_t;
 
 typedef struct sksc_log_item_t {

@@ -62,6 +62,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	// Get the inlcude folder
 	get_folder(argv[argc-1], result.folder, sizeof(result.folder));
 
+	bool set_targets = false;
 	for (int32_t i=1; i<argc-1; i++) {
 		if      (strcmp(argv[i], "-h" ) == 0) result.output_header = true;
 		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = false;
@@ -93,12 +94,35 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 			result.include_folders[result.include_folder_ct-1] = (char*)malloc(len);
 			strncpy(result.include_folders[result.include_folder_ct-1], argv[i+1], len); 
 			i++; }
+		else if (strcmp(argv[i], "-t" ) == 0 && i<argc-1) {
+			set_targets = true;
+			const char *targets = argv[i + 1];
+			size_t      len     = strlen(targets);
+			for (size_t i = 0; i < len; i++) {
+				if      (targets[i] == 'x') result.target_langs[skg_shader_lang_hlsl];
+				else if (targets[i] == 's') result.target_langs[skg_shader_lang_spirv];
+				else if (targets[i] == 'g') result.target_langs[skg_shader_lang_glsl];
+				else if (targets[i] == 'e') result.target_langs[skg_shader_lang_glsl_es];
+				else if (targets[i] == 'w') result.target_langs[skg_shader_lang_glsl_web];
+				else { printf("Unrecognized shader language target '%c'\n", targets[i]); *exit = true; }
+			}
+			i++;
+		}
 		else { printf("Unrecognized option '%s'\n", argv[i]); *exit = true; }
 	}
 
+	// Default language targets, all of them
+	if (!set_targets) {
+		for (size_t i = 0; i < sizeof(result.target_langs)/sizeof(result.target_langs[0]); i++) {
+			result.target_langs[i] = true;
+		}
+	}
+
+	// Default shader model
 	if (result.shader_model[0] == 0)
 		strncpy(result.shader_model, "5_0", sizeof(result.shader_model));
 
+	// default desktop glsl version
 	if (result.gl_version == 0)
 		result.gl_version = 430;
 
@@ -155,6 +179,11 @@ Options:
 			files.
 	-gl version	Sets the target GLSL version for generated desktop OpenGL 
 			shaders. By default this is '430'.
+	-t targets	Sets a list of shader language targets to generate. This is a
+			string of characters, where each character represents a language.
+			'x' is d3d11 dxil, 's' is d3d12 and vulkan spir-v, 'g' is desktop
+			GLSL, 'w' is web GLSL, and 'e' is GLES GLSL. Default value is 
+			'xsgwe'.
 
 	target_file	This can be any filename, and can use the wildcard '*' to 
 			compile multiple files in the same call.

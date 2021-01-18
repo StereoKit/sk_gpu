@@ -58,6 +58,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	result.silent_err    = false;
 	result.silent_info   = false;
 	result.silent_warn   = false;
+	result.only_if_changed = true;
 
 	// Get the inlcude folder
 	get_folder(argv[argc-1], result.folder, sizeof(result.folder));
@@ -68,7 +69,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = false;
 		else if (strcmp(argv[i], "-r" ) == 0) result.row_major     = true;
 		else if (strcmp(argv[i], "-d" ) == 0) result.debug         = true;
-		else if (strcmp(argv[i], "-c" ) == 0) result.only_if_changed=true;
+		else if (strcmp(argv[i], "-f" ) == 0) result.only_if_changed=false;
 		else if (strcmp(argv[i], "-si") == 0) result.silent_info   = true;
 		else if (strcmp(argv[i], "-sw") == 0) { result.silent_info = true; result.silent_warn = true; }
 		else if (strcmp(argv[i], "-s" ) == 0) { result.silent_err = true; result.silent_info = true; result.silent_warn = true;}
@@ -154,7 +155,8 @@ Options:
 			shaders.
 	-sw		No info or warnings are printed when compiling shaders.
 	-si		No info is printed when compiling shaders.
-	-c		Only compile if the source code is newer than the output file.
+	-f		Force the shader to recompile, even if the timestamp on the 
+			matching .sks file is newer.
 	
 	-d		Compile shaders with debug info embedded. Enabling this will
 			disable shader optimizations.

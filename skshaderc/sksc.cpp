@@ -817,6 +817,8 @@ void sksc_dxc_errors_to_log(const char *error_string) {
 			int32_t col_id  = atoi(col_num);
 
 			sksc_log_at(level, line_id, col_id, "%.*s\n", line_len(msg), msg);
+		} else {
+			sksc_log_at(log_level_info, -1, -1, "%.*s\n", line_len(line), line);
 		}
 		line = next_line(line);
 	}

@@ -74,15 +74,17 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 		else if (strcmp(argv[i], "-sw") == 0) { result.silent_info = true; result.silent_warn = true; }
 		else if (strcmp(argv[i], "-s" ) == 0) { result.silent_err = true; result.silent_info = true; result.silent_warn = true;}
 		else if (strcmp(argv[i], "-o0") == 0 ||
-				 strcmp(argv[i], "-O0") == 0) result.optimize = 0;
+		         strcmp(argv[i], "-O0") == 0) result.optimize = 0;
 		else if (strcmp(argv[i], "-o1") == 0 ||
-				 strcmp(argv[i], "-O1") == 0) result.optimize = 1;
+		         strcmp(argv[i], "-O1") == 0) result.optimize = 1;
 		else if (strcmp(argv[i], "-o2") == 0 ||
-				 strcmp(argv[i], "-O2") == 0) result.optimize = 2;
+		         strcmp(argv[i], "-O2") == 0) result.optimize = 2;
 		else if (strcmp(argv[i], "-o3") == 0 ||
-				 strcmp(argv[i], "-O3") == 0) result.optimize = 3;
+		         strcmp(argv[i], "-O3") == 0) result.optimize = 3;
 		else if (strcmp(argv[i], "-help" ) == 0 ||
-				 strcmp(argv[i], "/?" ) == 0 ) *exit = true;
+		         strcmp(argv[i], "-?" ) == 0 ||
+		         strcmp(argv[i], "--help" ) == 0 ||
+		         strcmp(argv[i], "/?" ) == 0 ) *exit = true;
 		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }

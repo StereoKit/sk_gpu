@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <direct.h>
 
 #define SKG_IMPL
 #include "../sk_gpu.h"
@@ -97,6 +98,11 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 			result.include_folders[result.include_folder_ct-1] = (char*)malloc(len);
 			strncpy(result.include_folders[result.include_folder_ct-1], argv[i+1], len); 
 			i++; }
+		else if (strcmp(argv[i], "-o" ) == 0) { 
+			size_t len = strlen(argv[i + 1]) + 1;
+			result.out_folder = (char*)malloc(len);
+			strncpy(result.out_folder, argv[i+1], len); 
+			i++; }
 		else if (strcmp(argv[i], "-t" ) == 0 && i<argc-1) {
 			set_targets = true;
 			const char *targets = argv[i + 1];
@@ -181,6 +187,8 @@ Options:
 
 	-i folder	Adds a folder to the include path when searching for #include
 			files.
+	-o folder	Sets the output folder for compiled shaders. Default will 
+			leave them in the same folder as the original file.
 	-gl version	Sets the target GLSL version for generated desktop OpenGL 
 			shaders. By default this is '430'.
 	-t targets	Sets a list of shader language targets to generate. This is a
@@ -209,19 +217,22 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 			char filename[1024];
 			sprintf_s(filename, "%s%s", folder, file_info.cFileName);
 
-			char new_filename[512];
+			char new_filename[1024];
+			sprintf_s(new_filename, "%s\\%s", settings->out_folder ? settings->out_folder : folder, file_info.cFileName);
 			char drive[16];
 			char dir  [512];
 			char name [128];
-			_splitpath_s(filename,
+			char ext  [32];
+			_splitpath_s(new_filename,
 				drive, sizeof(drive),
 				dir,   sizeof(dir),
-				name,  sizeof(name), nullptr, 0); 
+				name,  sizeof(name), 
+				ext,   sizeof(ext)); 
 
 			if (settings->replace_ext) {
 				sprintf_s(new_filename, "%s%s%s.%s", drive, dir, name, settings->output_header?"h":"sks");
 			} else {
-				sprintf_s(new_filename, "%s.%s", filename, settings->output_header?"h":"sks");
+				sprintf_s(new_filename, "%s.%s", new_filename, settings->output_header?"h":"sks");
 			}
 
 			// Skip this file if it hasn't changed
@@ -237,8 +248,6 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 			if (read_file(filename, &file_text, &file_size)) {
 				skg_shader_file_t file;
 				if (sksc_compile(filename, file_text, settings, &file)) {
-					
-
 					void  *sks_data;
 					size_t sks_size;
 					sksc_build_file(&file, &sks_data, &sks_size);
@@ -254,7 +263,7 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 				sksc_log_clear();
 				free(file_text);
 			} else {
-				printf("Couldn't read file '%s'!\n", filename);
+				printf("Couldn't read file '%s'!\n", file_info.cFileName);
 			}
 		} while(FindNextFileA(handle, &file_info));
 		FindClose(handle);
@@ -290,6 +299,18 @@ bool read_file(char *filename, char **out_text, size_t *out_size) {
 ///////////////////////////////////////////
 
 void write_file(char *filename, void *file_data, size_t file_size) {
+	// Make sure the folder exists
+	char drive[16];
+	char dir  [1024];
+	_splitpath_s(filename,
+		drive, sizeof(drive),
+		dir,   sizeof(dir),
+		nullptr, 0, nullptr, 0); 
+	char folder[1040];
+	snprintf(folder, sizeof(folder), "%s%s", drive, dir);
+	_mkdir(folder);
+
+	// Open and write
 	FILE *fp = fopen(filename, "wb");
 	if (fp == nullptr) {
 		return;

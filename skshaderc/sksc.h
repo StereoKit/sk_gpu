@@ -19,6 +19,7 @@ typedef struct sksc_settings_t {
 	bool only_if_changed;
 	int  optimize;
 	char folder[512];
+	char *out_folder;
 	char vs_entrypoint[64];
 	char ps_entrypoint[64];
 	char cs_entrypoint[64];

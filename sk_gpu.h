@@ -817,7 +817,9 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 		buffer_desc.Usage     = D3D11_USAGE_DEFAULT;
 	} break;
 	}
-	d3d_device->CreateBuffer(&buffer_desc, data==nullptr ? nullptr : &buffer_data, &result._buffer);
+	if (FAILED(d3d_device->CreateBuffer(&buffer_desc, data == nullptr ? nullptr : &buffer_data, &result._buffer))) {
+		skg_log(skg_log_critical, "CreateBuffer failed!");
+	}
 	return result;
 }
 
@@ -1771,10 +1773,10 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 			int src_n = src + width*4;
 			T *cD = &result[dest];
 
-			cD[0] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++;
-			cD[1] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++;
-			cD[2] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++;
-			cD[3] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++;
+			cD[0] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
+			cD[1] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
+			cD[2] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
+			cD[3] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
 		}
 	}
 }

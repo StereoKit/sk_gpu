@@ -492,14 +492,28 @@ void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 	D3D11_BLEND_DESC desc_blend = {};
 	desc_blend.AlphaToCoverageEnable  = false;
 	desc_blend.IndependentBlendEnable = false;
-	desc_blend.RenderTarget[0].BlendEnable           = pipeline->transparency == skg_transparency_blend;
 	desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-	desc_blend.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
-	desc_blend.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
-	desc_blend.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
-	desc_blend.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
-	desc_blend.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
-	desc_blend.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+	switch (pipeline->transparency) {
+	case skg_transparency_blend:
+		desc_blend.RenderTarget[0].BlendEnable           = true;
+		desc_blend.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+		desc_blend.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+		desc_blend.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+		desc_blend.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+		desc_blend.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+		desc_blend.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+		break;
+	case skg_transparency_add:
+		desc_blend.RenderTarget[0].BlendEnable           = true;
+		desc_blend.RenderTarget[0].SrcBlend              = D3D11_BLEND_ONE;
+		desc_blend.RenderTarget[0].DestBlend             = D3D11_BLEND_ONE;
+		desc_blend.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+		desc_blend.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+		desc_blend.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ONE;
+		desc_blend.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+		break;
+	}
+
 	d3d_device->CreateBlendState(&desc_blend, &pipeline->_blend);
 }
 

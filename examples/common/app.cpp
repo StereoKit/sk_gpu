@@ -52,6 +52,7 @@ skg_tex_t         app_tex_gradient_linear= {};
 skg_tex_t         app_target             = {};
 skg_tex_t         app_target_depth       = {};
 skg_tex_t         app_cubemap            = {};
+skg_tex_t         app_particle           = {};
 
 skg_tex_t         app_tex_colspace[4];
 skg_color32_t   (*app_col_func[4])(float h, float s, float v, float a) = {
@@ -75,6 +76,7 @@ skg_bind_t        app_sh_default_tex_bind  = {};
 skg_bind_t        app_sh_default_inst_bind = {};
 skg_bind_t        app_sh_default_data_bind = {};
 skg_pipeline_t    app_mat_default          = {};
+skg_pipeline_t    app_mat_transparent      = {};
 skg_shader_t      app_sh_cube              = {};
 skg_pipeline_t    app_mat_cube             = {};
 skg_bind_t        app_sh_cube_tex_bind     = {};
@@ -183,18 +185,37 @@ bool app_init() {
 	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skg_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t));
 
 	// Make a checkered texture
-	const int32_t w = 512, h = 512;
+	int32_t w = 512, h = 512;
 	skg_color32_t *colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* w * h);
 	for (int32_t y = 0; y < h; y++) {
 	for (int32_t x = 0; x < w; x++) {
 		int32_t i  = x + y*w;
 		float   c  = (x/32 + y/32) % 2 == 0 ? 1 : y/(float)h;
 		uint8_t c8 = (uint8_t)(c * 255);
-		colors[i] = { c8,c8,c8,255 };
+		colors[i] = { c8,c8,c8,c8 };
 	} }
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
 	skg_tex_settings    (&app_tex, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_tex, colors, w, h);
+	free(colors);
+
+	// Make a particle texture
+	w = 64; h = 64;
+	colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* w * h);
+	for (int32_t y = 0; y < h; y++) {
+	for (int32_t x = 0; x < w; x++) {
+		int32_t i  = x + y*w;
+
+		float dx = ((w/2.0f)-x) / (w/2.0f);
+		float dy = ((h/2.0f)-y) / (h/2.0f);
+		
+		float   c  =  fmaxf(0,1-sqrtf(dx*dx+dy*dy));
+		uint8_t c8 = (uint8_t)(c * 255);
+		colors[i] = { c8,c8,c8,c8 };
+	} }
+	app_particle = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
+	skg_tex_settings    (&app_particle, skg_tex_address_clamp, skg_tex_sample_linear, 0);
+	skg_tex_set_contents(&app_particle, colors, w, h);
 	free(colors);
 
 	// Make a plain white texture
@@ -283,9 +304,14 @@ bool app_init() {
 	app_sh_cube_inst_bind    = skg_shader_get_buffer_bind(&app_sh_cube, "TransformBuffer");
 	app_sh_cube_data_bind    = skg_shader_get_buffer_bind(&app_sh_cube, "SystemBuffer");
 	app_mat_cube             = skg_pipeline_create(&app_sh_cube);
-	skg_pipeline_set_cull(&app_mat_cube, skg_cull_front);
+	skg_pipeline_set_cull       (&app_mat_cube, skg_cull_front);
 	skg_pipeline_set_depth_write(&app_mat_cube, false);
 	skg_pipeline_set_scissor    (&app_mat_cube, true);
+
+	app_mat_transparent = skg_pipeline_create(&app_sh_cube);
+	skg_pipeline_set_depth_write (&app_mat_transparent, false);
+	skg_pipeline_set_cull        (&app_mat_transparent, skg_cull_none);
+	skg_pipeline_set_transparency(&app_mat_transparent, skg_transparency_add);
 	
 	app_sh_default           = skg_shader_create_memory(sks_test_hlsl, sizeof(sks_test_hlsl));
 	app_sh_default_tex_bind  = skg_shader_get_tex_bind   (&app_sh_default, "tex");
@@ -295,6 +321,7 @@ bool app_init() {
 	
 	app_shader_data_buffer = skg_buffer_create(&app_shader_data, 1,   sizeof(app_shader_data_t), skg_buffer_type_constant, skg_use_dynamic);
 	app_shader_inst_buffer = skg_buffer_create(&app_shader_inst, 100, sizeof(app_shader_inst_t), skg_buffer_type_constant, skg_use_dynamic);
+
 	return true;
 }
 
@@ -450,6 +477,20 @@ void app_test_rendertarget(float t) {
 
 ///////////////////////////////////////////
 
+void app_test_blend() {
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,.5f,0} }) * HMM_Scale(hmm_vec3{ {.5f,.5f,.5f} }));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind, 0);
+
+	skg_mesh_bind    (&app_mesh_cube.mesh);
+	skg_pipeline_bind(&app_mat_transparent);
+	skg_tex_bind     (&app_particle, app_sh_default_tex_bind);
+	skg_draw(0, 0, app_mesh_cube.ind_count, 1);
+}
+
+///////////////////////////////////////////
+
 void app_test_instancing() {
 	// Set transforms for another 16 instances
 	for (int32_t i = 0; i < 16; i++) {
@@ -488,9 +529,10 @@ void app_render(float t, hmm_mat4 view, hmm_mat4 proj) {
 	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
 	app_test_colors(t);
-	app_test_instancing();
 	app_test_cubemap();
 	app_test_dyn_update(t);
+	app_test_instancing();
+	app_test_blend();
 }
 
 ///////////////////////////////////////////

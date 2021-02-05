@@ -148,7 +148,7 @@ typedef enum skg_shader_var_ {
 typedef enum skg_transparency_ {
 	skg_transparency_none = 1,
 	skg_transparency_blend,
-	skg_transparency_clip,
+	skg_transparency_add,
 } skg_transparency_;
 
 typedef enum skg_cull_ {
@@ -2574,6 +2574,9 @@ void skg_tex_target_bind(skg_tex_t *render_target, bool clear, const float *clea
 #endif
 
 	if (clear) {
+		// If DepthMask is false, glClear won't clear depth
+		glDepthMask(true);
+
 		glClearColor(clear_color_4[0], clear_color_4[1], clear_color_4[2], clear_color_4[3]);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
@@ -2952,13 +2955,17 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	glUseProgram(pipeline->_shader._program);
 	
 	switch (pipeline->transparency) {
-	case skg_transparency_blend: {
+	case skg_transparency_blend:
 		glEnable(GL_BLEND);
-	}break;
-	case skg_transparency_clip:
-	case skg_transparency_none: {
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		break;
+	case skg_transparency_add:
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
+		break;
+	case skg_transparency_none:
 		glDisable(GL_BLEND);
-	}break;
+		break;
 	}
 
 	switch (pipeline->cull) {
@@ -2975,7 +2982,7 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	} break;
 	}
 
-	if (pipeline->depth_write || pipeline->depth_test != skg_depth_test_always)
+	if (pipeline->depth_test != skg_depth_test_always)
 		 glEnable (GL_DEPTH_TEST);
 	else glDisable(GL_DEPTH_TEST);
 
@@ -3488,6 +3495,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 #if defined(_SKG_GL_WEB) || defined(_SKG_GL_ES)
 	return false;
+	// For GLES, you need to use glReadPixels after rendering to a 
+	// FrameBuffer, something like this:
+	// https://stackoverflow.com/questions/53993820/opengl-es-2-0-android-c-glgetteximage-alternative
 #else
 	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
 	glBindTexture (tex->_target, tex->_texture);

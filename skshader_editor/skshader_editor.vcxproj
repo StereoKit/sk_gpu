@@ -168,6 +168,7 @@
     <ClInclude Include="..\skshaderc\sksc.h" />
     <ClInclude Include="app_shader.h" />
     <ClInclude Include="array.h" />
+    <ClInclude Include="geo.h" />
     <ClInclude Include="HandmadeMath.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />

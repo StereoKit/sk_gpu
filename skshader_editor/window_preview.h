@@ -6,6 +6,7 @@
 #include "../sk_gpu.h"
 
 #include "app_shader.h"
+#include "geo.h"
 
 #define HANDMADE_MATH_IMPLEMENTATION
 #include "HandmadeMath.h"
@@ -17,11 +18,19 @@ float camera_arc_x = 3.14159f/4.0f;
 float camera_arc_y = 3.14159f/8.0f;
 float camera_arc_dist = 8;
 
+struct preview_mesh_t {
+	const char  *name;
+	skg_buffer_t verts;
+	skg_buffer_t inds;
+	skg_mesh_t   mesh;
+	int32_t      faces;
+};
+
+preview_mesh_t preview_meshes[] = { {"Cube"}, {"Sphere"} };
+int32_t        preview_mesh_active = 1;
+
 skg_tex_t    surface    = {};
 skg_tex_t    zbuffer    = {};
-skg_buffer_t cube_verts = {};
-skg_buffer_t cube_inds  = {};
-skg_mesh_t   cube_mesh  = {};
 skg_tex_t    cube_tex   = {};
 
 void window_preview_resize(int32_t width, int32_t height) {
@@ -37,42 +46,11 @@ void window_preview_resize(int32_t width, int32_t height) {
 }
 
 void window_preview_init() {
-	skg_vert_t verts[24];
-	uint32_t   inds [36];
-	for (size_t i = 0; i < 24; i++) {
-		float neg = (float)((i / 4) % 2 ? -1 : 1);
-		int nx  = ((i+24) / 16) % 2;
-		int ny  = (i / 8)       % 2;
-		int nz  = (i / 16)      % 2;
-		int u   = ((i+1) / 2)   % 2; // U: 0,1,1,0
-		int v   = (i / 2)       % 2; // V: 0,0,1,1
 
-		verts[i].uv[0] = u;
-		verts[i].uv[1] = v;
-		verts[i].norm[0] = nx * neg;
-		verts[i].norm[1] = ny * neg;
-		verts[i].norm[2] = nz * neg;
-		verts[i].pos[0] = (nx ? neg : ny ? (u?-1:1)*neg : (u?1:-1)*neg);
-		verts[i].pos[1] = (nx || nz ? (v?1:-1) : neg);
-		verts[i].pos[2] = (nx ? (u?-1:1)*neg : ny ? (v?1:-1) : neg);
-		verts[i].col.r = 255;
-		verts[i].col.g = 255;
-		verts[i].col.b = 255;
-		verts[i].col.a = 255;
-	}
-	for (size_t i = 0; i < 6; i++) {
-		inds[i*6+0] = i*4;
-		inds[i*6+1] = i*4+1;
-		inds[i*6+2] = i*4+2;
-
-		inds[i*6+3] = i*4;
-		inds[i*6+4] = i*4+2;
-		inds[i*6+5] = i*4+3;
-	}
-
-	cube_verts = skg_buffer_create(verts, sizeof(verts)/sizeof(skg_vert_t), sizeof(skg_vert_t), skg_buffer_type_vertex, skg_use_static);
-	cube_inds  = skg_buffer_create(inds,  sizeof(inds )/sizeof(uint32_t  ), sizeof(uint32_t),   skg_buffer_type_index,  skg_use_static);
-	cube_mesh  = skg_mesh_create  (&cube_verts, &cube_inds);
+	preview_mesh_t *mesh = &preview_meshes[0];
+	gen_cube(&mesh->mesh, &mesh->verts, &mesh->inds, &mesh->faces);
+	mesh = &preview_meshes[1];
+	gen_sphere(2, 8, &mesh->mesh, &mesh->verts, &mesh->inds, &mesh->faces);
 
 	int32_t width, height, comp;
 	void *img_data = stbi_load("test.png", &width, &height, &comp, 4);
@@ -107,9 +85,9 @@ void window_preview_render() {
 	skg_pipeline_t *pipeline = app_shader_get_pipeline();
 	if (pipeline) {
 		skg_pipeline_bind(pipeline);
-		skg_mesh_bind    (&cube_mesh);
+		skg_mesh_bind    (&preview_meshes[preview_mesh_active].mesh);
 		skg_tex_bind     (&cube_tex, skg_bind_t{0, skg_stage_pixel});
-		skg_draw         (0, 0, 36, 1);
+		skg_draw         (0, 0, preview_meshes[preview_mesh_active].faces, 1);
 	}
 
 	skg_tex_target_bind(nullptr, false, nullptr);
@@ -124,6 +102,13 @@ void window_preview() {
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0,0 });
 	ImGui::Begin("Preview");
+
+	/*if (ImGui::BeginMenuBar()) {
+		if (ImGui::BeginMenu("Mesh")) {
+			ImGui::EndMenu();
+		}
+		ImGui::EndMenuBar();
+	}*/
 
 	camera_arc_dist -= ImGui::GetIO().MouseWheel * .2f;
 	if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && ImGui::IsWindowHovered()) {

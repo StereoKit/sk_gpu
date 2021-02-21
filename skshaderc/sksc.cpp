@@ -4,7 +4,7 @@
 
 #pragma comment(lib,"dxcompiler.lib")
 #pragma comment(lib,"d3dcompiler.lib")
-#if defined(_DEBUG) && false
+#if defined(_DEBUG)
 #pragma comment(lib,"spirv-cross-cd.lib")
 #pragma comment(lib,"spirv-cross-cored.lib")
 #pragma comment(lib,"spirv-cross-cppd.lib")

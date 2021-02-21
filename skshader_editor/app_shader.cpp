@@ -66,6 +66,11 @@ void app_shader_update_hlsl(const char *text) {
 	settings.silent_err    = false;
 	settings.silent_info   = false;
 	settings.silent_warn   = false;
+#if defined(SKG_OPENGL)
+	settings.target_langs[skg_shader_lang_glsl] = true;
+#elif defined(SKG_DIRECT3D11)
+	settings.target_langs[skg_shader_lang_hlsl] = true;
+#endif
 	if (settings.shader_model[0] == 0)
 		strncpy(settings.shader_model, "5_0", sizeof(settings.shader_model));
 
@@ -88,18 +93,20 @@ void app_shader_update_hlsl(const char *text) {
 		skg_shader_stage_destroy(&cs);
 		skg_shader_file_destroy (&file);
 
-		if (app_pipeline_valid) {
-			skg_shader_destroy  (&app_shader);
-			skg_pipeline_destroy(&app_pipeline);
+		if (skg_shader_is_valid(&result)) {
+			if (app_pipeline_valid) {
+				skg_shader_destroy  (&app_shader);
+				skg_pipeline_destroy(&app_pipeline);
+			} 
+			app_shader   = result;
+			app_pipeline = skg_pipeline_create(&app_shader);
+			app_pipeline_valid = true;
+
+			skg_pipeline_set_depth_test(&app_pipeline, skg_depth_test_always);
+
+			app_shader_remap();
+			app_shader_rebuild_buffers();
 		}
-		app_shader   = result;
-		app_pipeline = skg_pipeline_create(&app_shader);
-		app_pipeline_valid = true;
-
-		skg_pipeline_set_depth_test(&app_pipeline, skg_depth_test_always);
-
-		app_shader_remap();
-		app_shader_rebuild_buffers();
 	}
 	sksc_shutdown();
 }

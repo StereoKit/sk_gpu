@@ -700,11 +700,15 @@ const skg_shader_var_t *skg_shader_get_var_info(const skg_shader_t *shader, int3
 
 uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
 	switch (format) {
-	case skg_tex_fmt_rgba32:        return sizeof(uint8_t )*4;
-	case skg_tex_fmt_rgba32_linear: return sizeof(uint8_t )*4;
-	case skg_tex_fmt_bgra32:        return sizeof(uint8_t )*4;
-	case skg_tex_fmt_bgra32_linear: return sizeof(uint8_t )*4;
-	case skg_tex_fmt_rgba64:        return sizeof(uint16_t)*4;
+	case skg_tex_fmt_rgba32:
+	case skg_tex_fmt_rgba32_linear:
+	case skg_tex_fmt_bgra32:
+	case skg_tex_fmt_bgra32_linear:
+	case skg_tex_fmt_rg11b10: 
+	case skg_tex_fmt_rgb10a2:       return sizeof(uint8_t )*4;
+	case skg_tex_fmt_rgba64u:
+	case skg_tex_fmt_rgba64s:
+	case skg_tex_fmt_rgba64f:       return sizeof(uint16_t)*4;
 	case skg_tex_fmt_rgba128:       return sizeof(uint32_t)*4;
 	case skg_tex_fmt_depth16:       return sizeof(uint16_t);
 	case skg_tex_fmt_depth32:       return sizeof(uint32_t);

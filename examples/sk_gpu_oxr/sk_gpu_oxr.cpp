@@ -159,7 +159,8 @@ void main_destroy_swapchain(void *user_data) {
 void main_render(void *user_data, const XrCompositionLayerProjectionView *view, int32_t view_id, int32_t surf_id) {
 	float clear_color[4] = { 0,0,0,1 };
 	skg_tex_t *target = &app_swapchain.surfaces[view_id * app_swapchain.surf_count + surf_id].render_tex;
-	skg_tex_target_bind(target, true, clear_color);
+	skg_tex_target_bind(target);
+	skg_target_clear(true, clear_color);
 
 	hmm_quaternion head_orientation;
 	memcpy(&head_orientation, &view->pose.orientation, sizeof(XrQuaternionf));

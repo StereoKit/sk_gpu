@@ -439,7 +439,8 @@ void app_test_rendertarget(float t) {
 	skg_viewport_get(old_view);
 
 	float color[4] = { 1,1,1,1 };
-	skg_tex_target_bind(&app_target, true, color);
+	skg_tex_target_bind(&app_target);
+	skg_target_clear(true, color);
 
 	hmm_mat4 view = HMM_LookAt(
 		HMM_Vec3(0,0,.75f),
@@ -461,7 +462,7 @@ void app_test_rendertarget(float t) {
 	skg_tex_bind     (&app_tex_white, app_sh_default_tex_bind);
 	skg_draw         (0, 0, app_mesh_tri.ind_count, 1);
 
-	skg_tex_target_bind(old_target, false, color);
+	skg_tex_target_bind(old_target);
 	skg_viewport(old_view);
 
 	static bool has_saved = false;

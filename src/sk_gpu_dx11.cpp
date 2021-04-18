@@ -181,7 +181,7 @@ bool skg_capability(skg_cap_ capability) {
 
 ///////////////////////////////////////////
 
-void skg_tex_target_bind(skg_tex_t *render_target, bool clear, const float *clear_color_4) {
+void skg_tex_target_bind(skg_tex_t *render_target) {
 	d3d_active_rendertarget = render_target;
 
 	if (render_target == nullptr) {
@@ -193,15 +193,19 @@ void skg_tex_target_bind(skg_tex_t *render_target, bool clear, const float *clea
 
 	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(0.f, 0.f, (float)render_target->width, (float)render_target->height);
 	d3d_context->RSSetViewports(1, &viewport);
-
-	if (clear) {
-		d3d_context->ClearRenderTargetView(render_target->_target_view, clear_color_4);
-		if (render_target->_depth_view) {
-			UINT clear_flags = D3D11_CLEAR_DEPTH;
-			d3d_context->ClearDepthStencilView(render_target->_depth_view, clear_flags, 1.0f, 0);
-		}
-	}
 	d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
+}
+
+///////////////////////////////////////////
+
+void skg_target_clear(bool depth, const float *clear_color_4) {
+	if (!d3d_active_rendertarget) return;
+	if (clear_color_4)
+		d3d_context->ClearRenderTargetView(d3d_active_rendertarget->_target_view, clear_color_4);
+	if (depth && d3d_active_rendertarget->_depth_view) {
+		UINT clear_flags = D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL;
+		d3d_context->ClearDepthStencilView(d3d_active_rendertarget->_depth_view, clear_flags, 1.0f, 0);
+	}
 }
 
 ///////////////////////////////////////////
@@ -807,8 +811,8 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 
 ///////////////////////////////////////////
 
-void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *clear_color_4) {
-	skg_tex_target_bind(swapchain->_target.format != 0 ? &swapchain->_target : nullptr, clear, clear_color_4);
+void skg_swapchain_bind(skg_swapchain_t *swapchain) {
+	skg_tex_target_bind(swapchain->_target.format != 0 ? &swapchain->_target : nullptr);
 }
 
 ///////////////////////////////////////////

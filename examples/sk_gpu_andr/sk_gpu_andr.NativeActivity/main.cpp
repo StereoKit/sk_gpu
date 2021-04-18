@@ -130,7 +130,8 @@ static void engine_draw_frame(struct engine* engine) {
 
 	skg_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skg_swapchain_bind(&engine->swapchain, true, clear_color);
+	skg_swapchain_bind(&engine->swapchain);
+	skg_target_clear(true, clear_color);
 
 	static int32_t frame = 0;
 	frame++;
@@ -210,7 +211,8 @@ void main_render(void *user_data, const XrCompositionLayerProjectionView *view, 
 	engine *eng = (engine*)user_data;
 	float clear_color[4] = { 0,0,0,1 };
 	skg_tex_t *target = &eng->swapchain.surfaces[view_id * eng->swapchain.surf_count + surf_id].render_tex;
-	skg_tex_target_bind(target, true, clear_color);
+	skg_tex_target_bind(target);
+	skg_target_clear(true, clear_color);
 
 	hmm_quaternion head_orientation;
 	memcpy(&head_orientation, &view->pose.orientation, sizeof(XrQuaternionf));

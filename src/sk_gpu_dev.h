@@ -267,6 +267,7 @@ void                skg_draw                     (int32_t index_start, int32_t i
 void                skg_viewport                 (const int32_t *xywh);
 void                skg_viewport_get             (int32_t *out_xywh);
 void                skg_scissor                  (const int32_t *xywh);
+void                skg_target_clear             (bool depth, const float *clear_color_4);
 
 skg_buffer_t        skg_buffer_create            (const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use);
 bool                skg_buffer_is_valid          (const skg_buffer_t *buffer);
@@ -315,7 +316,7 @@ void                skg_pipeline_destroy         (      skg_pipeline_t *pipeline
 skg_swapchain_t     skg_swapchain_create         (void *hwnd, skg_tex_fmt_ format, skg_tex_fmt_ depth_format, int32_t requested_width, int32_t requested_height);
 void                skg_swapchain_resize         (      skg_swapchain_t *swapchain, int32_t width, int32_t height);
 void                skg_swapchain_present        (      skg_swapchain_t *swapchain);
-void                skg_swapchain_bind           (      skg_swapchain_t *swapchain, bool clear, const float *clear_color_4);
+void                skg_swapchain_bind           (      skg_swapchain_t *swapchain);
 void                skg_swapchain_destroy        (      skg_swapchain_t *swapchain);
 
 skg_tex_t           skg_tex_create_from_existing (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
@@ -328,7 +329,7 @@ void                skg_tex_set_contents         (      skg_tex_t *tex, const vo
 void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
 bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
-void                skg_tex_target_bind          (      skg_tex_t *render_target, bool clear, const float *clear_color_4);
+void                skg_tex_target_bind          (      skg_tex_t *render_target);
 skg_tex_t          *skg_tex_target_get           ();
 void                skg_tex_destroy              (      skg_tex_t *tex);
 int64_t             skg_tex_fmt_to_native        (skg_tex_fmt_ format);

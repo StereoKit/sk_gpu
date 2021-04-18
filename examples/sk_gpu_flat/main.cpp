@@ -150,8 +150,7 @@ int main_step(double t, void *) {
 
 	skg_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skg_swapchain_bind(&app_swapchain);
-	skg_target_clear(clear_color);
+	skg_swapchain_bind(&app_swapchain, true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(
 		HMM_Vec3(sinf((float)t*0.001f) * 5, 2, cosf((float)t*0.001f) * 5),

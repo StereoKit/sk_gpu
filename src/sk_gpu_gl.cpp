@@ -695,7 +695,7 @@ void skg_draw_begin() {
 
 ///////////////////////////////////////////
 
-void skg_tex_target_bind(skg_tex_t *render_target, bool clear, const float *clear_color_4) {
+void skg_tex_target_bind(skg_tex_t *render_target) {
 	gl_active_rendertarget = render_target;
 	gl_current_framebuffer = render_target == nullptr ? 0 : render_target->_framebuffer;
 
@@ -713,14 +713,16 @@ void skg_tex_target_bind(skg_tex_t *render_target, bool clear, const float *clea
 		glDisable(GL_FRAMEBUFFER_SRGB);
 	}
 #endif
+}
 
-	if (clear) {
-		// If DepthMask is false, glClear won't clear depth
-		glDepthMask(true);
+///////////////////////////////////////////
 
-		glClearColor(clear_color_4[0], clear_color_4[1], clear_color_4[2], clear_color_4[3]);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	}
+void skg_target_clear(const float *clear_color_4) {
+	// If DepthMask is false, glClear won't clear depth
+	glDepthMask(true);
+
+	glClearColor(clear_color_4[0], clear_color_4[1], clear_color_4[2], clear_color_4[3]);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 ///////////////////////////////////////////
@@ -1386,7 +1388,8 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 	glXSwapBuffers(xDisplay, *(Drawable *) swapchain->_x_window);
 #elif defined(_SKG_GL_LOAD_EMSCRIPTEN) && defined(SKG_MANUAL_SRGB)
 	float clear[4] = { 0,0,0,1 };
-	skg_tex_target_bind(nullptr, true, clear);
+	skg_tex_target_bind(nullptr);
+	skg_target_clear   (clear);
 	skg_tex_bind      (&swapchain->_surface, {0, skg_stage_pixel});
 	skg_mesh_bind     (&swapchain->_quad_mesh);
 	skg_pipeline_bind (&swapchain->_convert_pipe);
@@ -1396,20 +1399,20 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 
 ///////////////////////////////////////////
 
-void skg_swapchain_bind(skg_swapchain_t *swapchain, bool clear, const float *clear_color_4) {
+void skg_swapchain_bind(skg_swapchain_t *swapchain) {
 	gl_active_width  = swapchain->width;
 	gl_active_height = swapchain->height;
 #if   defined(_SKG_GL_LOAD_EMSCRIPTEN) && defined(SKG_MANUAL_SRGB)
-	skg_tex_target_bind(&swapchain->_surface, clear, clear_color_4);
+	skg_tex_target_bind(&swapchain->_surface);
 #elif defined(_SKG_GL_LOAD_WGL)
 	wglMakeCurrent((HDC)swapchain->_hdc, gl_hrc);
-	skg_tex_target_bind(nullptr, clear, clear_color_4);
+	skg_tex_target_bind(nullptr);
 #elif defined(_SKG_GL_LOAD_EGL)
 	eglMakeCurrent(egl_display, swapchain->_egl_surface, swapchain->_egl_surface, egl_context);
-	skg_tex_target_bind(nullptr, clear, clear_color_4);
+	skg_tex_target_bind(nullptr);
 #elif defined(_SKG_GL_LOAD_GLX)
 	glXMakeCurrent(xDisplay, *(Drawable *) swapchain->_x_window, glxContext);
-	skg_tex_target_bind(nullptr, clear, clear_color_4);
+	skg_tex_target_bind(nullptr);
 #endif
 }
 

@@ -4,16 +4,7 @@
 
 #pragma comment(lib,"dxcompiler.lib")
 #pragma comment(lib,"d3dcompiler.lib")
-#if defined(_DEBUG)
-#pragma comment(lib,"spirv-cross-cd.lib")
-#pragma comment(lib,"spirv-cross-cored.lib")
-#pragma comment(lib,"spirv-cross-cppd.lib")
-#pragma comment(lib,"spirv-cross-glsld.lib")
-#pragma comment(lib,"spirv-cross-hlsld.lib")
-#pragma comment(lib,"spirv-cross-msld.lib")
-#pragma comment(lib,"spirv-cross-reflectd.lib")
-#pragma comment(lib,"spirv-cross-utild.lib")
-#else
+
 #pragma comment(lib,"spirv-cross-c.lib")
 #pragma comment(lib,"spirv-cross-core.lib")
 #pragma comment(lib,"spirv-cross-cpp.lib")
@@ -22,7 +13,6 @@
 #pragma comment(lib,"spirv-cross-msl.lib")
 #pragma comment(lib,"spirv-cross-reflect.lib")
 #pragma comment(lib,"spirv-cross-util.lib")
-#endif
 #pragma comment(lib,"spirv-cross-c-shared.lib")
 
 #include "sksc.h"

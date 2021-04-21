@@ -13,7 +13,6 @@
 #pragma comment(lib,"spirv-cross-msl.lib")
 #pragma comment(lib,"spirv-cross-reflect.lib")
 #pragma comment(lib,"spirv-cross-util.lib")
-#pragma comment(lib,"spirv-cross-c-shared.lib")
 
 #include "sksc.h"
 

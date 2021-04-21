@@ -1975,7 +1975,9 @@ const char *skg_semantic_to_d3d(skg_el_semantic_ semantic) {
 #define WGL_CONTEXT_MAJOR_VERSION_ARB     0x2091
 #define WGL_CONTEXT_MINOR_VERSION_ARB     0x2092
 #define WGL_CONTEXT_FLAGS_ARB             0x2094
+#define WGL_CONTEXT_PROFILE_MASK_ARB      0x9126
 #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB  0x00000001
+#define WGL_CONTEXT_DEBUG_BIT_ARB         0x0001
 
 typedef BOOL  (*wglChoosePixelFormatARB_proc)    (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats);
 typedef HGLRC (*wglCreateContextAttribsARB_proc) (HDC hDC, HGLRC hShareContext, const int *attribList);
@@ -2391,8 +2393,11 @@ int32_t gl_init_wgl() {
 	// Create an OpenGL context
 	int attributes[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 3, 
-		WGL_CONTEXT_MINOR_VERSION_ARB, 3, 
-		WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+#if _DEBUG
+		WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+#endif
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 		0 };
 	gl_hrc = wglCreateContextAttribsARB( gl_hdc, 0, attributes );
 	if (!gl_hrc) {

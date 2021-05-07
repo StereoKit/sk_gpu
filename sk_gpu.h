@@ -685,6 +685,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	desc_rasterizer.FillMode = D3D11_FILL_SOLID;
 	desc_rasterizer.CullMode = D3D11_CULL_BACK;
 	desc_rasterizer.FrontCounterClockwise = true;
+	desc_rasterizer.DepthClipEnable       = true;
 	d3d_device->CreateRasterizerState(&desc_rasterizer, &d3d_rasterstate);
 	
 	D3D11_DEPTH_STENCIL_DESC desc_depthstate = {};
@@ -1117,6 +1118,7 @@ void skg_pipeline_update_rasterizer(skg_pipeline_t *pipeline) {
 	desc_rasterizer.FillMode              = pipeline->wireframe ? D3D11_FILL_WIREFRAME : D3D11_FILL_SOLID;
 	desc_rasterizer.FrontCounterClockwise = true;
 	desc_rasterizer.ScissorEnable         = pipeline->scissor;
+	desc_rasterizer.DepthClipEnable       = true;
 	switch (pipeline->cull) {
 	case skg_cull_none:  desc_rasterizer.CullMode = D3D11_CULL_NONE;  break;
 	case skg_cull_front: desc_rasterizer.CullMode = D3D11_CULL_FRONT; break;
@@ -3795,9 +3797,10 @@ bool skg_read_file(const char *filename, void **out_data, size_t *out_size) {
 
 uint64_t skg_hash(const char *string) {
 	uint64_t hash = 14695981039346656037UL;
-	uint8_t  c;
-	while ((c = *string++))
-		hash = (hash ^ c) * 1099511628211;
+	while (*string != '\0') {
+		hash = (hash ^ *string) * 1099511628211;
+		string++;
+	}
 	return hash;
 }
 

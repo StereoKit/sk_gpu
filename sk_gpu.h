@@ -51,6 +51,7 @@ sk_gpu.h
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 ///////////////////////////////////////////

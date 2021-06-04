@@ -88,6 +88,11 @@ typedef enum skg_use_ {
 	skg_use_dynamic,
 } skg_use_;
 
+typedef enum skg_read_ {
+	skg_read_only,
+	skg_read_write,
+} skg_read_;
+
 typedef enum skg_mip_ {
 	skg_mip_generate,
 	skg_mip_none,
@@ -289,6 +294,13 @@ SKG_API void                skg_buffer_set_contents      (      skg_buffer_t *bu
 SKG_API void                skg_buffer_get_contents      (const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
 SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
+
+SKG_API skg_computebuffer_t skg_computebuffer_create      (const void *data, uint32_t size_count, uint32_t size_stride, skg_read_ read_write);
+SKG_API bool                skg_computebuffer_is_valid    (const skg_computebuffer_t *buffer);
+SKG_API void                skg_computebuffer_set_contents(      skg_computebuffer_t *buffer, const void *data, uint32_t size_bytes);
+SKG_API void                skg_computebuffer_get_contents(const skg_computebuffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
+SKG_API void                skg_computebuffer_bind        (const skg_computebuffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
+SKG_API void                skg_computebuffer_destroy     (      skg_computebuffer_t *buffer);
 
 SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer);
 SKG_API void                skg_mesh_set_verts           (      skg_mesh_t *mesh, const skg_buffer_t *vert_buffer);

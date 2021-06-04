@@ -360,6 +360,61 @@ void skg_buffer_destroy(skg_buffer_t *buffer) {
 
 ///////////////////////////////////////////
 
+skg_computebuffer_t skg_computebuffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_read_ read_write) {
+	skg_computebuffer_t result = {};
+	result.read_write = read_write;
+	result.buffer     = skg_buffer_create(data, size_count, size_stride, skg_buffer_type_compute, skg_use_static);
+
+	if (!skg_buffer_is_valid(&result.buffer)) {
+		skg_buffer_destroy(&result.buffer);
+		return {};
+	}
+
+	D3D11_BUFFER_DESC desc = {};
+	result.buffer._buffer->GetDesc( &desc );
+
+	if (read_write == skg_read_only) {
+		D3D11_SHADER_RESOURCE_VIEW_DESC view = {};
+		view.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		view.Format        = DXGI_FORMAT_UNKNOWN;
+		view.BufferEx.FirstElement = 0;
+		view.BufferEx.NumElements  = desc.ByteWidth / desc.StructureByteStride;
+
+		if (FAILED(d3d_device->CreateShaderResourceView(result.buffer._buffer, &view, &result._resource))) {
+			skg_buffer_destroy(&result.buffer);
+			return {};
+		}
+	} else if (read_write == skg_read_write) {
+		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
+		view.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+		view.Format        = DXGI_FORMAT_UNKNOWN;
+		view.Buffer.FirstElement = 0;
+		view.Buffer.NumElements  = desc.ByteWidth / desc.StructureByteStride; 
+
+		if(FAILED(d3d_device->CreateUnorderedAccessView( result.buffer._buffer, &view, &result._unordered ))) {
+			skg_buffer_destroy(&result.buffer);
+			return {};
+		}
+	}
+
+	return result;
+}
+
+///////////////////////////////////////////
+
+bool skg_computebuffer_is_valid(const skg_computebuffer_t *buffer) {
+	return buffer->_resource != nullptr || buffer->_unordered != nullptr;
+}
+
+///////////////////////////////////////////
+
+void                skg_computebuffer_set_contents(      skg_computebuffer_t *buffer, const void *data, uint32_t size_bytes);
+void                skg_computebuffer_get_contents(const skg_computebuffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
+void                skg_computebuffer_bind        (const skg_computebuffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
+void                skg_computebuffer_destroy     (      skg_computebuffer_t *buffer);
+
+///////////////////////////////////////////
+
 skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
 	skg_mesh_t result = {};
 	result._ind_buffer  = ind_buffer  ? ind_buffer ->_buffer : nullptr;

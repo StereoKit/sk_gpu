@@ -226,6 +226,12 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_compute(uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z) {
+	d3d_context->Dispatch(thread_count_x, thread_count_y, thread_count_z);
+}
+
+///////////////////////////////////////////
+
 void skg_viewport(const int32_t *xywh) {
 	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT((float)xywh[0], (float)xywh[1], (float)xywh[2], (float)xywh[3]);
 	d3d_context->RSSetViewports(1, &viewport);
@@ -262,26 +268,55 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 	D3D11_BUFFER_DESC      buffer_desc = {};
 	buffer_desc.ByteWidth           = size_count * size_stride;
 	buffer_desc.StructureByteStride = size_stride;
-	switch (use) {
-	case skg_use_static:  buffer_desc.Usage = D3D11_USAGE_DEFAULT; break;
-	case skg_use_dynamic: {
+	buffer_desc.Usage               = D3D11_USAGE_DEFAULT;
+
+	if (use & skg_use_dynamic) {
 		buffer_desc.Usage          = D3D11_USAGE_DYNAMIC;
 		buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	}break;
 	}
-	switch (type) {
-	case skg_buffer_type_vertex:   buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;   break;
-	case skg_buffer_type_index:    buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;    break;
-	case skg_buffer_type_constant: buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; break;
-	case skg_buffer_type_compute:  {
+
+	if (use & skg_use_compute_write || use & skg_use_compute_read) {
 		buffer_desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE; 
-		buffer_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED; 
-		buffer_desc.Usage     = D3D11_USAGE_DEFAULT;
-	} break;
+		buffer_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	}
+
+	switch (type) {
+	case skg_buffer_type_vertex:   buffer_desc.BindFlags |= D3D11_BIND_VERTEX_BUFFER;   break;
+	case skg_buffer_type_index:    buffer_desc.BindFlags |= D3D11_BIND_INDEX_BUFFER;    break;
+	case skg_buffer_type_constant: buffer_desc.BindFlags |= D3D11_BIND_CONSTANT_BUFFER; break;
+	case skg_buffer_type_compute:  break;
 	}
 	if (FAILED(d3d_device->CreateBuffer(&buffer_desc, data == nullptr ? nullptr : &buffer_data, &result._buffer))) {
 		skg_log(skg_log_critical, "CreateBuffer failed!");
+		return {};
 	}
+
+	if (use & skg_use_compute_write) {
+		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
+		view.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+		view.Format        = DXGI_FORMAT_UNKNOWN;
+		view.Buffer.FirstElement = 0;
+		view.Buffer.NumElements  = size_count; 
+
+		if(FAILED(d3d_device->CreateUnorderedAccessView( result._buffer, &view, &result._unordered ))) {
+			skg_log(skg_log_critical, "CreateUnorderedAccessView failed!");
+			skg_buffer_destroy(&result);
+			return {};
+		}
+	} 
+	if (use & skg_use_compute_read) {
+		D3D11_SHADER_RESOURCE_VIEW_DESC view = {};
+		view.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		view.Format        = DXGI_FORMAT_UNKNOWN;
+		view.BufferEx.FirstElement = 0;
+		view.BufferEx.NumElements  = size_count;
+
+		if (FAILED(d3d_device->CreateShaderResourceView(result._buffer, &view, &result._resource))) {
+			skg_log(skg_log_critical, "CreateShaderResourceView failed!");
+			skg_buffer_destroy(&result);
+			return {};
+		}
+	} 
 	return result;
 }
 
@@ -327,8 +362,8 @@ void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint3
 
 	D3D11_MAPPED_SUBRESOURCE resource;
 	if (SUCCEEDED(d3d_context->Map(cpu_buff, 0, D3D11_MAP_READ, 0, &resource))) {
-		memcpy(ref_buffer, resource.pData, min(resource.DepthPitch * resource.DepthPitch, buffer_size));
-		d3d_context->Unmap(buffer->_buffer, 0);
+		memcpy(ref_buffer, resource.pData, buffer_size);
+		d3d_context->Unmap(cpu_buff, 0);
 	} else {
 		memset(ref_buffer, 0, buffer_size);
 		skg_log(skg_log_critical, "Failed to get contents of buffer!");
@@ -353,65 +388,17 @@ void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offse
 
 ///////////////////////////////////////////
 
+void skg_buffer_compute_bind(const skg_buffer_t *buffer, skg_bind_t bind) {
+	if (buffer->_resource ) d3d_context->CSSetShaderResources     (bind.slot, 1, &buffer->_resource);
+	if (buffer->_unordered) d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &buffer->_unordered, nullptr);
+}
+
+///////////////////////////////////////////
+
 void skg_buffer_destroy(skg_buffer_t *buffer) {
 	if (buffer->_buffer) buffer->_buffer->Release();
 	*buffer = {};
 }
-
-///////////////////////////////////////////
-
-skg_computebuffer_t skg_computebuffer_create(const void *data, uint32_t size_count, uint32_t size_stride, skg_read_ read_write) {
-	skg_computebuffer_t result = {};
-	result.read_write = read_write;
-	result.buffer     = skg_buffer_create(data, size_count, size_stride, skg_buffer_type_compute, skg_use_static);
-
-	if (!skg_buffer_is_valid(&result.buffer)) {
-		skg_buffer_destroy(&result.buffer);
-		return {};
-	}
-
-	D3D11_BUFFER_DESC desc = {};
-	result.buffer._buffer->GetDesc( &desc );
-
-	if (read_write == skg_read_only) {
-		D3D11_SHADER_RESOURCE_VIEW_DESC view = {};
-		view.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-		view.Format        = DXGI_FORMAT_UNKNOWN;
-		view.BufferEx.FirstElement = 0;
-		view.BufferEx.NumElements  = desc.ByteWidth / desc.StructureByteStride;
-
-		if (FAILED(d3d_device->CreateShaderResourceView(result.buffer._buffer, &view, &result._resource))) {
-			skg_buffer_destroy(&result.buffer);
-			return {};
-		}
-	} else if (read_write == skg_read_write) {
-		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
-		view.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-		view.Format        = DXGI_FORMAT_UNKNOWN;
-		view.Buffer.FirstElement = 0;
-		view.Buffer.NumElements  = desc.ByteWidth / desc.StructureByteStride; 
-
-		if(FAILED(d3d_device->CreateUnorderedAccessView( result.buffer._buffer, &view, &result._unordered ))) {
-			skg_buffer_destroy(&result.buffer);
-			return {};
-		}
-	}
-
-	return result;
-}
-
-///////////////////////////////////////////
-
-bool skg_computebuffer_is_valid(const skg_computebuffer_t *buffer) {
-	return buffer->_resource != nullptr || buffer->_unordered != nullptr;
-}
-
-///////////////////////////////////////////
-
-void                skg_computebuffer_set_contents(      skg_computebuffer_t *buffer, const void *data, uint32_t size_bytes);
-void                skg_computebuffer_get_contents(const skg_computebuffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
-void                skg_computebuffer_bind        (const skg_computebuffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
-void                skg_computebuffer_destroy     (      skg_computebuffer_t *buffer);
 
 ///////////////////////////////////////////
 
@@ -550,6 +537,13 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 bool skg_shader_is_valid(const skg_shader_t *shader) {
 	return shader->meta
 		&& (shader->_vertex && shader->_pixel) || shader->_compute;
+}
+
+///////////////////////////////////////////
+
+void skg_shader_compute_bind(const skg_shader_t *shader) {
+	if (shader) d3d_context->CSSetShader(shader->_compute, nullptr, 0);
+	else        d3d_context->CSSetShader(nullptr, nullptr, 0);
 }
 
 ///////////////////////////////////////////

@@ -8,6 +8,7 @@
 
 #include "test.hlsl.h"
 #include "cubemap.hlsl.h"
+#include "compute_test.hlsl.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -322,6 +323,26 @@ bool app_init() {
 	app_shader_data_buffer = skg_buffer_create(&app_shader_data, 1,   sizeof(app_shader_data_t), skg_buffer_type_constant, skg_use_dynamic);
 	app_shader_inst_buffer = skg_buffer_create(&app_shader_inst, 100, sizeof(app_shader_inst_t), skg_buffer_type_constant, skg_use_dynamic);
 
+	skg_color32_t      *data      = (skg_color32_t*)malloc(sizeof(skg_color32_t) * 1024*1024);
+	for (size_t i = 0; i < 1024*1024; i++) {
+		data[i] = { 255,0,0,0 };
+	}
+	skg_buffer_t cbuff     = skg_buffer_create(data, 1024*1024, sizeof(skg_color32_t), skg_buffer_type_compute, skg_use_compute_read);
+	skg_buffer_t cbuff_out = skg_buffer_create(data, 1024*1024, sizeof(skg_color32_t), skg_buffer_type_compute, skg_use_compute_write);
+	skg_shader_t cshader   = skg_shader_create_memory(sks_compute_test_hlsl, sizeof(sks_compute_test_hlsl));
+	skg_buffer_compute_bind(&cbuff,     { 0 });
+	skg_buffer_compute_bind(&cbuff_out, { 0 });
+	skg_shader_compute_bind(&cshader);
+	skg_compute(16, 16, 16);
+	skg_buffer_get_contents(&cbuff_out, data, sizeof(skg_color32_t) * 1024 * 1024);
+	for (size_t i = 0; i < 10; i++) {
+		printf("%d, %d, %d, %d\n", data[i].r, data[i].g, data[i].b, data[i].a);
+	}
+	skg_buffer_destroy(&cbuff);
+	skg_buffer_destroy(&cbuff_out);
+	skg_shader_destroy       (&cshader);
+	free(data);
+
 	return true;
 }
 
@@ -362,7 +383,6 @@ void app_test_dyn_update(float time) {
 	skg_pipeline_bind(&app_mat_default);
 	skg_tex_bind     (&app_target, app_sh_default_tex_bind);
 	skg_draw(0, 0, app_mesh_wave.ind_count, 1);
-	skg_tex_bind     (nullptr, app_sh_default_tex_bind);
 }
 
 ///////////////////////////////////////////

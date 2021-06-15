@@ -10,6 +10,8 @@ typedef struct skg_buffer_t {
 	skg_buffer_type_ type;
 	uint32_t         stride;
 	ID3D11Buffer    *_buffer;
+	ID3D11ShaderResourceView  *_resource;
+	ID3D11UnorderedAccessView *_unordered;
 } skg_buffer_t;
 
 typedef struct skg_computebuffer_t {

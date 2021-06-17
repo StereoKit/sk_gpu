@@ -161,6 +161,15 @@ typedef enum skg_stage_ {
 	skg_stage_compute = 1 << 2,
 } skg_stage_;
 
+typedef enum skg_register_ {
+	skg_register_default,
+	skg_register_vertex,
+	skg_register_index,
+	skg_register_constant,
+	skg_register_resource,
+	skg_register_readwrite,
+} skg_register_;
+
 typedef enum skg_shader_var_ {
 	skg_shader_var_none,
 	skg_shader_var_int,
@@ -221,7 +230,8 @@ typedef struct skg_vert_t {
 
 typedef struct skg_bind_t {
 	uint16_t slot;
-	uint16_t stage_bits;
+	uint8_t  stage_bits;
+	uint8_t  register_type;
 } skg_bind_t;
 
 typedef struct skg_shader_var_t {
@@ -296,7 +306,6 @@ SKG_API bool                skg_buffer_is_valid          (const skg_buffer_t *bu
 SKG_API void                skg_buffer_set_contents      (      skg_buffer_t *buffer, const void *data, uint32_t size_bytes);
 SKG_API void                skg_buffer_get_contents      (const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
 SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
-SKG_API void                skg_buffer_compute_bind      (const skg_buffer_t *buffer, skg_bind_t slot);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 
 SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer);

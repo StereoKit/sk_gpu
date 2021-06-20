@@ -48,6 +48,8 @@ SKG_API skg_color128_t     skg_col_jsl128              (float hue, float saturat
 SKG_API skg_color32_t      skg_col_lab32               (float l, float a, float b, float alpha);
 SKG_API skg_color128_t     skg_col_lab128              (float l, float a, float b, float alpha);
 SKG_API skg_color128_t     skg_col_rgb_to_lab128       (skg_color128_t rgb);
+SKG_API skg_color128_t     skg_col_to_srgb             (skg_color128_t rgb_linear);
+SKG_API skg_color128_t     skg_col_to_linear           (skg_color128_t srgb);
 
 SKG_API bool               skg_shader_file_verify      (const void *file_memory, size_t file_size, uint16_t *out_version, char *out_name, size_t out_name_size);
 SKG_API bool               skg_shader_file_load_memory (const void *file_memory, size_t file_size, skg_shader_file_t *out_file);

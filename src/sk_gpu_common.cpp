@@ -410,6 +410,36 @@ skg_color128_t skg_col_rgb_to_lab128(skg_color128_t rgb) {
 
 ///////////////////////////////////////////
 
+inline float _skg_to_srgb(float x) {
+	return x < 0.0031308f
+		? x * 12.92f
+		: 1.055f * powf(x, 1 / 2.4f) - 0.055f;
+}
+skg_color128_t skg_col_to_srgb(skg_color128_t rgb_linear) {
+	return {
+		_skg_to_srgb(rgb_linear.r),
+		_skg_to_srgb(rgb_linear.g),
+		_skg_to_srgb(rgb_linear.b),
+		rgb_linear.a };
+}
+
+///////////////////////////////////////////
+
+inline float _skg_to_linear(float x) {
+	return x < 0.04045f
+		? x / 12.92f
+		: powf((x + 0.055f) / 1.055f, 2.4f);
+}
+skg_color128_t skg_col_to_linear(skg_color128_t srgb) {
+	return {
+		_skg_to_linear(srgb.r),
+		_skg_to_linear(srgb.g),
+		_skg_to_linear(srgb.b),
+		srgb.a };
+}
+
+///////////////////////////////////////////
+
 bool skg_shader_file_load(const char *file, skg_shader_file_t *out_file) {
 	void  *data = nullptr;
 	size_t size = 0;

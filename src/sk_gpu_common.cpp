@@ -410,6 +410,36 @@ skg_color128_t skg_col_rgb_to_lab128(skg_color128_t rgb) {
 
 ///////////////////////////////////////////
 
+inline float _skg_to_srgb(float x) {
+	return x < 0.0031308f
+		? x * 12.92f
+		: 1.055f * powf(x, 1 / 2.4f) - 0.055f;
+}
+skg_color128_t skg_col_to_srgb(skg_color128_t rgb_linear) {
+	return {
+		_skg_to_srgb(rgb_linear.r),
+		_skg_to_srgb(rgb_linear.g),
+		_skg_to_srgb(rgb_linear.b),
+		rgb_linear.a };
+}
+
+///////////////////////////////////////////
+
+inline float _skg_to_linear(float x) {
+	return x < 0.04045f
+		? x / 12.92f
+		: powf((x + 0.055f) / 1.055f, 2.4f);
+}
+skg_color128_t skg_col_to_linear(skg_color128_t srgb) {
+	return {
+		_skg_to_linear(srgb.r),
+		_skg_to_linear(srgb.g),
+		_skg_to_linear(srgb.b),
+		srgb.a };
+}
+
+///////////////////////////////////////////
+
 bool skg_shader_file_load(const char *file, skg_shader_file_t *out_file) {
 	void  *data = nullptr;
 	size_t size = 0;
@@ -571,6 +601,67 @@ void skg_shader_file_destroy(skg_shader_file_t *file) {
 }
 
 ///////////////////////////////////////////
+// skg_shader_meta_t                     //
+///////////////////////////////////////////
+
+skg_bind_t skg_shader_meta_get_tex_bind(const skg_shader_meta_t *meta, const char *name) {
+	for (uint32_t i = 0; i < meta->texture_count; i++) {
+		if (strcmp(name, meta->textures[i].name) == 0)
+			return meta->textures[i].bind;
+	}
+	skg_bind_t empty = {};
+	return empty;
+}
+
+///////////////////////////////////////////
+
+skg_bind_t skg_shader_meta_get_buffer_bind(const skg_shader_meta_t *meta, const char *name) {
+	for (uint32_t i = 0; i < meta->buffer_count; i++) {
+		if (strcmp(name, meta->buffers[i].name) == 0)
+			return meta->buffers[i].bind;
+	}
+	skg_bind_t empty = {};
+	return empty;
+}
+
+///////////////////////////////////////////
+
+int32_t skg_shader_meta_get_var_count(const skg_shader_meta_t *meta) {
+	return meta->global_buffer_id != -1
+		? meta->buffers[meta->global_buffer_id].var_count
+		: 0;
+}
+
+///////////////////////////////////////////
+
+int32_t skg_shader_meta_get_var_index(const skg_shader_meta_t *meta, const char *name) {
+	return skg_shader_meta_get_var_index_h(meta, skg_hash(name));
+}
+
+///////////////////////////////////////////
+
+int32_t skg_shader_meta_get_var_index_h(const skg_shader_meta_t *meta, uint64_t name_hash) {
+	if (meta->global_buffer_id == -1) return -1;
+
+	skg_shader_buffer_t *buffer = &meta->buffers[meta->global_buffer_id];
+	for (uint32_t i = 0; i < buffer->var_count; i++) {
+		if (buffer->vars[i].name_hash == name_hash) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+///////////////////////////////////////////
+
+const skg_shader_var_t *skg_shader_meta_get_var_info(const skg_shader_meta_t *meta, int32_t var_index) {
+	if (meta->global_buffer_id == -1 || var_index == -1) return nullptr;
+
+	skg_shader_buffer_t *buffer = &meta->buffers[meta->global_buffer_id];
+	return &buffer->vars[var_index];
+}
+
+///////////////////////////////////////////
 
 void skg_shader_meta_reference(skg_shader_meta_t *meta) {
 	meta->references += 1;
@@ -641,60 +732,37 @@ skg_shader_t skg_shader_create_memory(const void *sks_data, size_t sks_data_size
 ///////////////////////////////////////////
 
 skg_bind_t skg_shader_get_tex_bind(const skg_shader_t *shader, const char *name) {
-	for (uint32_t i = 0; i < shader->meta->texture_count; i++) {
-		if (strcmp(name, shader->meta->textures[i].name) == 0)
-			return shader->meta->textures[i].bind;
-	}
-	skg_bind_t empty = {};
-	return empty;
+	return skg_shader_meta_get_tex_bind(shader->meta, name);
 }
 
 ///////////////////////////////////////////
 
 skg_bind_t skg_shader_get_buffer_bind(const skg_shader_t *shader, const char *name) {
-	for (uint32_t i = 0; i < shader->meta->buffer_count; i++) {
-		if (strcmp(name, shader->meta->buffers[i].name) == 0)
-			return shader->meta->buffers[i].bind;
-	}
-	skg_bind_t empty = {};
-	return empty;
+	return skg_shader_meta_get_buffer_bind(shader->meta, name);
 }
 
 ///////////////////////////////////////////
 
 int32_t skg_shader_get_var_count(const skg_shader_t *shader) {
-	return shader->meta->global_buffer_id != -1
-		? shader->meta->buffers[shader->meta->global_buffer_id].var_count
-		: 0;
+	return skg_shader_meta_get_var_count(shader->meta);
 }
 
 ///////////////////////////////////////////
 
 int32_t skg_shader_get_var_index(const skg_shader_t *shader, const char *name) {
-	return skg_shader_get_var_index_h(shader, skg_hash(name));
+	return skg_shader_meta_get_var_index_h(shader->meta, skg_hash(name));
 }
 
 ///////////////////////////////////////////
 
 int32_t skg_shader_get_var_index_h(const skg_shader_t *shader, uint64_t name_hash) {
-	if (shader->meta->global_buffer_id == -1) return -1;
-
-	skg_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
-	for (uint32_t i = 0; i < buffer->var_count; i++) {
-		if (buffer->vars[i].name_hash == name_hash) {
-			return i;
-		}
-	}
-	return -1;
+	return skg_shader_meta_get_var_index_h(shader->meta, name_hash);
 }
 
 ///////////////////////////////////////////
 
-const skg_shader_var_t *skg_shader_get_var_info(const skg_shader_t *shader, int32_t var_id) {
-	if (shader->meta->global_buffer_id == -1 || var_id == -1) return nullptr;
-
-	skg_shader_buffer_t *buffer = &shader->meta->buffers[shader->meta->global_buffer_id];
-	return &buffer->vars[var_id];
+const skg_shader_var_t *skg_shader_get_var_info(const skg_shader_t *shader, int32_t var_index) {
+	return skg_shader_meta_get_var_info(shader->meta, var_index);
 }
 
 ///////////////////////////////////////////

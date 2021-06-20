@@ -62,10 +62,6 @@
 #include <openxr/openxr_platform.h>
 #include <openxr/openxr_reflection.h>
 
-#ifdef __ANDROID__
-#include <openxr/openxr_oculus.h>
-#endif
-
 ///////////////////////////////////////////
 
 struct xr_settings_t {

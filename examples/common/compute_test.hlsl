@@ -1,3 +1,6 @@
+// Reference and numbers are from here:
+// http://mrob.com/pub/comp/xmorphia/
+
 float feed;
 float kill;
 float diffuseA;
@@ -47,29 +50,20 @@ void cs( uint3 dispatchThreadID : SV_DispatchThreadID) {
 
 	float px = (dispatchThreadID.x / (float)size);
 	float py = (dispatchThreadID.y / (float)size);
-	//float feed2 = lerp(.01, .1, py);
-	//float kill2 = lerp(.045, .060, px + sin(py*3.14+.5)*0.6);
-
+	px = 1-abs(px - 0.5) * 2;
+	py = 1-abs(py - 0.5) * 2;
 	// Good!
-	//float feed2 = .02;
-	//float kill2 = lerp(.05, .06, abs(px-0.5) * 2);
-
 	float feed2 = .02;
 	float kill2 = lerp(.045, .065, abs(px-0.5) * 2);
-
-	//float feed2 = (dispatchThreadID.y/(float)size) * 0.083; 
-	//float kill2 = (dispatchThreadID.x/(float)size) * 0.073;
 	//float feed2 = feed;
 	//float kill2 = kill;
+	//float diffuseA2 = lerp(0.15, 0.25, px);
+	//float diffuseB2 = lerp(0.05, 0.15, py);
 
 	output[id] = float2(
 		A + ((diffuseA * lap.x - reactionTerm + feed2 * (1.0 - A))   * timestep),
 		B + ((diffuseB * lap.y + reactionTerm - (kill2 + feed2) * B)  * timestep)
 	);
-
-	/*output[id].y = id / (32.0 * 32.0);// input[id].y;// (float)dispatchThreadID.x / 256;
-	out_tex[dispatchThreadID.xy] = float4((float)dispatchThreadID.x/(float)size, (float)dispatchThreadID.y/(float)size, 0, 1);
-	return;*/
 
 	float3 col;
 	float  a;
@@ -101,7 +95,4 @@ void cs( uint3 dispatchThreadID : SV_DispatchThreadID) {
 		col = color6.rgb;
 	}
 	out_tex[dispatchThreadID.xy] = float4(col,1);
-	/*out_tex[dispatchThreadID.xy] = float4( 
-		saturate((output[id].x-0.5)*10), 0, 
-		saturate((output[id].y-0.5)*10), 1);*/
 }

@@ -347,10 +347,15 @@ struct reaction_diffusion_args_t {
 	float pad[2];
 };
 reaction_diffusion_args_t compute_args      = {
-	0.0367f, 0.0649f, 
+	//0.0367f, 0.0649f, 
 	//0.082f, 0.06f,
 	//0.029f, 0.057f, // Mazes
 	//0.037f, 0.06f, // Fingerprints
+	0.042f, 0.059f, // Turing patterns
+	//0.039f, 0.058f, // Chaos to Turing Negatons
+	//0.022f, 0.059f, // Warring microbes
+	//0.025f, 0.060f, // Pulsating solitons
+	//0.018f, 0.051f, // Spots and loops
 	//0.055f, 0.062f,
 	0.2097f, 0.105f, 0.8f, c_size};
 skg_buffer_t              compute_buff_args = {};
@@ -380,16 +385,7 @@ void app_test_compute_init() {
 	float *data = (float*)malloc(sizeof(float)*2 * c_size*c_size);
 	for (size_t y = 0; y < c_size; y+=1) {
 	for (size_t x = 0; x < c_size; x+=1) {
-		float r = hash_f(0, (x/20)*13+(y/20)*127);
-		//float r = hash_f(x+y*c_size, 0);
-		/*float dx = (int32_t)x - c_size / 2;
-		float dy = (int32_t)y - c_size / 2;
-		float d = sqrtf(dx * dx*2 + dy * dy);
-		if (d < 256) {
-			r = 1 - d/256;
-			r = r * r;
-		}*/
-
+		float r = hash_f(1, (x/16)*13+(y/16)*127);
 		data[(x+y*c_size)*2    ] = r;
 		data[(x+y*c_size)*2 + 1] = 1.0f-r;
 	}}
@@ -432,10 +428,15 @@ void app_test_compute_update() {
 	static skg_color32_t *data = (skg_color32_t *)malloc(sizeof(skg_color32_t) * c_size * c_size);
 	static int32_t frame = 0;
 	frame += 1;
-	if ((frame % 2) == 1) {
+	if (frame == 1000) {
 		skg_tex_get_contents(&compute_tex, data, sizeof(skg_color32_t) * c_size * c_size);
 		char name[128];
 		snprintf(name, 128, "diffusion%d.bmp", frame);
+		for (size_t i = 0; i < c_size*c_size; i++) {
+			skg_color128_t col = { data[i].r / 255.f, data[i].g / 255.f, data[i].b / 255.f, data[i].a / 255.f };
+			col = skg_col_to_srgb(col);
+			data[i] = {(uint8_t)(col.r*255), (uint8_t)(col.g*255), (uint8_t)(col.b*255), (uint8_t)(col.a*255)};
+		}
 		bmp_write(name, c_size, c_size, (uint8_t *)data);
 	}
 

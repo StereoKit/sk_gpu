@@ -1,9 +1,11 @@
 import os
 import re
 
+src_path = os.path.dirname(os.path.abspath(__file__))
+
 regex_includes = re.compile('#include "[^"]*"')
 
-src_header_file = open("sk_gpu_dev.h", "r")
+src_header_file = open(os.path.join(src_path, "sk_gpu_dev.h"), "r")
 src_header      = src_header_file.read()
 src_header_file.close()
 
@@ -18,12 +20,12 @@ for match in re.findall(regex_includes, dest_header):
         dest_header = dest_header.replace(match, "")
         continue
     
-    include_file     = open(include_filename, "r")
+    include_file     = open(os.path.join(src_path, include_filename), "r")
     include_text     = include_file.read().replace('#pragma once', '').replace('#include "sk_gpu_dev.h"', '')
     include_file.close()
     
     body_filename    = include_filename.replace(".h", ".cpp")
-    body_file        = open(body_filename, "r")
+    body_file        = open(os.path.join(src_path, body_filename), "r")
     body_text        = body_file.read().replace('#include "sk_gpu_dev.h"', '')
     body_file.close()
 

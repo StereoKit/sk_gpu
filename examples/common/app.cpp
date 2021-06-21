@@ -617,11 +617,7 @@ bool ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_ver
 void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA, uint8_t dataChannels, uint8_t fileChannels) {
 #ifndef __EMSCRIPTEN__
 	FILE *fp = NULL;
-#ifdef __ANDROID__
 	fp = fopen(filename, "wb");
-#else
-	fopen_s(&fp, filename, "wb");
-#endif
 	if (fp == NULL) return;
 
 	// You can find details about TGA headers here: http://www.paulbourke.net/dataformats/tga/

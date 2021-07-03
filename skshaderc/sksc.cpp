@@ -22,7 +22,7 @@
 #include <windows.h>
 #include <dxcapi.h>
 #include <d3d12shader.h>
-#include <spirv_cross/spirv_cross_c.h>
+#include <spirv_cross_c.h>
 #include <d3dcompiler.h>
 #include <stdint.h>
 #include <stdio.h>

@@ -2,28 +2,33 @@
 
 ///////////////////////////////////////////
 
-#pragma comment(lib,"dxcompiler.lib")
-#pragma comment(lib,"d3dcompiler.lib")
-
-#pragma comment(lib,"spirv-cross-c.lib")
+/*#pragma comment(lib,"spirv-cross-c.lib")
 #pragma comment(lib,"spirv-cross-core.lib")
 #pragma comment(lib,"spirv-cross-cpp.lib")
 #pragma comment(lib,"spirv-cross-glsl.lib")
 #pragma comment(lib,"spirv-cross-hlsl.lib")
 #pragma comment(lib,"spirv-cross-msl.lib")
 #pragma comment(lib,"spirv-cross-reflect.lib")
-#pragma comment(lib,"spirv-cross-util.lib")
+#pragma comment(lib,"spirv-cross-util.lib")*/
 
 #include "sksc.h"
-
-#define SKR_DIRECT3D11
 #include "../sk_gpu.h"
 
-#include <windows.h>
-#include <dxcapi.h>
-#include <d3d12shader.h>
+#if defined(SKSC_D3D11)
+	#pragma comment(lib,"d3dcompiler.lib")
+	#include <windows.h>
+	#include <d3dcompiler.h>
+#endif
+
+#if defined(SKSC_SPIRV_DXC)
+	#pragma comment(lib,"dxcompiler.lib")
+	#include <dxcapi.h>
+	#include <d3d12shader.h>
+#elif defined(SKSC_SPIRV_GLSLANG)
+	#include <glslang/Include/glslang_c_interface.h>
+#endif
+
 #include <spirv_cross_c.h>
-#include <d3dcompiler.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,48 +84,548 @@ enum log_level_ {
 void                  sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
 bool                  sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta);
 
-DWORD                 sksc_d3d11_build_flags     (const sksc_settings_t *settings);
-bool                  sksc_d3d11_compile_shader  (const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage);
-
-array_t<const char *> sksc_dxc_build_flags       (sksc_settings_t settings, skg_stage_ type, skg_shader_lang_ lang);
-void                  sksc_dxc_shader_meta       (IDxcResult *compile_result, skg_stage_ stage, skg_shader_meta_t *out_meta);
-bool                  sksc_dxc_compile_shader    (DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta);
-void                  sksc_dxc_errors_to_log     (const char *error_string);
-
 bool                  sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta);
 
 void                  sksc_line_col              (const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
 void                  sksc_log_at                (log_level_ level, int32_t line, int32_t column, const char *text, ...);
 void                  sksc_log                   (log_level_ level, const char *text, ...);
 
-
 ///////////////////////////////////////////
 
-IDxcCompiler3           *sksc_compiler;
-IDxcUtils               *sksc_utils;
 array_t<sksc_log_item_t> sksc_log_list = {};
 
 ///////////////////////////////////////////
 
+#if defined(SKSC_SPIRV_DXC)
+
+IDxcCompiler3        *sksc_dxc_compiler;
+IDxcUtils            *sksc_dxc_utils;
+
+void                  sksc_dxc_init              ();
+void                  sksc_dxc_shutdown          ();
+array_t<const char *> sksc_dxc_build_flags       (sksc_settings_t settings, skg_stage_ type, skg_shader_lang_ lang);
+void                  sksc_dxc_shader_meta       (IDxcResult *compile_result, skg_stage_ stage, skg_shader_meta_t *out_meta);
+bool                  sksc_dxc_compile_shader    (DxcBuffer *source_buff, IDxcIncludeHandler *include_handler, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta);
+void                  sksc_dxc_errors_to_log     (const char *error_string);
+
+///////////////////////////////////////////
+
 void sksc_init() {
-	DxcCreateInstance(CLSID_DxcCompiler, __uuidof(IDxcCompiler3), (void **)(&sksc_compiler));	
-	DxcCreateInstance(CLSID_DxcUtils,    __uuidof(IDxcUtils),     (void **)(&sksc_utils));
+	DxcCreateInstance(CLSID_DxcCompiler, __uuidof(IDxcCompiler3), (void **)(&sksc_dxc_compiler));	
+	DxcCreateInstance(CLSID_DxcUtils,    __uuidof(IDxcUtils),     (void **)(&sksc_dxc_utils));
 }
 
 ///////////////////////////////////////////
 
 void sksc_shutdown() {
-	sksc_utils   ->Release();
-	sksc_compiler->Release();
+	sksc_dxc_utils   ->Release();
+	sksc_dxc_compiler->Release();
 }
+
+///////////////////////////////////////////
+
+bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include_handler, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
+	IDxcResult   *compile_result;
+	IDxcBlobUtf8 *errors;
+	bool result = false;
+
+	array_t<const char *> flags  = sksc_dxc_build_flags(*settings, type, lang);
+	array_t<wchar_t    *> wflags = {};
+	for (size_t i = 0; i < flags.count; i++) {
+		size_t   len = strlen(flags[i]);
+		wchar_t *f   = (wchar_t*)malloc(sizeof(wchar_t) * (len+1));
+		mbstowcs_s(nullptr, f, len+1, flags[i], len);
+		wflags.add(f);
+	}
+	if (FAILED(sksc_dxc_compiler->Compile(source_buff, (LPCWSTR*)wflags.data, (uint32_t)wflags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
+		sksc_log(log_level_err, "DXShaderCompile failed!");
+		return false;
+	}
+
+	const char *lang_name = lang == skg_shader_lang_hlsl ? "HLSL"  : "SPIRV";
+	const char *type_name = type == skg_stage_pixel      ? "Pixel" : "Vertex";
+	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
+	if (errors && errors->GetStringLength() > 0) {
+		sksc_dxc_errors_to_log((char *)errors->GetBufferPointer());
+	} else {
+		out_stage->stage    = type;
+		out_stage->language = lang;
+
+		// Get the shader binary
+		IDxcBlob *shader_bin;
+		compile_result->GetOutput(DXC_OUT_OBJECT, __uuidof(IDxcBlob), (void **)(&shader_bin), nullptr);
+
+		void  *src  = shader_bin->GetBufferPointer();
+		size_t size = shader_bin->GetBufferSize();
+		out_stage->code      = malloc(size);
+		out_stage->code_size = (uint32_t)size;
+		memcpy(out_stage->code, src, size);
+		shader_bin->Release();
+
+		if (lang == skg_shader_lang_hlsl && out_meta != nullptr) {
+			sksc_dxc_shader_meta(compile_result, type, out_meta);
+		}
+		result = true;
+	}
+	errors        ->Release();
+	compile_result->Release();
+	flags.free();
+	for (size_t i = 0; i < wflags.count; i++)
+		free(wflags[i]);
+	wflags.free();
+
+	return result;
+}
+
+///////////////////////////////////////////
+
+void sksc_dxc_errors_to_log(const char *error_string) {
+	const char *(*next_line)(const char *from) = [](const char *from) {
+		const char *curr = from;
+		while (*curr != '\n') {
+			if (*curr == '\0') return (const char*)nullptr;
+			curr++;
+		}
+		while (*curr == '\n' || *curr == '\r') { curr++; }
+
+		if (*curr == '\0') return (const char*)nullptr;
+		return curr;
+	};
+
+	bool (*is_err)(const char *line) = [](const char *line) {
+		const char *curr = line;
+		int32_t ct = 0;
+		while (*curr != '\n' && *curr != '\0') {
+			if (*curr == ':') ct++;
+			curr++;
+		}
+		return ct >= 4;
+	};
+
+	size_t (*line_len)(const char *line) = [](const char *line) {
+		const char *curr = line;
+		while (*curr != '\n' && *curr != '\0') curr++;
+		return (size_t)(curr-line);
+	};
+
+	void (*extract)(const char *line, char *out_word) = [](const char *line, char *out_word) {
+		const char *curr = line;
+		int32_t     ct   = 0;
+		while (*curr != '\n' && *curr != '\0' && *curr != ':') {
+			out_word[ct] = *curr;
+			ct++;
+			curr++;
+		}
+		out_word[ct] = '\0';
+	};
+
+	const char *(*index_seg)(const char *line, int out_word) = [](const char *line, int out_word) {
+		const char *curr = line;
+		while (*curr != '\n' && *curr != '\0') {
+			if (*curr == ':') out_word -= 1;
+			curr++;
+			if (out_word <= 0) {
+				while (*curr == ' ' || *curr == '\t') curr++;
+				return curr;
+			}
+		}
+		return (const char *)nullptr;
+	};
+
+	const char *line = error_string;
+	while (line != nullptr) {
+		if (is_err(line)) {
+			char line_num[32];
+			char col_num [32];
+			char type    [32];
+			extract(index_seg(line, 1), line_num);
+			extract(index_seg(line, 2), col_num);
+			extract(index_seg(line, 3), type);
+			const char *msg = index_seg(line, 4);
+
+			log_level_ level = log_level_err;
+			if (strcmp(type, "warning") == 0) level = log_level_warn;
+			int32_t line_id = atoi(line_num);
+			int32_t col_id  = atoi(col_num);
+
+			sksc_log_at(level, line_id, col_id, "%.*s\n", line_len(msg), msg);
+		} else {
+			sksc_log_at(log_level_info, -1, -1, "%.*s\n", line_len(line), line);
+		}
+		line = next_line(line);
+	}
+}
+
+///////////////////////////////////////////
+
+void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shader_meta_t *out_meta) {
+	// Get information about the shader!
+	IDxcBlob *reflection;
+	compile_result->GetOutput(DXC_OUT_REFLECTION,  __uuidof(IDxcBlob), (void **)(&reflection), nullptr);
+
+	array_t<skg_shader_buffer_t> buffer_list = {};
+	buffer_list.data     = out_meta->buffers;
+	buffer_list.capacity = out_meta->buffer_count;
+	buffer_list.count    = out_meta->buffer_count;
+	array_t<skg_shader_texture_t> texture_list = {};
+	texture_list.data     = out_meta->textures;
+	texture_list.capacity = out_meta->texture_count;
+	texture_list.count    = out_meta->texture_count;
+
+	ID3D12ShaderReflection *shader_reflection;
+	DxcBuffer               reflection_buffer;
+	reflection_buffer.Ptr      = reflection->GetBufferPointer();
+	reflection_buffer.Size     = reflection->GetBufferSize();
+	reflection_buffer.Encoding = 0;
+	sksc_dxc_utils->CreateReflection(&reflection_buffer, __uuidof(ID3D12ShaderReflection), (void **)(&shader_reflection));
+	D3D12_SHADER_DESC desc;
+	shader_reflection->GetDesc(&desc);
+
+	for (uint32_t i = 0; i < desc.BoundResources; i++) {
+		D3D12_SHADER_INPUT_BIND_DESC bind_desc;
+		shader_reflection->GetResourceBindingDesc(i, &bind_desc);
+		
+		if (bind_desc.Type == D3D_SIT_CBUFFER) {
+			ID3D12ShaderReflectionConstantBuffer *cb = shader_reflection->GetConstantBufferByName(bind_desc.Name);
+			D3D12_SHADER_BUFFER_DESC              shader_buff;
+			cb->GetDesc(&shader_buff);
+
+			// Find or create a buffer
+			int64_t id = buffer_list.index_where([](auto &buff, void *data) { 
+				return strcmp(buff.name, (char*)data) == 0; 
+			}, (void*)bind_desc.Name);
+			bool is_new = id == -1;
+			if (is_new) id = buffer_list.add({});
+
+			// flag it as used by this shader stage
+			buffer_list[id].bind.stage_bits = (skg_stage_)(buffer_list[id].bind.stage_bits | stage);
+
+			if (!is_new) continue;
+
+			// Initialize the buffer with data from the shaders!
+			sprintf_s(buffer_list[id].name, _countof(buffer_list[id].name), "%s", bind_desc.Name);
+			buffer_list[id].bind.slot = bind_desc.BindPoint;
+			buffer_list[id].size      = shader_buff.Size;
+			buffer_list[id].var_count = shader_buff.Variables;
+			buffer_list[id].vars      = (skg_shader_var_t*)malloc(sizeof(skg_shader_var_t) * buffer_list[i].var_count);
+			*buffer_list[id].vars     = {};
+
+			for (uint32_t v = 0; v < shader_buff.Variables; v++) {
+				ID3D12ShaderReflectionVariable *var  = cb->GetVariableByIndex(v);
+				ID3D12ShaderReflectionType     *type = var->GetType();
+				D3D12_SHADER_TYPE_DESC          type_desc;
+				D3D12_SHADER_VARIABLE_DESC      var_desc;
+				type->GetDesc(&type_desc);
+				var ->GetDesc(&var_desc );
+
+				skg_shader_var_ skg_type = skg_shader_var_none;
+				switch (type_desc.Type) {
+				case D3D_SVT_FLOAT:  skg_type = skg_shader_var_float;  break;
+				case D3D_SVT_DOUBLE: skg_type = skg_shader_var_double; break;
+				case D3D_SVT_INT:    skg_type = skg_shader_var_int;    break;
+				case D3D_SVT_UINT:   skg_type = skg_shader_var_uint;   break;
+				case D3D_SVT_UINT8:  skg_type = skg_shader_var_uint8;  break;
+				}
+				buffer_list[id].vars[v].type = skg_type;
+				if (type_desc.Class == D3D_SVC_STRUCT) {
+					buffer_list[id].vars[v].type_count = type_desc.Elements;
+				} else {
+					buffer_list[id].vars[v].type_count = 1;
+					if (type_desc.Elements != 0)
+						buffer_list[id].vars[v].type_count = type_desc.Elements;
+					if (type_desc.Rows != 0)
+						buffer_list[id].vars[v].type_count *= type_desc.Rows * type_desc.Columns;
+				}
+
+				buffer_list[id].vars[v].size       = var_desc.Size;
+				buffer_list[id].vars[v].offset     = var_desc.StartOffset;
+				sprintf_s(buffer_list[id].vars[v].name, _countof(buffer_list[id].vars[v].name), "%s", var_desc.Name);
+			}
+		} 
+		if (bind_desc.Type == D3D_SIT_TEXTURE) {
+			int64_t id = texture_list.index_where([](auto &tex, void *data) { 
+				return strcmp(tex.name, (char*)data) == 0; 
+			}, (void*)bind_desc.Name);
+			if (id == -1)
+				id = texture_list.add({});
+
+			sprintf_s(texture_list[id].name, _countof(texture_list[id].name), "%s", bind_desc.Name);
+			texture_list[id].bind.stage_bits = (skg_stage_)(texture_list[id].bind.stage_bits | stage);
+			texture_list[id].bind.slot       = bind_desc.BindPoint;
+		}
+	}
+
+	buffer_list .trim();
+	texture_list.trim();
+	out_meta->buffers       =           buffer_list .data;
+	out_meta->buffer_count  = (uint32_t)buffer_list .count;
+	out_meta->textures      =           texture_list.data;
+	out_meta->texture_count = (uint32_t)texture_list.count;
+
+	// Find the globals buffer, if there is one
+	out_meta->global_buffer_id = -1;
+	for (size_t i = 0; i < out_meta->buffer_count; i++) {
+		if (strcmp(out_meta->buffers[i].name, "$Globals") == 0) {
+			out_meta->global_buffer_id = i;
+		}
+	}
+
+	shader_reflection->Release();
+	reflection       ->Release();
+}
+
+///////////////////////////////////////////
+
+array_t<const char *> sksc_dxc_build_flags(sksc_settings_t settings, skg_stage_ type, skg_shader_lang_ lang) {
+	// https://simoncoenen.com/blog/programming/graphics/DxcCompiling.html
+
+	array_t<const char *> result = {};
+	if (lang == skg_shader_lang_spirv) {
+		result.add("-spirv");
+		result.add("-fspv-reflect");
+	}
+	result.add(settings.row_major 
+		? "-Zpr"   // DXC_ARG_PACK_MATRIX_ROW_MAJOR 
+		: "-Zpc"); // DXC_ARG_PACK_MATRIX_COLUMN_MAJOR);
+
+	// Debug vs. Release
+	if (settings.debug) {
+		result.add("-Zi"); // DXC_ARG_DEBUG
+		result.add("-Qembed_debug");
+		result.add("-Od");
+	} else {
+		result.add("-Qstrip_debug");
+		result.add("-Qstrip_reflect");
+		switch (settings.optimize) {
+		case 0: result.add("-O0"); break;
+		case 1: result.add("-O1"); break;
+		case 2: result.add("-O2"); break;
+		case 3: result.add("-O3"); break;
+		}
+	}
+
+	// Entrypoint
+	result.add("-E"); 
+	switch (type) {
+	case skg_stage_pixel:   result.add(settings.ps_entrypoint); break;
+	case skg_stage_vertex:  result.add(settings.vs_entrypoint); break;
+	case skg_stage_compute: result.add(settings.cs_entrypoint); break;
+	}
+
+	// Target
+	result.add("-T");
+	switch (type) {
+	case skg_stage_vertex:  snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "vs_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
+	case skg_stage_pixel:   snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "ps_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
+	case skg_stage_compute: snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "cs_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
+	}
+
+	// Include folders
+	result.add("-I");
+	result.add(settings.folder);
+	for (size_t i = 0; i < settings.include_folder_ct; i++) {
+		result.add("-I");
+		result.add(settings.include_folders[i]);
+	}
+
+	return result;
+}
+
+#endif
+
+///////////////////////////////////////////
+
+#if defined(SKSC_SPIRV_GLSLANG)
+void sksc_init() {
+	glslang_initialize_process();
+}
+
+///////////////////////////////////////////
+
+void sksc_shutdown() {
+}
+
+///////////////////////////////////////////
+
+bool sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
+	glslang_resource_s default_resource = {};
+	glslang_input_t input = {};
+	input.language                = GLSLANG_SOURCE_HLSL;
+	input.code                    = hlsl;
+	input.client                  = GLSLANG_CLIENT_VULKAN;
+	input.client_version          = GLSLANG_TARGET_VULKAN_1_0,
+	input.target_language         = GLSLANG_TARGET_SPV;
+    input.target_language_version = GLSLANG_TARGET_SPV_1_0;
+	input.default_version         = 100;
+	input.resource = &default_resource;
+	switch(type) {
+		case skg_stage_vertex:  input.stage = GLSLANG_STAGE_VERTEX;   break;
+		case skg_stage_pixel:   input.stage = GLSLANG_STAGE_FRAGMENT; break;
+		case skg_stage_compute: input.stage = GLSLANG_STAGE_COMPUTE;  break;
+	}
+
+	glslang_shader_t* shader = glslang_shader_create(&input);
+	
+    if (!glslang_shader_preprocess(shader, &input)) {
+		sksc_log(log_level_err, glslang_shader_get_info_log(shader));
+		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
+		return false;
+    }
+
+    if (!glslang_shader_parse(shader, &input)) {
+        sksc_log(log_level_err, glslang_shader_get_info_log(shader));
+		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
+		return false;
+    }
+
+    glslang_program_t* program = glslang_program_create();
+    glslang_program_add_shader(program, shader);
+
+    if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT)) {
+        sksc_log(log_level_err, glslang_shader_get_info_log(shader));
+		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
+		return false;
+    }
+
+    glslang_program_SPIRV_generate(program, input.stage);
+
+    if (glslang_program_SPIRV_get_messages(program)) {
+        sksc_log(log_level_info, glslang_program_SPIRV_get_messages(program));
+    }
+
+	out_stage->language  = lang;
+	out_stage->stage     = type;
+	out_stage->code_size = glslang_program_SPIRV_get_size(program) * sizeof(unsigned int);
+	out_stage->code      = malloc(out_stage->code_size);
+	glslang_program_SPIRV_get(program, (unsigned int*)out_stage->code);
+
+	glslang_shader_delete (shader);
+	glslang_program_delete(program);
+
+	return true;
+}
+
+#endif
+
+///////////////////////////////////////////
+
+#if defined(SKSC_D3D11)
+
+DWORD sksc_d3d11_build_flags   (const sksc_settings_t *settings);
+bool  sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage);
+
+///////////////////////////////////////////
+
+DWORD sksc_d3d11_build_flags(const sksc_settings_t *settings) {
+	DWORD result = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
+
+	if (settings->row_major) result |= D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
+	else                     result |= D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR;
+	if (settings->debug) {
+		result |= D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG;
+	} else {
+		switch (settings->optimize) {
+		case 0:  result |= D3DCOMPILE_OPTIMIZATION_LEVEL0; break;
+		case 1:  result |= D3DCOMPILE_OPTIMIZATION_LEVEL1; break;
+		case 2:  result |= D3DCOMPILE_OPTIMIZATION_LEVEL2; break;
+		default: result |= D3DCOMPILE_OPTIMIZATION_LEVEL3; break;
+		}
+	}
+	return result;
+}
+
+///////////////////////////////////////////
+
+class SKSCInclude : public ID3DInclude
+{
+public:
+	const sksc_settings_t *settings;
+
+	SKSCInclude(const sksc_settings_t *settings) {
+		this->settings = settings;
+	}
+
+	HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* out_text, UINT* out_size) override
+	{
+		char path_filename[1024];
+		snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->folder, pFileName);
+		FILE *fp = fopen(path_filename, "rb");
+		for (int32_t i = 0; fp == nullptr && i < settings->include_folder_ct; i++) {
+			snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->include_folders[i], pFileName);
+			fp = fopen(path_filename, "rb");
+		}
+		if (fp == nullptr) {
+			return E_FAIL;
+		}
+
+		fseek(fp, 0L, SEEK_END);
+		*out_size = ftell(fp);
+		rewind(fp);
+
+		*out_text = (char*)malloc(*out_size+1);
+		if (*out_text == nullptr) { *out_size = 0; fclose(fp); return false; }
+		fread((void*)*out_text, 1, *out_size, fp);
+		fclose(fp);
+
+		((char*)*out_text)[*out_size] = 0;
+
+		return S_OK;
+	}
+
+	HRESULT Close(LPCVOID data) override
+	{
+		free((void*)data);
+		return S_OK;
+	}
+};
+
+///////////////////////////////////////////
+
+bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
+	DWORD flags = sksc_d3d11_build_flags(settings);
+
+	const char *entrypoint = nullptr;
+	char target[64];
+	switch (type) {
+	case skg_stage_vertex:  entrypoint = settings->vs_entrypoint; break;
+	case skg_stage_pixel:   entrypoint = settings->ps_entrypoint; break;
+	case skg_stage_compute: entrypoint = settings->cs_entrypoint; break;
+	}
+	switch (type) {
+	case skg_stage_vertex:  snprintf(target, sizeof(target), "vs_%s", settings->shader_model); break;
+	case skg_stage_pixel:   snprintf(target, sizeof(target), "ps_%s", settings->shader_model); break;
+	case skg_stage_compute: snprintf(target, sizeof(target), "cs_%s", settings->shader_model); break;
+	}
+
+	SKSCInclude includer(settings);
+	ID3DBlob *errors, *compiled = nullptr;
+	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, &includer, entrypoint, target, flags, 0, &compiled, &errors))) {
+		sksc_log(log_level_err, "D3DCompile failed: %s\n", (char *)errors->GetBufferPointer());
+		if (errors) errors->Release();
+		return false;
+	}
+	if (errors) errors->Release();
+
+	out_stage->language  = skg_shader_lang_hlsl;
+	out_stage->stage     = type;
+	out_stage->code_size = (uint32_t)compiled->GetBufferSize();
+	out_stage->code       = malloc(out_stage->code_size);
+	memcpy(out_stage->code, compiled->GetBufferPointer(), out_stage->code_size);
+
+	compiled->Release();
+	return true;
+}
+
+#endif
 
 ///////////////////////////////////////////
 
 bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file) {
 	sksc_log(log_level_info, " ________________\n| Compiling %s...\n|\n", filename);
 
+#if defined(SKSC_SPIRV_DXC)
 	IDxcBlobEncoding *source;
-	if (FAILED(sksc_utils->CreateBlob(hlsl_text, (uint32_t)strlen(hlsl_text), CP_UTF8, &source))) {
+	if (FAILED(sksc_dxc_utils->CreateBlob(hlsl_text, (uint32_t)strlen(hlsl_text), CP_UTF8, &source))) {
 		sksc_log(log_level_err, "CreateBlob failed\n");
 		sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
 		return false;
@@ -132,11 +637,12 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 	source_buff.Encoding = 0;
 
 	IDxcIncludeHandler* include_handler = nullptr;
-	if (FAILED(sksc_utils->CreateDefaultIncludeHandler(&include_handler))) {
+	if (FAILED(sksc_dxc_utils->CreateDefaultIncludeHandler(&include_handler))) {
 		sksc_log(log_level_err, "CreateDefaultIncludeHandler failed\n");
 		sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
 		return false;
 	}
+#endif
 
 	*out_file = {};
 	 out_file->meta = (skg_shader_meta_t*)malloc(sizeof(skg_shader_meta_t));
@@ -151,19 +657,10 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (entrypoints[i][0] == 0)
 			continue;
 
+#if defined(SKSC_SPIRV_DXC)
 		skg_shader_file_stage_t d3d12_hlsl_stage = {};
 		if (!sksc_dxc_compile_shader(&source_buff, include_handler, settings, compile_stages[i], skg_shader_lang_hlsl, &d3d12_hlsl_stage, out_file->meta)) {
 			sksc_log(log_level_err, "DXC failed to compile shader information.\n");
-			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
-			return false;
-		}
-
-		stages.add({});
-		if (settings->target_langs[skg_shader_lang_hlsl] && !sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
-			include_handler->Release();
-			source         ->Release();
-
-			sksc_log(log_level_err, "HLSL shader compile failed\n");
 			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
 			return false;
 		}
@@ -181,12 +678,40 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 			}
 			stages.add(spirv_stage);
 		}
+		include_handler->Release();
+		source         ->Release();
+#endif
+
+#if defined(SKSC_SPIRV_GLSLANG)
+		skg_shader_file_stage_t spirv_stage = {};
+		bool spirv_result = sksc_glslang_compile_shader(hlsl_text, settings, compile_stages[i], skg_shader_lang_spirv, &spirv_stage, nullptr);
+		if (settings->target_langs[skg_shader_lang_spirv]) {
+			if (!spirv_result) {
+				sksc_log(log_level_err, "SPIRV shader compile failed\n");
+				sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
+				return false;
+			}
+			stages.add(spirv_stage);
+		}
+#endif
+
+#if defined(SKSC_D3D11)
+		stages.add({});
+		if (settings->target_langs[skg_shader_lang_hlsl] && !sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
+			sksc_log(log_level_err, "HLSL shader compile failed\n");
+			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
+			return false;
+		}
+#else
+		if (settings->target_langs[skg_shader_lang_hlsl]) {
+			sksc_log(log_level_err, "HLSL shader compiler not available in this build! Please don't include HLSL as a build target.\n");
+			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
+			return false;
+		}
+#endif
 
 		stages.add({});
 		if (settings->target_langs[skg_shader_lang_glsl] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
-			include_handler->Release();
-			source         ->Release();
-
 			sksc_log(log_level_err, "GLSL shader compile failed\n");
 			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
 			return false;
@@ -195,9 +720,6 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (compile_stages[i] != skg_stage_compute) {
 			stages.add({});
 			if (settings->target_langs[skg_shader_lang_glsl_es] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
-				include_handler->Release();
-				source         ->Release();
-
 				sksc_log(log_level_err, "GLES shader compile failed\n");
 				sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
 				return false;
@@ -207,22 +729,16 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (compile_stages[i] != skg_stage_compute) {
 			stages.add({});
 			if (settings->target_langs[skg_shader_lang_glsl_web] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
-				include_handler->Release();
-				source         ->Release();
-
 				sksc_log(log_level_err, "GLSL web shader compile failed\n");
 				sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
 				return false;
 			}
 		}
-		free(d3d12_hlsl_stage.code);
+
+		//free(d3d12_hlsl_stage.code);
 		if (!settings->target_langs[skg_shader_lang_spirv])
 			free(spirv_stage.code);
 	}
-	
-	// cleanup
-	include_handler->Release();
-	source         ->Release();
 
 	sksc_meta_find_defaults(hlsl_text, out_file->meta);
 	out_file->stage_count = stages.count;
@@ -581,412 +1097,7 @@ bool sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta) {
 
 ///////////////////////////////////////////
 
-DWORD sksc_d3d11_build_flags(const sksc_settings_t *settings) {
-	DWORD result = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
 
-	if (settings->row_major) result |= D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
-	else                     result |= D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR;
-	if (settings->debug) {
-		result |= D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG;
-	} else {
-		switch (settings->optimize) {
-		case 0:  result |= D3DCOMPILE_OPTIMIZATION_LEVEL0; break;
-		case 1:  result |= D3DCOMPILE_OPTIMIZATION_LEVEL1; break;
-		case 2:  result |= D3DCOMPILE_OPTIMIZATION_LEVEL2; break;
-		default: result |= D3DCOMPILE_OPTIMIZATION_LEVEL3; break;
-		}
-	}
-	return result;
-}
-
-///////////////////////////////////////////
-
-class SKSCInclude : public ID3DInclude
-{
-public:
-	const sksc_settings_t *settings;
-
-	SKSCInclude(const sksc_settings_t *settings) {
-		this->settings = settings;
-	}
-
-	HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* out_text, UINT* out_size) override
-	{
-		char path_filename[1024];
-		snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->folder, pFileName);
-		FILE *fp = fopen(path_filename, "rb");
-		for (int32_t i = 0; fp == nullptr && i < settings->include_folder_ct; i++) {
-			snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->include_folders[i], pFileName);
-			fp = fopen(path_filename, "rb");
-		}
-		if (fp == nullptr) {
-			return E_FAIL;
-		}
-
-		fseek(fp, 0L, SEEK_END);
-		*out_size = ftell(fp);
-		rewind(fp);
-
-		*out_text = (char*)malloc(*out_size+1);
-		if (*out_text == nullptr) { *out_size = 0; fclose(fp); return false; }
-		fread((void*)*out_text, 1, *out_size, fp);
-		fclose(fp);
-
-		((char*)*out_text)[*out_size] = 0;
-
-		return S_OK;
-	}
-
-	HRESULT Close(LPCVOID data) override
-	{
-		free((void*)data);
-		return S_OK;
-	}
-};
-
-bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
-	DWORD flags = sksc_d3d11_build_flags(settings);
-
-	const char *entrypoint = nullptr;
-	char target[64];
-	switch (type) {
-	case skg_stage_vertex:  entrypoint = settings->vs_entrypoint; break;
-	case skg_stage_pixel:   entrypoint = settings->ps_entrypoint; break;
-	case skg_stage_compute: entrypoint = settings->cs_entrypoint; break;
-	}
-	switch (type) {
-	case skg_stage_vertex:  snprintf(target, sizeof(target), "vs_%s", settings->shader_model); break;
-	case skg_stage_pixel:   snprintf(target, sizeof(target), "ps_%s", settings->shader_model); break;
-	case skg_stage_compute: snprintf(target, sizeof(target), "cs_%s", settings->shader_model); break;
-	}
-
-	SKSCInclude includer(settings);
-	ID3DBlob *errors, *compiled = nullptr;
-	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, &includer, entrypoint, target, flags, 0, &compiled, &errors))) {
-		sksc_log(log_level_err, "D3DCompile failed: %s\n", (char *)errors->GetBufferPointer());
-		if (errors) errors->Release();
-		return false;
-	}
-	if (errors) errors->Release();
-
-	out_stage->language  = skg_shader_lang_hlsl;
-	out_stage->stage     = type;
-	out_stage->code_size = (uint32_t)compiled->GetBufferSize();
-	out_stage->code       = malloc(out_stage->code_size);
-	memcpy(out_stage->code, compiled->GetBufferPointer(), out_stage->code_size);
-
-	compiled->Release();
-	return true;
-}
-
-///////////////////////////////////////////
-
-bool sksc_dxc_compile_shader(DxcBuffer *source_buff, IDxcIncludeHandler* include_handler, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
-	IDxcResult   *compile_result;
-	IDxcBlobUtf8 *errors;
-	bool result = false;
-
-	array_t<const char *> flags  = sksc_dxc_build_flags(*settings, type, lang);
-	array_t<wchar_t    *> wflags = {};
-	for (size_t i = 0; i < flags.count; i++) {
-		size_t   len = strlen(flags[i]);
-		wchar_t *f   = (wchar_t*)malloc(sizeof(wchar_t) * (len+1));
-		mbstowcs_s(nullptr, f, len+1, flags[i], len);
-		wflags.add(f);
-	}
-	if (FAILED(sksc_compiler->Compile(source_buff, (LPCWSTR*)wflags.data, (uint32_t)wflags.count, include_handler, __uuidof(IDxcResult), (void **)(&compile_result)))) {
-		sksc_log(log_level_err, "DXShaderCompile failed!");
-		return false;
-	}
-
-	const char *lang_name = lang == skg_shader_lang_hlsl ? "HLSL"  : "SPIRV";
-	const char *type_name = type == skg_stage_pixel      ? "Pixel" : "Vertex";
-	compile_result->GetOutput(DXC_OUT_ERRORS, __uuidof(IDxcBlobUtf8), (void **)(&errors), nullptr);
-	if (errors && errors->GetStringLength() > 0) {
-		sksc_dxc_errors_to_log((char *)errors->GetBufferPointer());
-	} else {
-		out_stage->stage    = type;
-		out_stage->language = lang;
-
-		// Get the shader binary
-		IDxcBlob *shader_bin;
-		compile_result->GetOutput(DXC_OUT_OBJECT, __uuidof(IDxcBlob), (void **)(&shader_bin), nullptr);
-
-		void  *src  = shader_bin->GetBufferPointer();
-		size_t size = shader_bin->GetBufferSize();
-		out_stage->code      = malloc(size);
-		out_stage->code_size = (uint32_t)size;
-		memcpy(out_stage->code, src, size);
-		shader_bin->Release();
-
-		if (lang == skg_shader_lang_hlsl && out_meta != nullptr) {
-			sksc_dxc_shader_meta(compile_result, type, out_meta);
-		}
-		result = true;
-	}
-	errors        ->Release();
-	compile_result->Release();
-	flags.free();
-	for (size_t i = 0; i < wflags.count; i++)
-		free(wflags[i]);
-	wflags.free();
-
-	return result;
-}
-
-///////////////////////////////////////////
-
-void sksc_dxc_errors_to_log(const char *error_string) {
-	const char *(*next_line)(const char *from) = [](const char *from) {
-		const char *curr = from;
-		while (*curr != '\n') {
-			if (*curr == '\0') return (const char*)nullptr;
-			curr++;
-		}
-		while (*curr == '\n' || *curr == '\r') { curr++; }
-
-		if (*curr == '\0') return (const char*)nullptr;
-		return curr;
-	};
-
-	bool (*is_err)(const char *line) = [](const char *line) {
-		const char *curr = line;
-		int32_t ct = 0;
-		while (*curr != '\n' && *curr != '\0') {
-			if (*curr == ':') ct++;
-			curr++;
-		}
-		return ct >= 4;
-	};
-
-	size_t (*line_len)(const char *line) = [](const char *line) {
-		const char *curr = line;
-		while (*curr != '\n' && *curr != '\0') curr++;
-		return (size_t)(curr-line);
-	};
-
-	void (*extract)(const char *line, char *out_word) = [](const char *line, char *out_word) {
-		const char *curr = line;
-		int32_t     ct   = 0;
-		while (*curr != '\n' && *curr != '\0' && *curr != ':') {
-			out_word[ct] = *curr;
-			ct++;
-			curr++;
-		}
-		out_word[ct] = '\0';
-	};
-
-	const char *(*index_seg)(const char *line, int out_word) = [](const char *line, int out_word) {
-		const char *curr = line;
-		while (*curr != '\n' && *curr != '\0') {
-			if (*curr == ':') out_word -= 1;
-			curr++;
-			if (out_word <= 0) {
-				while (*curr == ' ' || *curr == '\t') curr++;
-				return curr;
-			}
-		}
-		return (const char *)nullptr;
-	};
-
-	const char *line = error_string;
-	while (line != nullptr) {
-		if (is_err(line)) {
-			char line_num[32];
-			char col_num [32];
-			char type    [32];
-			extract(index_seg(line, 1), line_num);
-			extract(index_seg(line, 2), col_num);
-			extract(index_seg(line, 3), type);
-			const char *msg = index_seg(line, 4);
-
-			log_level_ level = log_level_err;
-			if (strcmp(type, "warning") == 0) level = log_level_warn;
-			int32_t line_id = atoi(line_num);
-			int32_t col_id  = atoi(col_num);
-
-			sksc_log_at(level, line_id, col_id, "%.*s\n", line_len(msg), msg);
-		} else {
-			sksc_log_at(log_level_info, -1, -1, "%.*s\n", line_len(line), line);
-		}
-		line = next_line(line);
-	}
-}
-
-///////////////////////////////////////////
-
-void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shader_meta_t *out_meta) {
-	// Get information about the shader!
-	IDxcBlob *reflection;
-	compile_result->GetOutput(DXC_OUT_REFLECTION,  __uuidof(IDxcBlob), (void **)(&reflection), nullptr);
-
-	array_t<skg_shader_buffer_t> buffer_list = {};
-	buffer_list.data     = out_meta->buffers;
-	buffer_list.capacity = out_meta->buffer_count;
-	buffer_list.count    = out_meta->buffer_count;
-	array_t<skg_shader_texture_t> texture_list = {};
-	texture_list.data     = out_meta->textures;
-	texture_list.capacity = out_meta->texture_count;
-	texture_list.count    = out_meta->texture_count;
-
-	ID3D12ShaderReflection *shader_reflection;
-	DxcBuffer               reflection_buffer;
-	reflection_buffer.Ptr      = reflection->GetBufferPointer();
-	reflection_buffer.Size     = reflection->GetBufferSize();
-	reflection_buffer.Encoding = 0;
-	sksc_utils->CreateReflection(&reflection_buffer, __uuidof(ID3D12ShaderReflection), (void **)(&shader_reflection));
-	D3D12_SHADER_DESC desc;
-	shader_reflection->GetDesc(&desc);
-
-	for (uint32_t i = 0; i < desc.BoundResources; i++) {
-		D3D12_SHADER_INPUT_BIND_DESC bind_desc;
-		shader_reflection->GetResourceBindingDesc(i, &bind_desc);
-		
-		if (bind_desc.Type == D3D_SIT_CBUFFER) {
-			ID3D12ShaderReflectionConstantBuffer *cb = shader_reflection->GetConstantBufferByName(bind_desc.Name);
-			D3D12_SHADER_BUFFER_DESC              shader_buff;
-			cb->GetDesc(&shader_buff);
-
-			// Find or create a buffer
-			int64_t id = buffer_list.index_where([](auto &buff, void *data) { 
-				return strcmp(buff.name, (char*)data) == 0; 
-			}, (void*)bind_desc.Name);
-			bool is_new = id == -1;
-			if (is_new) id = buffer_list.add({});
-
-			// flag it as used by this shader stage
-			buffer_list[id].bind.stage_bits = (skg_stage_)(buffer_list[id].bind.stage_bits | stage);
-
-			if (!is_new) continue;
-
-			// Initialize the buffer with data from the shaders!
-			sprintf_s(buffer_list[id].name, _countof(buffer_list[id].name), "%s", bind_desc.Name);
-			buffer_list[id].bind.slot = bind_desc.BindPoint;
-			buffer_list[id].size      = shader_buff.Size;
-			buffer_list[id].var_count = shader_buff.Variables;
-			buffer_list[id].vars      = (skg_shader_var_t*)malloc(sizeof(skg_shader_var_t) * buffer_list[i].var_count);
-			*buffer_list[id].vars     = {};
-
-			for (uint32_t v = 0; v < shader_buff.Variables; v++) {
-				ID3D12ShaderReflectionVariable *var  = cb->GetVariableByIndex(v);
-				ID3D12ShaderReflectionType     *type = var->GetType();
-				D3D12_SHADER_TYPE_DESC          type_desc;
-				D3D12_SHADER_VARIABLE_DESC      var_desc;
-				type->GetDesc(&type_desc);
-				var ->GetDesc(&var_desc );
-
-				skg_shader_var_ skg_type = skg_shader_var_none;
-				switch (type_desc.Type) {
-				case D3D_SVT_FLOAT:  skg_type = skg_shader_var_float;  break;
-				case D3D_SVT_DOUBLE: skg_type = skg_shader_var_double; break;
-				case D3D_SVT_INT:    skg_type = skg_shader_var_int;    break;
-				case D3D_SVT_UINT:   skg_type = skg_shader_var_uint;   break;
-				case D3D_SVT_UINT8:  skg_type = skg_shader_var_uint8;  break;
-				}
-				buffer_list[id].vars[v].type = skg_type;
-				if (type_desc.Class == D3D_SVC_STRUCT) {
-					buffer_list[id].vars[v].type_count = type_desc.Elements;
-				} else {
-					buffer_list[id].vars[v].type_count = 1;
-					if (type_desc.Elements != 0)
-						buffer_list[id].vars[v].type_count = type_desc.Elements;
-					if (type_desc.Rows != 0)
-						buffer_list[id].vars[v].type_count *= type_desc.Rows * type_desc.Columns;
-				}
-
-				buffer_list[id].vars[v].size       = var_desc.Size;
-				buffer_list[id].vars[v].offset     = var_desc.StartOffset;
-				sprintf_s(buffer_list[id].vars[v].name, _countof(buffer_list[id].vars[v].name), "%s", var_desc.Name);
-			}
-		} 
-		if (bind_desc.Type == D3D_SIT_TEXTURE) {
-			int64_t id = texture_list.index_where([](auto &tex, void *data) { 
-				return strcmp(tex.name, (char*)data) == 0; 
-			}, (void*)bind_desc.Name);
-			if (id == -1)
-				id = texture_list.add({});
-
-			sprintf_s(texture_list[id].name, _countof(texture_list[id].name), "%s", bind_desc.Name);
-			texture_list[id].bind.stage_bits = (skg_stage_)(texture_list[id].bind.stage_bits | stage);
-			texture_list[id].bind.slot       = bind_desc.BindPoint;
-		}
-	}
-
-	buffer_list .trim();
-	texture_list.trim();
-	out_meta->buffers       =           buffer_list .data;
-	out_meta->buffer_count  = (uint32_t)buffer_list .count;
-	out_meta->textures      =           texture_list.data;
-	out_meta->texture_count = (uint32_t)texture_list.count;
-
-	// Find the globals buffer, if there is one
-	out_meta->global_buffer_id = -1;
-	for (size_t i = 0; i < out_meta->buffer_count; i++) {
-		if (strcmp(out_meta->buffers[i].name, "$Globals") == 0) {
-			out_meta->global_buffer_id = i;
-		}
-	}
-
-	shader_reflection->Release();
-	reflection       ->Release();
-}
-
-///////////////////////////////////////////
-
-array_t<const char *> sksc_dxc_build_flags(sksc_settings_t settings, skg_stage_ type, skg_shader_lang_ lang) {
-	// https://simoncoenen.com/blog/programming/graphics/DxcCompiling.html
-
-	array_t<const char *> result = {};
-	if (lang == skg_shader_lang_spirv) {
-		result.add("-spirv");
-		result.add("-fspv-reflect");
-	}
-	result.add(settings.row_major 
-		? "-Zpr"   // DXC_ARG_PACK_MATRIX_ROW_MAJOR 
-		: "-Zpc"); // DXC_ARG_PACK_MATRIX_COLUMN_MAJOR);
-
-	// Debug vs. Release
-	if (settings.debug) {
-		result.add("-Zi"); // DXC_ARG_DEBUG
-		result.add("-Qembed_debug");
-		result.add("-Od");
-	} else {
-		result.add("-Qstrip_debug");
-		result.add("-Qstrip_reflect");
-		switch (settings.optimize) {
-		case 0: result.add("-O0"); break;
-		case 1: result.add("-O1"); break;
-		case 2: result.add("-O2"); break;
-		case 3: result.add("-O3"); break;
-		}
-	}
-
-	// Entrypoint
-	result.add("-E"); 
-	switch (type) {
-	case skg_stage_pixel:   result.add(settings.ps_entrypoint); break;
-	case skg_stage_vertex:  result.add(settings.vs_entrypoint); break;
-	case skg_stage_compute: result.add(settings.cs_entrypoint); break;
-	}
-
-	// Target
-	result.add("-T");
-	switch (type) {
-	case skg_stage_vertex:  snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "vs_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
-	case skg_stage_pixel:   snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "ps_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
-	case skg_stage_compute: snprintf(settings.shader_model_str, sizeof(settings.shader_model_str), "cs_6_0", settings.shader_model); result.add(settings.shader_model_str); break;
-	}
-
-	// Include folders
-	result.add("-I");
-	result.add(settings.folder);
-	for (size_t i = 0; i < settings.include_folder_ct; i++) {
-		result.add("-I");
-		result.add(settings.include_folders[i]);
-	}
-
-	return result;
-}
 
 ///////////////////////////////////////////
 

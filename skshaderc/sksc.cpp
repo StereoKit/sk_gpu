@@ -81,14 +81,14 @@ enum log_level_ {
 
 ///////////////////////////////////////////
 
-void                  sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
-bool                  sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta);
+void sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
+bool sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta);
 
-bool                  sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta);
+bool sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta);
 
-void                  sksc_line_col              (const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
-void                  sksc_log_at                (log_level_ level, int32_t line, int32_t column, const char *text, ...);
-void                  sksc_log                   (log_level_ level, const char *text, ...);
+void sksc_line_col              (const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
+void sksc_log_at                (log_level_ level, int32_t line, int32_t column, const char *text, ...);
+void sksc_log                   (log_level_ level, const char *text, ...);
 
 ///////////////////////////////////////////
 
@@ -443,6 +443,7 @@ void sksc_init() {
 ///////////////////////////////////////////
 
 void sksc_shutdown() {
+	glslang_finalize_process();
 }
 
 ///////////////////////////////////////////
@@ -1097,10 +1098,6 @@ bool sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta) {
 
 ///////////////////////////////////////////
 
-
-
-///////////////////////////////////////////
-
 bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta) {
 	spvc_context context = nullptr;
 	spvc_context_create            (&context);
@@ -1196,6 +1193,76 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 	out_stage->code_size = (uint32_t)strlen(result) + 1;
 	out_stage->code      = malloc(out_stage->code_size);
 	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
+
+	// Frees all memory we allocated so far.
+	spvc_context_destroy(context);
+	return true;
+}
+
+///////////////////////////////////////////
+
+bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, const skg_shader_meta_t *meta) {
+	spvc_context context = nullptr;
+	spvc_context_create            (&context);
+	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
+		sksc_log(log_level_err, "SPIRV-Cross err: %s\n", error);
+	}, nullptr);
+
+	spvc_compiler  compiler = nullptr;
+	spvc_parsed_ir ir       = nullptr;
+	spvc_context_parse_spirv    (context, (const SpvId*)spirv_stage->code, spirv_stage->code_size/sizeof(SpvId), &ir);
+	spvc_context_create_compiler(context, SPVC_BACKEND_HLSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &compiler);
+
+	spvc_resources resources = nullptr;
+	spvc_compiler_create_shader_resources(compiler, &resources);
+
+	array_t<skg_shader_buffer_t>  buffer_list  = {};
+	array_t<skg_shader_texture_t> texture_list = {};
+
+	// Ensure buffer ids stay the same
+	const spvc_reflected_resource *list = nullptr;
+	size_t                         count;
+	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_UNIFORM_BUFFER, &list, &count);
+	for (size_t i = 0; i < count; i++) {
+		for (size_t b = 0; b < meta->buffer_count; b++) {
+			const char *name = spvc_compiler_get_name(compiler, list[i].id);
+			if (strcmp(meta->buffers[b].name, name) == 0 || (strcmp(name, "_Globals") == 0 && strcmp(meta->buffers[b].name, "$Globals") == 0)) {
+				spvc_compiler_set_decoration(compiler, list[i].id, SpvDecorationBinding, meta->buffers[b].bind.slot);
+				break;
+			}
+		}
+	}
+	
+	// Make sure sampler names stay the same in GLSL
+	const spvc_combined_image_sampler *samplers = nullptr;
+	spvc_compiler_get_combined_image_samplers(compiler, &samplers, &count);
+	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
+	for (size_t i = 0; i < count; i++) {
+		const char *name    = spvc_compiler_get_name      (compiler, samplers[i].image_id);
+		uint32_t    binding = spvc_compiler_get_decoration(compiler, samplers[i].image_id, SpvDecorationBinding);
+		spvc_compiler_set_name      (compiler, samplers[i].combined_id, name);
+		spvc_compiler_set_decoration(compiler, samplers[i].combined_id, SpvDecorationBinding, binding);
+	}
+
+	if (src_stage->stage == skg_stage_vertex || src_stage->stage == skg_stage_pixel) {
+		size_t             off = src_stage->stage == skg_stage_vertex ? 3 : 2;
+		spvc_resource_type res = src_stage->stage == skg_stage_vertex
+			? SPVC_RESOURCE_TYPE_STAGE_OUTPUT
+			: SPVC_RESOURCE_TYPE_STAGE_INPUT;
+		
+		spvc_resources_get_resource_list_for_type(resources, res, &list, &count);
+		for (size_t i = 0; i < count; i++) {
+			char fs_name[64];
+			sprintf_s(fs_name, "fs%s", list[i].name+off);
+			spvc_compiler_set_name(compiler, list[i].id, fs_name);
+		}
+	}
+
+	const char *result = nullptr;
+	if (spvc_compiler_compile(compiler, &result) != SPVC_SUCCESS) {
+		spvc_context_destroy(context);
+		return false;
+	}
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

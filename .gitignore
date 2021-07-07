@@ -353,3 +353,6 @@ MigrationBackup/
 !skshaderc/lib/*
 !skshaderc/lib/bin/*
 !skshaderc/lib/x64/*
+
+# cmake folders
+build/

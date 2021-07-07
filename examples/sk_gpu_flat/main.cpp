@@ -1,10 +1,14 @@
 
-#ifndef __EMSCRIPTEN__
+#if defined(_WIN32)
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
-#else
+#elif defined(__linux__)
+#include <X11/Xlib.h>
+#include <GL/glx.h>
+Display *x_dpy;
+#elif defined(__EMSCRIPTEN__)
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #define _countof(a) (sizeof(a)/sizeof(*(a)))
@@ -77,11 +81,7 @@ int main() {
 ///////////////////////////////////////////
 
 bool main_init() {
-	skg_callback_log([](skg_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
-	if (!skg_init(app_name, nullptr)) 
-		return false;
-
-#ifndef __EMSCRIPTEN__
+#if defined(_WIN32)
 	WNDCLASS wc = {}; 
 	wc.lpfnWndProc = [](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 		switch(message) {
@@ -121,7 +121,55 @@ bool main_init() {
 	GetClientRect((HWND)app_hwnd, &bounds);
 	app_width  = bounds.right  - bounds.left;
 	app_height = bounds.bottom - bounds.top;
+#elif defined(__linux__)
+	x_dpy = XOpenDisplay(0);
+	if (x_dpy == nullptr) return false;
+
+	GLint                   fb_att[] = {
+		GLX_DOUBLEBUFFER,  true,
+		GLX_RED_SIZE,      8,
+		GLX_GREEN_SIZE,    8,
+		GLX_BLUE_SIZE,     8,
+		GLX_ALPHA_SIZE,    8,
+		GLX_DEPTH_SIZE,    16,
+		GLX_RENDER_TYPE,   GLX_RGBA_BIT,
+		GLX_DRAWABLE_TYPE, GLX_PBUFFER_BIT,
+		GLX_X_RENDERABLE,  true,
+		None
+	};
+
+	Window       x_root = DefaultRootWindow(x_dpy);
+	int          fbConfigNumber = 0;
+	GLXFBConfig *x_fb_config = glXChooseFBConfig       (x_dpy, 0, fb_att, &fbConfigNumber);
+	XVisualInfo *x_vi        = glXGetVisualFromFBConfig(x_dpy, *x_fb_config);
+	if (x_vi == nullptr) return false;
+
+	Colormap x_cmap = XCreateColormap(x_dpy, x_root, x_vi->visual, AllocNone);
+	XSetWindowAttributes x_swa = {};
+	x_swa.colormap   = x_cmap;
+	x_swa.event_mask = ExposureMask | KeyPressMask;
+
+	Window x_win = XCreateWindow(x_dpy, x_root, 0, 0, 1280, 720, 0, x_vi->depth, InputOutput, x_vi->visual, CWColormap | CWEventMask, &x_swa);
+
+	XSizeHints *hints = XAllocSizeHints();
+	if (hints != nullptr) {
+		hints->flags      = PMinSize;
+		hints->min_width  = 100;
+		hints->min_height = 100;
+		XSetWMNormalHints(x_dpy, x_win, hints);
+		XSetWMSizeHints  (x_dpy, x_win, hints, PMinSize);
+	}
+
+	XMapWindow(x_dpy, x_win);
+	XStoreName(x_dpy, x_win, app_name);
+
+	skg_setup_xlib(x_dpy, x_vi, x_fb_config, &x_win);
+	app_hwnd = (void *)x_win;
 #endif
+
+	skg_callback_log([](skg_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
+	if (!skg_init(app_name, nullptr)) 
+		return false;
 	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, app_width, app_height);
 
 	return app_init();
@@ -140,11 +188,17 @@ int main_step(double t, void *) {
 	if (app_stereo)
 		return 0; // Cancel the emscripten animation loop
 
-#ifndef __EMSCRIPTEN__
+#if defined(_WIN32)
 	MSG msg = {};
 	if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
+	}
+#elif defined(__linux__)
+	XEvent event;
+
+	while (XPending(x_dpy)) {
+		XNextEvent(x_dpy, &event);
 	}
 #endif
 

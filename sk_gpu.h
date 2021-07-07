@@ -41,8 +41,14 @@ sk_gpu.h
 		#define _SKG_GL_LOAD_EGL
 		#define _SKG_GL_MAKE_FUNCTIONS
 	#elif defined(__linux__)
-		#define _SKG_GL_DESKTOP
-		#define _SKG_GL_LOAD_GLX
+		#if defined(SKG_LINUX_EGL)
+			#define _SKG_GL_ES
+			#define _SKG_GL_LOAD_EGL
+			#define _SKG_GL_MAKE_FUNCTIONS
+		#else
+			#define _SKG_GL_DESKTOP
+			#define _SKG_GL_LOAD_GLX
+		#endif
 	#elif defined(_WIN32)
 		#define _SKG_GL_DESKTOP
 		#define _SKG_GL_LOAD_WGL
@@ -3475,7 +3481,7 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 #elif defined(_SKG_GL_LOAD_EGL)
 	eglSwapBuffers(egl_display, swapchain->_egl_surface);
 #elif defined(_SKG_GL_LOAD_GLX)
-	glXSwapBuffers(xDisplay, *(Drawable *) swapchain->_x_window);
+	glXSwapBuffers(xDisplay, (Drawable) swapchain->_x_window);
 #elif defined(_SKG_GL_LOAD_EMSCRIPTEN) && defined(SKG_MANUAL_SRGB)
 	float clear[4] = { 0,0,0,1 };
 	skg_tex_target_bind(nullptr);
@@ -3501,7 +3507,7 @@ void skg_swapchain_bind(skg_swapchain_t *swapchain) {
 	eglMakeCurrent(egl_display, swapchain->_egl_surface, swapchain->_egl_surface, egl_context);
 	skg_tex_target_bind(nullptr);
 #elif defined(_SKG_GL_LOAD_GLX)
-	glXMakeCurrent(xDisplay, *(Drawable *) swapchain->_x_window, glxContext);
+	glXMakeCurrent(xDisplay, (Drawable)swapchain->_x_window, glxContext);
 	skg_tex_target_bind(nullptr);
 #endif
 }

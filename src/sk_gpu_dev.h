@@ -41,8 +41,14 @@ sk_gpu.h
 		#define _SKG_GL_LOAD_EGL
 		#define _SKG_GL_MAKE_FUNCTIONS
 	#elif defined(__linux__)
-		#define _SKG_GL_DESKTOP
-		#define _SKG_GL_LOAD_GLX
+		#if defined(SKG_LINUX_EGL)
+			#define _SKG_GL_ES
+			#define _SKG_GL_LOAD_EGL
+			#define _SKG_GL_MAKE_FUNCTIONS
+		#else
+			#define _SKG_GL_DESKTOP
+			#define _SKG_GL_LOAD_GLX
+		#endif
 	#elif defined(_WIN32)
 		#define _SKG_GL_DESKTOP
 		#define _SKG_GL_LOAD_WGL

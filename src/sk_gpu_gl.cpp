@@ -478,7 +478,7 @@ int32_t gl_init_wgl() {
 	int attributes[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 3, 
 		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
-#ifdef _DEBUG
+#if !defined(NDEBUG)
 		WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
 #endif
 		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
@@ -578,7 +578,7 @@ int32_t gl_init_glx() {
 		GLX_RENDER_TYPE,               GLX_RGBA_TYPE,
 		GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
 		GLX_CONTEXT_MINOR_VERSION_ARB, 5,
-#ifdef _DEBUG
+#if !defined(NDEBUG)
 		GLX_CONTEXT_FLAGS_ARB,         GLX_CONTEXT_DEBUG_BIT_ARB,
 #endif
 		GLX_CONTEXT_PROFILE_MASK_ARB,  GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
@@ -626,7 +626,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	skg_log(skg_log_info, "Using OpenGL");
 	skg_log(skg_log_info, (char*)glGetString(GL_VERSION));
 
-#if _DEBUG && !defined(_SKG_GL_WEB)
+#if !defined(NDEBUG) && !defined(_SKG_GL_WEB)
 	skg_log(skg_log_info, "Debug info enabled.");
 	// Set up debug info for development
 	glEnable(GL_DEBUG_OUTPUT);
@@ -663,7 +663,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 		case GL_DEBUG_SEVERITY_HIGH:   skg_log(skg_log_critical, msg); break;
 		}
 	}, nullptr);
-#endif // _DEBUG && !defined(_SKG_GL_WEB)
+#endif // !defined(NDEBUG) && !defined(_SKG_GL_WEB)
 	
 	// Some default behavior
 	glEnable   (GL_DEPTH_TEST);  

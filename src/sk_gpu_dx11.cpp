@@ -39,7 +39,7 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 
 int32_t skg_init(const char *app_name, void *adapter_id) {
 	UINT creation_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-#ifdef _DEBUG
+#if !defined(NDEBUG)
 	creation_flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
@@ -411,7 +411,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	result.type = type;
 
 	DWORD flags = D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
-#ifdef _DEBUG
+#if !defined(NDEBUG)
 	flags |= D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG;
 #else
 	flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;

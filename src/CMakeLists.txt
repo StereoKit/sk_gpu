@@ -9,6 +9,14 @@ find_package(PythonInterp REQUIRED)
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/../sk_gpu.h"
     COMMAND "${PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/build_header.py" --argument
+    DEPENDS 
+        ${CMAKE_CURRENT_SOURCE_DIR}/sk_gpu_common.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/sk_gpu_common.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sk_gpu_dev.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/sk_gpu_dx11.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/sk_gpu_dx11.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sk_gpu_gl.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/sk_gpu_gl.cpp
 )
 
 add_custom_target(sk_gpu_header ALL

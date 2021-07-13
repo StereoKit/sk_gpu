@@ -1228,6 +1228,7 @@ void skg_tex_destroy(skg_tex_t *tex) {
 	if (tex->_resource   ) tex->_resource   ->Release();
 	if (tex->_sampler    ) tex->_sampler    ->Release();
 	if (tex->_texture    ) tex->_texture    ->Release();
+	*tex = {};
 }
 
 ///////////////////////////////////////////

@@ -400,6 +400,7 @@ typedef struct skg_shader_t {
 	uint32_t           _vertex;
 	uint32_t           _pixel;
 	uint32_t           _program;
+	uint32_t           _compute;
 } skg_shader_t;
 
 typedef struct skg_pipeline_t {
@@ -424,6 +425,8 @@ typedef struct skg_tex_t {
 	uint32_t      _texture;
 	uint32_t      _framebuffer;
 	uint32_t      _target;
+	uint32_t      _access;
+	uint32_t      _format;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {
@@ -2186,8 +2189,12 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_UNIFORM_BUFFER 0x8A11
+#define GL_SHADER_STORAGE_BUFFER 0x90D2
 #define GL_STATIC_DRAW 0x88E4
 #define GL_DYNAMIC_DRAW 0x88E8
+#define GL_READ_ONLY 0x88B8
+#define GL_WRITE_ONLY 0x88B9
+#define GL_READ_WRITE 0x88BA
 #define GL_TRIANGLES 0x0004
 #define GL_VERSION 0x1F02
 #define GL_CULL_FACE 0x0B44
@@ -2310,6 +2317,7 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_VERTEX_SHADER 0x8B31
+#define GL_COMPUTE_SHADER 0x91B9
 #define GL_COMPILE_STATUS 0x8B81
 #define GL_LINK_STATUS 0x8B82
 #define GL_INFO_LOG_LENGTH 0x8B84
@@ -2375,6 +2383,7 @@ GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, u
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
 GLE(void,     glDeleteTextures,          int32_t n, const uint32_t *textures) \
 GLE(void,     glBindTexture,             uint32_t target, uint32_t texture) \
+GLE(void,     glBindImageTexture,        uint32_t unit, uint32_t texture, int32_t level, unsigned char layered, int32_t layer, uint32_t access, uint32_t format) \
 GLE(void,     glTexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
 GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalformat, uint32_t pname, int32_t bufSize, int32_t *params)\
 GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
@@ -2403,6 +2412,7 @@ GLE(void,     glScissor,                 int32_t x, int32_t y, uint32_t width, u
 GLE(void,     glCullFace,                uint32_t mode) \
 GLE(void,     glBlendFunc,               uint32_t sfactor, uint32_t dfactor) \
 GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
+GLE(void,     glDispatchCompute,         uint32_t num_groups_x, uint32_t num_groups_y, uint32_t num_groups_z) \
 GLE(const char *, glGetString,           uint32_t name) \
 GLE(const char *, glGetStringi,          uint32_t name, uint32_t index)
 
@@ -2885,6 +2895,12 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_compute(uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z) {
+	glDispatchCompute(thread_count_x, thread_count_y, thread_count_z);
+}
+
+///////////////////////////////////////////
+
 void skg_viewport(const int32_t *xywh) {
 	glViewport(xywh[0], xywh[1], xywh[2], xywh[3]);
 }
@@ -2940,7 +2956,7 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 ///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
-	if (buffer->type == skg_buffer_type_constant)
+	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute)
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
 	else if (buffer->type == skg_buffer_type_vertex) {
 #ifdef _SKG_GL_WEB
@@ -3021,6 +3037,8 @@ void skg_mesh_destroy(skg_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
+// skg_shader_t                          //
+///////////////////////////////////////////
 
 skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_size, skg_stage_ type) {
 	const char *file_chars = (const char *)file_data;
@@ -3036,7 +3054,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	switch (type) {
 	case skg_stage_pixel:   gl_type = GL_FRAGMENT_SHADER; break;
 	case skg_stage_vertex:  gl_type = GL_VERTEX_SHADER;   break;
-	case skg_stage_compute: skg_log(skg_log_critical, "GL compute shaders not implemented yet."); break;
+	case skg_stage_compute: gl_type = GL_COMPUTE_SHADER;  break;
 	}
 
 	// Convert the prefix if it doesn't match the GL version we're using
@@ -3095,19 +3113,19 @@ void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 }
 
 ///////////////////////////////////////////
-// skg_shader_t                          //
-///////////////////////////////////////////
 
 skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader) {
 	skg_shader_t result = {};
-	result.meta    = meta;
-	result._vertex = v_shader._shader;
-	result._pixel  = p_shader._shader;
+	result.meta     = meta;
+	result._vertex  = v_shader._shader;
+	result._pixel   = p_shader._shader;
+	result._compute = c_shader._shader;
 	skg_shader_meta_reference(result.meta);
 
 	result._program = glCreateProgram();
-	if (result._vertex) glAttachShader(result._program, result._vertex);
-	if (result._pixel)  glAttachShader(result._program, result._pixel);
+	if (result._vertex)  glAttachShader(result._program, result._vertex);
+	if (result._pixel)   glAttachShader(result._program, result._pixel);
+	if (result._compute) glAttachShader(result._program, result._compute);
 	glLinkProgram (result._program);
 
 	// check for errors?
@@ -3152,6 +3170,13 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	}
 
 	return result;
+}
+
+
+///////////////////////////////////////////
+
+void skg_shader_compute_bind(const skg_shader_t *shader) {
+	glUseProgram(shader->_program);
 }
 
 ///////////////////////////////////////////
@@ -3541,6 +3566,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result.height      = height;
 	result.array_count = array_count;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
+	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target     = type == skg_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: array_count > 1 
@@ -3579,6 +3605,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result.array_count = 1;
 	result.array_start = array_layer;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
+	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target     = type == skg_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP
 		: GL_TEXTURE_2D_ARRAY;
@@ -3601,9 +3628,15 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	result.use     = use;
 	result.format  = format;
 	result.mips    = mip_maps;
+	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target = type == skg_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: GL_TEXTURE_2D;
+
+	if      (use & skg_use_compute_read && use & skg_use_compute_write) result._access = GL_READ_WRITE;
+	else if (use & skg_use_compute_read)                                result._access = GL_READ_ONLY;
+	else if (use & skg_use_compute_write)                               result._access = GL_WRITE_ONLY;
+	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 
 	glGenTextures(1, &result._texture);
 	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, 1);
@@ -3699,7 +3732,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 
 	glBindTexture(tex->_target, tex->_texture);
 
-	uint32_t format = (uint32_t)skg_tex_fmt_to_native   (tex->format);
+	tex->_format    = (uint32_t)skg_tex_fmt_to_native   (tex->format);
 	uint32_t layout =           skg_tex_fmt_to_gl_layout(tex->format);
 	uint32_t type   =           skg_tex_fmt_to_gl_type  (tex->format);
 	if (tex->type == skg_tex_type_cubemap) {
@@ -3708,9 +3741,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 			return;
 		}
 		for (int32_t f = 0; f < 6; f++)
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, format, width, height, 0, layout, type, data_frames[f]);
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, tex->_format, width, height, 0, layout, type, data_frames[f]);
 	} else {
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
+		glTexImage2D(GL_TEXTURE_2D, 0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
 	}
 	if (tex->mips == skg_mip_generate)
 		glGenerateMipmap(tex->_target);
@@ -3780,10 +3813,14 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	// have no idea what's happening here!
 	//if (texture)
 	//	glUniform1i(bind.slot, bind.slot);
-
+	
 	if (texture) {
-		glActiveTexture(GL_TEXTURE0 + bind.slot);
-		glBindTexture  (texture->_target, texture->_texture);
+		if (bind.stage_bits & skg_stage_compute) {
+			glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, skg_tex_fmt_to_native( texture->format ));
+		} else {
+			glActiveTexture(GL_TEXTURE0 + bind.slot);
+			glBindTexture(texture->_target, texture->_texture);
+		}
 	}
 }
 
@@ -3804,6 +3841,7 @@ uint32_t skg_buffer_type_to_gl(skg_buffer_type_ type) {
 	case skg_buffer_type_vertex:   return GL_ARRAY_BUFFER;
 	case skg_buffer_type_index:    return GL_ELEMENT_ARRAY_BUFFER;
 	case skg_buffer_type_constant: return GL_UNIFORM_BUFFER;
+	case skg_buffer_type_compute:  return GL_SHADER_STORAGE_BUFFER;
 	default: return 0;
 	}
 }

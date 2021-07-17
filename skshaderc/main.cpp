@@ -342,14 +342,10 @@ void write_header(char *filename, void *file_data, size_t file_size) {
 		return;
 	}
 	fprintf(fp, "#pragma once\n\n");
-	int32_t ct = fprintf_s(fp, "const unsigned char sks_%s[%zu] = {", name, file_size);
+	fprintf_s(fp, "const unsigned char sks_%s[%zu] = {\n", name, file_size);
 	for (size_t i = 0; i < file_size; i++) {
 		unsigned char byte = ((unsigned char *)file_data)[i];
-		ct += fprintf_s(fp, "%d,", byte);
-		if (ct > 80) { 
-			fprintf(fp, "\n"); 
-			ct = 0; 
-		}
+		fprintf_s(fp, "%d,\n", byte);
 	}
 	fprintf_s(fp, "};\n");
 	fflush(fp);

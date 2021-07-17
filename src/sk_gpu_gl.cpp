@@ -871,6 +871,14 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 ///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
+	if (buffer == nullptr && bind.stage_bits == skg_stage_compute) {
+		if (bind.register_type == skg_register_constant)
+			glBindBufferBase(GL_UNIFORM_BUFFER, bind.slot, 0);
+		if (bind.register_type == skg_register_readwrite)
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bind.slot, 0);
+		return;
+	}
+
 	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute)
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
 	else if (buffer->type == skg_buffer_type_vertex) {
@@ -1091,7 +1099,8 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 ///////////////////////////////////////////
 
 void skg_shader_compute_bind(const skg_shader_t *shader) {
-	glUseProgram(shader->_program);
+	if (shader) glUseProgram(shader->_program);
+	else        glUseProgram(0);
 }
 
 ///////////////////////////////////////////

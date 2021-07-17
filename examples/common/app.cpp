@@ -423,7 +423,7 @@ void app_test_compute_update() {
 		skg_buffer_bind(nullptr, { 0, skg_stage_compute, skg_register_readwrite }, 0);
 		i += 1;
 	}
-	skg_tex_bind   (nullptr, { 1, skg_stage_compute, skg_register_readwrite });
+	skg_tex_bind(nullptr, { 1, skg_stage_compute, skg_register_readwrite });
 
 	static skg_color32_t *data = (skg_color32_t *)malloc(sizeof(skg_color32_t) * c_size * c_size);
 	static int32_t frame = 0;

@@ -94,6 +94,7 @@ typedef enum skg_use_ {
 	skg_use_dynamic       = 1 << 2,
 	skg_use_compute_read  = 1 << 3,
 	skg_use_compute_write = 1 << 4,
+	skg_use_compute_readwrite = skg_use_compute_read | skg_use_compute_write
 } skg_use_;
 
 typedef enum skg_read_ {
@@ -312,6 +313,7 @@ SKG_API bool                skg_buffer_is_valid          (const skg_buffer_t *bu
 SKG_API void                skg_buffer_set_contents      (      skg_buffer_t *buffer, const void *data, uint32_t size_bytes);
 SKG_API void                skg_buffer_get_contents      (const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
 SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
+SKG_API void                skg_buffer_clear             (skg_bind_t bind);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 
 SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer);
@@ -368,6 +370,7 @@ SKG_API void                skg_tex_set_contents         (      skg_tex_t *tex, 
 SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
+SKG_API void                skg_tex_clear                (skg_bind_t bind);
 SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target);
 SKG_API skg_tex_t          *skg_tex_target_get           ();
 SKG_API void                skg_tex_destroy              (      skg_tex_t *tex);

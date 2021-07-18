@@ -373,41 +373,40 @@ void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint3
 
 ///////////////////////////////////////////
 
+void skg_buffer_clear(skg_bind_t bind) {
+	if (bind.register_type == skg_register_readwrite) {
+		ID3D11UnorderedAccessView *null_uav = nullptr;
+		d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &null_uav, nullptr);
+	}
+}
+
+///////////////////////////////////////////
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
-	if (buffer) {
-		switch (buffer->type) {
-		case skg_buffer_type_vertex:   d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, &offset); break;
-		case skg_buffer_type_index:    d3d_context->IASetIndexBuffer(buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
-		case skg_buffer_type_constant: {
-			if (bind.stage_bits & skg_stage_vertex)
-				d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
-			if (bind.stage_bits & skg_stage_pixel)
-				d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
-			if (bind.stage_bits & skg_stage_compute)
-				d3d_context->CSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
-		} break;
-		case skg_buffer_type_compute: {
-			if (bind.stage_bits & skg_stage_vertex) {
-				if (bind.register_type == skg_register_resource)
-					d3d_context->VSSetShaderResources(bind.slot, 1, &buffer->_resource);
-			}
-			if (bind.stage_bits & skg_stage_pixel) {
-				if (bind.register_type == skg_register_resource)
-					d3d_context->PSSetShaderResources(bind.slot, 1, &buffer->_resource);
-			}
-			if (bind.stage_bits & skg_stage_compute) {
-				if (bind.register_type == skg_register_resource)
-					d3d_context->CSSetShaderResources(bind.slot, 1, &buffer->_resource);
-				else if (bind.register_type == skg_register_readwrite)
-					d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &buffer->_unordered, nullptr);
-			}
-		} break;
-		}
-	} else {
-		if (bind.register_type == skg_register_readwrite) {
-			ID3D11UnorderedAccessView *null_uav = nullptr;
-			d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &null_uav, nullptr);
-		}
+	switch (bind.register_type) {
+	case skg_register_index:  d3d_context->IASetIndexBuffer(buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
+	case skg_register_vertex: d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, &offset); break;
+	case skg_register_constant: {
+#if !defined(NDEBUG)
+		if (buffer->type != skg_buffer_type_constant) skg_log(skg_log_critical, "Attempting to bind the wrong buffer type to a constant register! Use skg_buffer_type_constant");
+#endif
+		if (bind.stage_bits & skg_stage_vertex ) d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
+		if (bind.stage_bits & skg_stage_pixel  ) d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
+		if (bind.stage_bits & skg_stage_compute) d3d_context->CSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
+	} break;
+	case skg_register_resource: {
+#if !defined(NDEBUG)
+		if (buffer->type != skg_buffer_type_compute) skg_log(skg_log_critical, "Attempting to bind the wrong buffer type to a resource register! Use skg_buffer_type_compute");
+#endif
+		if (bind.stage_bits & skg_stage_vertex ) d3d_context->VSSetShaderResources(bind.slot, 1, &buffer->_resource);
+		if (bind.stage_bits & skg_stage_pixel  ) d3d_context->PSSetShaderResources(bind.slot, 1, &buffer->_resource);
+		if (bind.stage_bits & skg_stage_compute) d3d_context->CSSetShaderResources(bind.slot, 1, &buffer->_resource);
+	} break;
+	case skg_register_readwrite: {
+#if !defined(NDEBUG)
+		if (buffer->type != skg_buffer_type_compute) skg_log(skg_log_critical, "Attempting to bind the wrong buffer type to a UAV register! Use skg_buffer_type_compute");
+#endif
+		if (bind.stage_bits & skg_stage_compute) d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &buffer->_unordered, nullptr);
+	} break;
 	}
 }
 
@@ -1285,9 +1284,40 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 
 ///////////////////////////////////////////
 
+void skg_tex_clear(skg_bind_t bind) {
+	switch (bind.register_type) {
+	case skg_register_resource: {
+		ID3D11SamplerState       *null_state = nullptr;
+		ID3D11ShaderResourceView *null_view  = nullptr;
+		if (bind.stage_bits & skg_stage_pixel ){
+			d3d_context->PSSetSamplers       (bind.slot, 1, &null_state);
+			d3d_context->PSSetShaderResources(bind.slot, 1, &null_view);
+		}
+		if (bind.stage_bits & skg_stage_vertex) {
+			d3d_context->VSSetSamplers       (bind.slot, 1, &null_state);
+			d3d_context->VSSetShaderResources(bind.slot, 1, &null_view);
+		}
+		if (bind.stage_bits & skg_stage_compute) {
+			d3d_context->CSSetSamplers       (bind.slot, 1, &null_state);
+			d3d_context->CSSetShaderResources(bind.slot, 1, &null_view);
+		}
+	} break;
+	case skg_register_readwrite: {
+		if (bind.stage_bits & skg_stage_compute) {
+			ID3D11UnorderedAccessView *null_view = nullptr;
+			d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &null_view, nullptr);
+		}
+	} break;
+	default: skg_log(skg_log_critical, "You can only bind/clear a texture to skg_register_resource, or skg_register_readwrite!"); break;
+	}
+}
+
+///////////////////////////////////////////
+
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
-	if (texture != nullptr) {
-		if (bind.stage_bits & skg_stage_pixel) {
+	switch (bind.register_type) {
+	case skg_register_resource: {
+		if (bind.stage_bits & skg_stage_pixel ){
 			d3d_context->PSSetSamplers       (bind.slot, 1, &texture->_sampler);
 			d3d_context->PSSetShaderResources(bind.slot, 1, &texture->_resource);
 		}
@@ -1296,31 +1326,14 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 			d3d_context->VSSetShaderResources(bind.slot, 1, &texture->_resource);
 		}
 		if (bind.stage_bits & skg_stage_compute) {
-			if (bind.register_type == skg_register_readwrite) {
-				d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &texture->_unordered, nullptr);
-			} else {
-				d3d_context->CSSetSamplers       (bind.slot, 1, &texture->_sampler);
-				d3d_context->CSSetShaderResources(bind.slot, 1, &texture->_resource);
-			}
+			d3d_context->CSSetSamplers       (bind.slot, 1, &texture->_sampler);
+			d3d_context->CSSetShaderResources(bind.slot, 1, &texture->_resource);
 		}
-	} else {
-		if (bind.stage_bits & skg_stage_pixel) {
-			d3d_context->PSSetShaderResources(bind.slot, 0, nullptr);
-		}
-		if (bind.stage_bits & skg_stage_vertex) {
-			d3d_context->VSSetShaderResources(bind.slot, 0, nullptr);
-		}
-		if (bind.stage_bits & skg_stage_compute) {
-			if (bind.register_type == skg_register_readwrite) {
-				ID3D11UnorderedAccessView *null_view = nullptr;
-				d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &null_view, nullptr);
-			} else {
-				ID3D11SamplerState       *null_state = nullptr;
-				ID3D11ShaderResourceView *null_view  = nullptr;
-				d3d_context->CSSetSamplers       (bind.slot, 1, &null_state);
-				d3d_context->CSSetShaderResources(bind.slot, 1, &null_view);
-			}
-		}
+	} break;
+	case skg_register_readwrite: {
+		if (bind.stage_bits & skg_stage_compute) d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &texture->_unordered, nullptr);
+	} break;
+	default: skg_log(skg_log_critical, "You can only bind/clear a texture to skg_register_resource, or skg_register_readwrite!"); break;
 	}
 }
 

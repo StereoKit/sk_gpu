@@ -390,12 +390,12 @@ void app_test_compute_init() {
 		data[(x+y*c_size)*2 + 1] = 1.0f-r;
 	}}
 
-	compute_tex = skg_tex_create(skg_tex_type_image, (skg_use_)(skg_use_static | skg_use_compute_write), skg_tex_fmt_rgba32_linear, skg_mip_none);
+	compute_tex = skg_tex_create(skg_tex_type_image, skg_use_compute_write, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	skg_tex_set_contents(&compute_tex, nullptr, c_size, c_size);
 
 	compute_buff_args = skg_buffer_create(&compute_args, 1, sizeof(reaction_diffusion_args_t), skg_buffer_type_constant, skg_use_static);
-	compute_buff_a    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, (skg_use_)(skg_use_compute_read | skg_use_compute_write));
-	compute_buff_b    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, (skg_use_)(skg_use_compute_read | skg_use_compute_write));
+	compute_buff_a    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
+	compute_buff_b    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
 	compute_shader    = skg_shader_create_memory(sks_compute_test_hlsl, sizeof(sks_compute_test_hlsl));
 	
 	free(data);
@@ -420,7 +420,7 @@ void app_test_compute_update() {
 		skg_buffer_bind(i%2==0?&compute_buff_b:&compute_buff_a, { 0, skg_stage_compute, skg_register_readwrite }, 0);
 
 		skg_compute(c_size/32, c_size/32, 1);
-		skg_buffer_bind(nullptr, { 0, skg_stage_compute, skg_register_readwrite }, 0);
+		skg_buffer_clear({ 0, skg_stage_compute, skg_register_readwrite });
 		i += 1;
 	}
 	skg_tex_bind(nullptr, { 1, skg_stage_compute, skg_register_readwrite });

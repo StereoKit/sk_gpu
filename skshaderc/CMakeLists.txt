@@ -18,6 +18,21 @@ CPMAddPackage(
 )
 
 CPMAddPackage(
+    NAME SPIRV-Headers
+    GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
+    GIT_TAG 1d4e3a7e3a04ba205ed8cb1485f7cb7369bec609
+)
+
+CPMAddPackage(
+    NAME SPIRV-Tools
+    GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
+    GIT_TAG 3a68a7274022f75d1a54baebda313820010b1c9c
+    OPTIONS
+    "SPIRV_SKIP_TESTS ON"
+    "SPIRV_SKIP_EXECUTABLES ON"
+)
+
+CPMAddPackage(
     NAME glslang
     GITHUB_REPOSITORY KhronosGroup/glslang
     GIT_TAG ae2a562936cc8504c9ef2757cceaff163147834f
@@ -34,6 +49,7 @@ add_executable(skshaderc
 target_link_libraries(skshaderc
     PRIVATE
     spirv-cross-c
+    SPIRV-Tools-opt
     glslang
     SPIRV
 )

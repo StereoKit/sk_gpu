@@ -22,16 +22,7 @@ set(SKGPU_TEST_SHADERS_HLSL
     ../common/compute_test.hlsl
     ../common/cubemap.hlsl
     ../common/test.hlsl )
-
-foreach(SHADER ${SKGPU_TEST_SHADERS_HLSL})
-    message(STATUS "Compiling shader ${SKSHADERC_EXE_PATH} -h -t xge ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}.h
-        COMMAND ${SKSHADERC_EXE_PATH} -h -t xge ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}
-        DEPENDS ${SHADER} 
-        COMMENT "${SKSHADERC_EXE_PATH} -h -t xge ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
-    list(APPEND SKGPU_TEST_SHADERS_H ${SHADER}.h)
-endforeach(SHADER)
+skshaderc_compile_headers(SKGPU_TEST_SHADERS_HLSL "-t xge" SKGPU_TEST_SHADERS_H)
 
 ## Target definition
 

@@ -1,3 +1,30 @@
+# The skshaderc cmake file exports a few useful items for
+# building shaders in your own project! The first is the
+# skshaderc_compile_headers macro, which can compile a list
+# of shader files, and return a list with the same files
+# and .h appended to them.
+#
+# Example:
+# set(PROJECT_SHADERS_HLSL
+#     compute_test.hlsl
+#     cubemap.hlsl
+#     test.hlsl )
+# skshaderc_compile_headers(PROJECT_SHADERS_HLSL "-t xge" PROJECT_SHADERS_H)
+#
+# PROJECT_SHADERS_H now contains a list of .h files that
+# contain shader binaries in arrays.
+#
+# skshaderc_compile_assets is similar, but is not specifically
+# for header files. It's best if you're looking for side-by-side
+# .sks files. It has no output list.
+#
+# skshaderc_compile_assets(PROJECT_SHADERS_HLSL "-t xge")
+#
+# If you wish to design your own shader compiling function,
+# this file also exports SKSHADERC_EXE_PATH, which is a 
+# generator for the path to the skshaderc compiler executable
+# file.
+
 cmake_minimum_required(VERSION 3.9.2)
 
 project(skshaderc VERSION 1.0
@@ -7,6 +34,7 @@ project(skshaderc VERSION 1.0
 # See: https://github.com/cpm-cmake/CPM.cmake
 include(../cmake/CPM.cmake)
 
+# For converting SPIR-V to flavors of GLSL
 CPMAddPackage(
     NAME SPIRV-Cross
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
@@ -17,12 +45,16 @@ CPMAddPackage(
     "SPIRV_CROSS_ENABLE_MSL OFF"
 )
 
+# For SPIRV-Tools
 CPMAddPackage(
     NAME SPIRV-Headers
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
     GIT_TAG 1d4e3a7e3a04ba205ed8cb1485f7cb7369bec609
 )
 
+# For optimizing SPIR-V shaders, a baseline amount of
+# optimization is crucial for meta compatability with
+# HLSL compilers.
 CPMAddPackage(
     NAME SPIRV-Tools
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
@@ -32,6 +64,9 @@ CPMAddPackage(
     "SPIRV_SKIP_EXECUTABLES ON"
 )
 
+# This is used to convert HLSL to SPIR-V. DXC is an
+# alternative, but is far more difficult to compile,
+# and generates a much larger binary.
 CPMAddPackage(
     NAME glslang
     GITHUB_REPOSITORY KhronosGroup/glslang
@@ -55,3 +90,34 @@ target_link_libraries(skshaderc
 )
 
 set(SKSHADERC_EXE_PATH $<TARGET_FILE:skshaderc> PARENT_SCOPE)
+
+macro(SKSHADERC_COMPILE_HEADERS LIST COMMAND_STRING OUT_LIST)
+    set(SKSHADERC_COMPILE_COMMANDS ${COMMAND_STRING})
+    separate_arguments(SKSHADERC_COMPILE_COMMANDS)
+
+    foreach(SHADER ${${LIST}})
+        add_custom_command(
+            OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}.h
+            COMMAND ${SKSHADERC_EXE_PATH} -h ${SKSHADERC_COMPILE_COMMANDS} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}
+            DEPENDS 
+                ${SHADER} 
+                ${SKSHADERC_EXE_PATH}
+            COMMENT "skshaderc -h ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
+        list(APPEND ${OUT_LIST} ${SHADER}.h)
+    endforeach(SHADER)
+endmacro()
+
+macro(SKSHADERC_COMPILE_ASSETS LIST COMMAND_STRING)
+    set(SKSHADERC_COMPILE_COMMANDS ${COMMAND_STRING})
+    separate_arguments(SKSHADERC_COMPILE_COMMANDS)
+
+    foreach(SHADER ${${LIST}})
+        add_custom_command(
+            OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}.sks
+            COMMAND ${SKSHADERC_EXE_PATH} ${SKSHADERC_COMPILE_COMMANDS} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}
+            DEPENDS 
+                ${SHADER} 
+                ${SKSHADERC_EXE_PATH}
+            COMMENT "skshaderc ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
+    endforeach(SHADER)
+endmacro()

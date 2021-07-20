@@ -1342,7 +1342,7 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 		if (id == -1)
 			id = texture_list.add({});
 		
-		skg_shader_texture_t *tex = &texture_list[i];
+		skg_shader_texture_t *tex = &texture_list[id];
 		tex->bind.slot       = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
 		tex->bind.stage_bits = spirv_stage->stage;
 		strncpy(tex->name, name, sizeof(tex->name));

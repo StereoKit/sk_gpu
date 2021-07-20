@@ -16,6 +16,10 @@
 
 ///////////////////////////////////////////
 
+uint64_t exe_file_time = 0;
+
+///////////////////////////////////////////
+
 void            get_folder    (char *filename, char *out_dest,  size_t dest_size);
 bool            read_file     (char *filename, char **out_text, size_t *out_size);
 void            write_file    (char *filename, void *file_data, size_t file_size);
@@ -28,10 +32,12 @@ uint64_t        file_time     (char *file);
 ///////////////////////////////////////////
 
 int main(int argc, char **argv) {
-	bool exit = false;
+	bool            exit     = false;
 	sksc_settings_t settings = check_settings(argc, argv, &exit);
 	if (exit) return 0;
 
+	exe_file_time = file_time(argv[0]);
+	
 	sksc_init();
 
 	iterate_files(argv[argc - 1], &settings);
@@ -235,8 +241,10 @@ void iterate_files(char *input_name, sksc_settings_t *settings) {
 				sprintf_s(new_filename, "%s.%s", new_filename, settings->output_header?"h":"sks");
 			}
 
-			// Skip this file if it hasn't changed
-			if (settings->only_if_changed && file_time(filename) < file_time(new_filename)) {
+			// Skip this file if it hasn't changed 
+			uint64_t src_file_time      = file_time(filename);
+			uint64_t compiled_file_time = file_time(new_filename);
+			if (settings->only_if_changed && src_file_time < compiled_file_time && exe_file_time < compiled_file_time) {
 				if (!settings->silent_info) {
 					printf("File '%s' is already up-to-date, skipping...\n", filename);
 				}

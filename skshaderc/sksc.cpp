@@ -1326,16 +1326,14 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 		}
 		
 		if (strcmp(buffer->name, "$Global") == 0) {
-			ref_meta->global_buffer_id = i;
+			ref_meta->global_buffer_id = id;
 		}
 	}
 	
 	// Make sure sampler names stay the same in GLSL
-	const spvc_combined_image_sampler *samplers = nullptr;
-	spvc_compiler_get_combined_image_samplers(compiler, &samplers, &count);
 	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
 	for (size_t i = 0; i < count; i++) {
-		const char *name = spvc_compiler_get_name(compiler, samplers[i].image_id);
+		const char *name = spvc_compiler_get_name(compiler, list[i].id);
 		int64_t     id   = texture_list.index_where([](auto &tex, void *data) { 
 			return strcmp(tex.name, (char*)data) == 0; 
 		}, (void*)name);

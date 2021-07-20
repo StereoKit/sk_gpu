@@ -361,7 +361,7 @@ void app_test_dyn_update(float time) {
 	skg_mesh_bind    (&app_mesh_wave.mesh);
 	skg_pipeline_bind(&app_mat_default);
 	skg_tex_bind     (&app_target, app_sh_default_tex_bind);
-	skg_draw(0, 0, app_mesh_wave.ind_count, 1);
+	skg_draw         (0, 0, app_mesh_wave.ind_count, 1);
 	skg_tex_bind     (nullptr, app_sh_default_tex_bind);
 }
 

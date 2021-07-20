@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
 	if (exit) return 0;
 
 	exe_file_time = file_time(argv[0]);
-	
+
 	sksc_init();
 
 	iterate_files(argv[argc - 1], &settings);

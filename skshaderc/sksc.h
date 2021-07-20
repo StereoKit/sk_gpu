@@ -25,8 +25,11 @@ typedef struct sksc_settings_t {
 	char folder[512];
 	char *out_folder;
 	char vs_entrypoint[64];
+	bool vs_entry_require;
 	char ps_entrypoint[64];
+	bool ps_entry_require;
 	char cs_entrypoint[64];
+	bool cs_entry_require;
 	char shader_model[64];
 	char shader_model_str[16];
 	int32_t gl_version;

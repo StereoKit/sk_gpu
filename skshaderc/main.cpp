@@ -92,9 +92,9 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 		         strcmp(argv[i], "-?" ) == 0 ||
 		         strcmp(argv[i], "--help" ) == 0 ||
 		         strcmp(argv[i], "/?" ) == 0 ) *exit = true;
-		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { result.cs_entry_require = true; strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { result.vs_entry_require = true; strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { result.ps_entry_require = true; strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-gl") == 0 && i<argc-1) { result.gl_version = atoi(argv[i+1]); i++; }
 		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shader_model,  argv[i+1], sizeof(result.shader_model )); i++; }
 		else if (strcmp(argv[i], "-i" ) == 0 && i<argc-1) {
@@ -145,6 +145,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	if (result.ps_entrypoint[0] == 0 && result.vs_entrypoint[0] == 0 && result.cs_entrypoint[0] == 0) {
 		strncpy(result.ps_entrypoint, "ps", sizeof(result.ps_entrypoint));
 		strncpy(result.vs_entrypoint, "vs", sizeof(result.vs_entrypoint));
+		strncpy(result.cs_entrypoint, "cs", sizeof(result.cs_entrypoint));
 	}
 
 	if (*exit) {
@@ -181,7 +182,7 @@ Options:
 
 	-cs name	Compiles a compute shader stage from this file, using an entry
 			function of [name]. Specifying this removes the default entry 
-			names from vertex and pixel shader stages.
+			names from vertex and pixel shader stages. Default is 'cs'.
 	-ps name	Compiles a pixel shader stage from this file, using an entry
 			function of [name]. Specifying this removes default entry
 			names from vertex and pixel shader stages. Default is 'ps'.

@@ -81,6 +81,12 @@ enum log_level_ {
 	log_level_err,
 };
 
+enum compile_result_ {
+	compile_result_success = 1,
+	compile_result_fail = 0,
+	compile_result_skip = -1,
+};
+
 ///////////////////////////////////////////
 
 void sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
@@ -456,7 +462,7 @@ typedef struct glslang_shader_s {
     std::string preprocessedGLSL;
 } glslang_shader_t;
 
-bool sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
+compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
 	glslang_resource_s default_resource = {};
 	glslang_input_t    input            = {};
 	input.language                = GLSLANG_SOURCE_HLSL;
@@ -482,23 +488,37 @@ bool sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, sk
     if (!glslang_shader_preprocess(shader, &input)) {
 		sksc_log(log_level_err, glslang_shader_get_info_log(shader));
 		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
-		return false;
+		glslang_shader_delete (shader);
+		return compile_result_fail;
     }
 
     if (!glslang_shader_parse(shader, &input)) {
         sksc_log(log_level_err, glslang_shader_get_info_log(shader));
 		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
-		return false;
+		glslang_shader_delete (shader);
+		return compile_result_fail;
     }
 
     glslang_program_t* program = glslang_program_create();
     glslang_program_add_shader(program, shader);
 
-    if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT)) {
+    if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT | GLSLANG_MSG_DEBUG_INFO_BIT)) {
         sksc_log(log_level_err, glslang_shader_get_info_log(shader));
 		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
-		return false;
+		glslang_shader_delete (shader);
+		glslang_program_delete(program);
+		return compile_result_fail;
     }
+
+	// Check if we found an entry point
+	const char *link_info = glslang_program_get_info_log(program);
+	if (link_info != nullptr) {
+		if (strstr(link_info, "Entry point not found") != nullptr) {
+			glslang_shader_delete (shader);
+			glslang_program_delete(program);
+			return compile_result_skip;
+		}
+	}
 	
     glslang_program_SPIRV_generate(program, input.stage);
 
@@ -523,8 +543,10 @@ bool sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, sk
 	//optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
 	optimizer.RegisterPerformancePasses();
 	std::vector<uint32_t> spirv_optimized;
-	if (!optimizer.Run((uint32_t*)spirv_code, spirv_size/sizeof(uint32_t), &spirv_optimized)) 
-		return false;
+	if (!optimizer.Run((uint32_t*)spirv_code, spirv_size/sizeof(uint32_t), &spirv_optimized)) {
+		free(spirv_code);
+		return compile_result_fail;
+	}
 
 	out_stage->language  = lang;
 	out_stage->stage     = type;
@@ -534,7 +556,7 @@ bool sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, sk
 	
 	free(spirv_code);
 
-	return true;
+	return compile_result_success;
 }
 
 #endif
@@ -684,7 +706,8 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 	array_t<skg_shader_file_stage_t> stages = {};
 
 	skg_stage_ compile_stages[3] = { skg_stage_vertex, skg_stage_pixel, skg_stage_compute };
-	char      *entrypoints   [3] = { settings->vs_entrypoint, settings->ps_entrypoint, settings->cs_entrypoint };
+	char      *entrypoints   [3] = { settings->vs_entrypoint,    settings->ps_entrypoint,    settings->cs_entrypoint };
+	bool       entrypoint_req[3] = { settings->vs_entry_require, settings->ps_entry_require, settings->cs_entry_require };
 	for (size_t i = 0; i < sizeof(compile_stages)/sizeof(compile_stages[0]); i++) {
 		if (entrypoints[i][0] == 0)
 			continue;
@@ -715,14 +738,17 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 #endif
 
 #if defined(SKSC_SPIRV_GLSLANG)
-		skg_shader_file_stage_t spirv_stage = {};
-		bool spirv_result = sksc_glslang_compile_shader(hlsl_text, settings, compile_stages[i], skg_shader_lang_spirv, &spirv_stage, nullptr);
+		skg_shader_file_stage_t spirv_stage  = {};
+		compile_result_         spirv_result = sksc_glslang_compile_shader(hlsl_text, settings, compile_stages[i], skg_shader_lang_spirv, &spirv_stage, nullptr);
+		if (spirv_result == compile_result_fail || (spirv_result == compile_result_skip && entrypoint_req[i])) {
+			sksc_log(log_level_err, "SPIRV compile failed\n");
+			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
+			return false;
+		}
+		else if (spirv_result == compile_result_skip)
+			continue;
+
 		if (settings->target_langs[skg_shader_lang_spirv]) {
-			if (!spirv_result) {
-				sksc_log(log_level_err, "SPIRV shader compile failed\n");
-				sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
-				return false;
-			}
 			stages.add(spirv_stage);
 		}
 		sksc_spvc_read_meta(&spirv_stage, out_file->meta);

@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 ///////////////////////////////////////////
 
@@ -305,7 +306,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shad
 			if (!is_new) continue;
 
 			// Initialize the buffer with data from the shaders!
-			sprintf_s(buffer_list[id].name, _countof(buffer_list[id].name), "%s", bind_desc.Name);
+			snprintf(buffer_list[id].name, _countof(buffer_list[id].name), "%s", bind_desc.Name);
 			buffer_list[id].bind.slot = bind_desc.BindPoint;
 			buffer_list[id].size      = shader_buff.Size;
 			buffer_list[id].var_count = shader_buff.Variables;
@@ -341,7 +342,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shad
 
 				buffer_list[id].vars[v].size       = var_desc.Size;
 				buffer_list[id].vars[v].offset     = var_desc.StartOffset;
-				sprintf_s(buffer_list[id].vars[v].name, _countof(buffer_list[id].vars[v].name), "%s", var_desc.Name);
+				snprintf(buffer_list[id].vars[v].name, _countof(buffer_list[id].vars[v].name), "%s", var_desc.Name);
 			}
 		} 
 		if (bind_desc.Type == D3D_SIT_TEXTURE) {
@@ -351,7 +352,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shad
 			if (id == -1)
 				id = texture_list.add({});
 
-			sprintf_s(texture_list[id].name, _countof(texture_list[id].name), "%s", bind_desc.Name);
+			snprintf(texture_list[id].name, _countof(texture_list[id].name), "%s", bind_desc.Name);
 			texture_list[id].bind.stage_bits = (skg_stage_)(texture_list[id].bind.stage_bits | stage);
 			texture_list[id].bind.slot       = bind_desc.BindPoint;
 		}
@@ -1032,7 +1033,7 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 			for (size_t i = 0; buff && i < buff->var_count; i++) {
 				if (strcmp(buff->vars[i].name, name) == 0) {
 					found += 1;
-					strcpy_s(buff->vars[i].extra, tag);
+					strncpy(buff->vars[i].extra, tag, sizeof(buff->vars[i].extra));
 
 					if (value_str) {
 						int32_t commas = count_ch(value, ',');
@@ -1084,7 +1085,7 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 				if (strcmp(ref_meta->textures[i].name, name) == 0) {
 					if (value_str) {
 						found += 1;
-						strcpy_s(ref_meta->textures[i].extra, value);
+						strncpy(ref_meta->textures[i].extra, value, sizeof(ref_meta->textures[i].extra));
 					} else {
 						int32_t line, col;
 						sksc_line_col(hlsl_text, value_str, &line, &col);
@@ -1095,7 +1096,7 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 			}
 			if (strcmp(name, "name") == 0) {
 				found += 1;
-				strcpy_s(ref_meta->name, value);
+				strncpy(ref_meta->name, value, sizeof(ref_meta->name));
 			}
 			
 
@@ -1208,7 +1209,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		spvc_resources_get_resource_list_for_type(resources, res, &list, &count);
 		for (size_t i = 0; i < count; i++) {
 			char fs_name[64];
-			sprintf_s(fs_name, "fs%s", list[i].name+off);
+			snprintf(fs_name, sizeof(fs_name), "fs%s", list[i].name+off);
 			spvc_compiler_set_name(compiler_glsl, list[i].id, fs_name);
 		}
 	}
@@ -1223,7 +1224,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 	out_stage->language  = lang;
 	out_stage->code_size = (uint32_t)strlen(result) + 1;
 	out_stage->code      = malloc(out_stage->code_size);
-	strcpy_s((char*)out_stage->code, out_stage->code_size, result);
+	strncpy((char*)out_stage->code, result, out_stage->code_size);
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

@@ -53,3 +53,5 @@ target_link_libraries(skshaderc
     glslang
     SPIRV
 )
+
+set(SKSHADERC_EXE_PATH $<TARGET_FILE:skshaderc> PARENT_SCOPE)

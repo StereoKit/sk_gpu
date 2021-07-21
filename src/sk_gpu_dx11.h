@@ -10,7 +10,16 @@ typedef struct skg_buffer_t {
 	skg_buffer_type_ type;
 	uint32_t         stride;
 	ID3D11Buffer    *_buffer;
+	ID3D11ShaderResourceView  *_resource;
+	ID3D11UnorderedAccessView *_unordered;
 } skg_buffer_t;
+
+typedef struct skg_computebuffer_t {
+	skg_read_                  read_write;
+	skg_buffer_t               buffer;
+	ID3D11ShaderResourceView  *_resource;
+	ID3D11UnorderedAccessView *_unordered;
+} skg_computebuffer_t;
 
 typedef struct skg_mesh_t {
 	ID3D11Buffer *_ind_buffer;
@@ -48,18 +57,19 @@ typedef struct skg_pipeline_t {
 } skg_pipeline_t;
 
 typedef struct skg_tex_t {
-	int32_t                   width;
-	int32_t                   height;
-	int32_t                   array_count;
-	skg_use_                  use;
-	skg_tex_type_             type;
-	skg_tex_fmt_              format;
-	skg_mip_                  mips;
-	ID3D11Texture2D          *_texture;
-	ID3D11SamplerState       *_sampler;
-	ID3D11ShaderResourceView *_resource;
-	ID3D11RenderTargetView   *_target_view;
-	ID3D11DepthStencilView   *_depth_view;
+	int32_t                    width;
+	int32_t                    height;
+	int32_t                    array_count;
+	skg_use_                   use;
+	skg_tex_type_              type;
+	skg_tex_fmt_               format;
+	skg_mip_                   mips;
+	ID3D11Texture2D           *_texture;
+	ID3D11SamplerState        *_sampler;
+	ID3D11ShaderResourceView  *_resource;
+	ID3D11UnorderedAccessView *_unordered;
+	ID3D11RenderTargetView    *_target_view;
+	ID3D11DepthStencilView    *_depth_view;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {

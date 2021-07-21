@@ -8,6 +8,7 @@
 
 #include "test.hlsl.h"
 #include "cubemap.hlsl.h"
+#include "compute_test.hlsl.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -129,6 +130,11 @@ app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool ver
 void       app_mesh_destroy(app_mesh_t *mesh);
 bool       ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_vert_count, uint32_t **out_indices, int32_t *out_ind_count);
 void       tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataBGRA, uint8_t dataChannels = 4, uint8_t fileChannels = 3);
+void       bmp_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA);
+
+void app_test_compute_init();
+void app_test_compute_destroy();
+void app_test_compute_update();
 
 ///////////////////////////////////////////
 
@@ -322,7 +328,127 @@ bool app_init() {
 	app_shader_data_buffer = skg_buffer_create(&app_shader_data, 1,   sizeof(app_shader_data_t), skg_buffer_type_constant, skg_use_dynamic);
 	app_shader_inst_buffer = skg_buffer_create(&app_shader_inst, 100, sizeof(app_shader_inst_t), skg_buffer_type_constant, skg_use_dynamic);
 
+	app_test_compute_init();
+
 	return true;
+}
+
+///////////////////////////////////////////
+
+const int32_t c_size = 512;
+
+struct reaction_diffusion_args_t {
+	float feed;
+	float kill;
+	float diffuseA;
+	float diffuseB;
+	float timestep;
+	uint32_t size;
+	float pad[2];
+};
+reaction_diffusion_args_t compute_args      = {
+	//0.0367f, 0.0649f, 
+	//0.082f, 0.06f,
+	//0.029f, 0.057f, // Mazes
+	//0.037f, 0.06f, // Fingerprints
+	0.042f, 0.059f, // Turing patterns
+	//0.039f, 0.058f, // Chaos to Turing Negatons
+	//0.022f, 0.059f, // Warring microbes
+	//0.025f, 0.060f, // Pulsating solitons
+	//0.018f, 0.051f, // Spots and loops
+	//0.055f, 0.062f,
+	0.2097f, 0.105f, 0.8f, c_size};
+skg_buffer_t              compute_buff_args = {};
+skg_buffer_t              compute_buff_a    = {};
+skg_buffer_t              compute_buff_b    = {};
+skg_tex_t                 compute_tex       = {};
+skg_shader_t              compute_shader    = {};
+
+float hash_f(int32_t aPosition, uint32_t aSeed) {
+	const uint32_t BIT_NOISE1 = 0x68E31DA4;
+	const uint32_t BIT_NOISE2 = 0xB5297A4D;
+	const uint32_t BIT_NOISE3 = 0x1B56C4E9;
+
+	uint32_t mangled = (uint32_t )aPosition;
+	mangled *= BIT_NOISE1;
+	mangled += aSeed;
+	mangled ^= (mangled >> 8);
+	mangled += BIT_NOISE2;
+	mangled ^= (mangled << 8);
+	mangled *= BIT_NOISE3;
+	mangled ^= (mangled >> 8);
+	return (float)mangled / 4294967295;
+}
+
+void app_test_compute_init() {
+	
+	float *data = (float*)malloc(sizeof(float)*2 * c_size*c_size);
+	for (size_t y = 0; y < c_size; y+=1) {
+	for (size_t x = 0; x < c_size; x+=1) {
+		float r = hash_f(1, (x/16)*13+(y/16)*127);
+		data[(x+y*c_size)*2    ] = r;
+		data[(x+y*c_size)*2 + 1] = 1.0f-r;
+	}}
+
+	compute_tex = skg_tex_create(skg_tex_type_image, skg_use_compute_write, skg_tex_fmt_rgba32_linear, skg_mip_none);
+	skg_tex_set_contents(&compute_tex, nullptr, c_size, c_size);
+
+	compute_buff_args = skg_buffer_create(&compute_args, 1, sizeof(reaction_diffusion_args_t), skg_buffer_type_constant, skg_use_static);
+	compute_buff_a    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
+	compute_buff_b    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
+	compute_shader    = skg_shader_create_memory(sks_compute_test_hlsl, sizeof(sks_compute_test_hlsl));
+	
+	free(data);
+}
+
+void app_test_compute_destroy() {
+	skg_tex_destroy(&compute_tex);
+	skg_buffer_destroy(&compute_buff_args);
+	skg_buffer_destroy(&compute_buff_a);
+	skg_buffer_destroy(&compute_buff_b);
+	skg_shader_destroy(&compute_shader);
+}
+
+void app_test_compute_update() {
+	static int i = 0; 
+	skg_shader_compute_bind(&compute_shader);
+	skg_buffer_bind(&compute_buff_args, skg_bind_t{ 0, skg_stage_compute, skg_register_constant }, 0);
+
+	skg_tex_bind(&compute_tex, { 1, skg_stage_compute, skg_register_readwrite });
+	for (size_t c = 0; c < 8; c++) 		{
+		skg_buffer_bind(i%2==0?&compute_buff_a:&compute_buff_b, { 0, skg_stage_compute, skg_register_resource }, 0);
+		skg_buffer_bind(i%2==0?&compute_buff_b:&compute_buff_a, { 0, skg_stage_compute, skg_register_readwrite }, 0);
+
+		skg_compute(c_size/32, c_size/32, 1);
+		skg_buffer_clear({ 0, skg_stage_compute, skg_register_readwrite });
+		i += 1;
+	}
+	skg_tex_bind(nullptr, { 1, skg_stage_compute, skg_register_readwrite });
+
+	static skg_color32_t *data = (skg_color32_t *)malloc(sizeof(skg_color32_t) * c_size * c_size);
+	static int32_t frame = 0;
+	frame += 1;
+	if (frame == 1000) {
+		skg_tex_get_contents(&compute_tex, data, sizeof(skg_color32_t) * c_size * c_size);
+		char name[128];
+		snprintf(name, 128, "diffusion%d.bmp", frame);
+		for (size_t i = 0; i < c_size*c_size; i++) {
+			skg_color128_t col = { data[i].r / 255.f, data[i].g / 255.f, data[i].b / 255.f, data[i].a / 255.f };
+			col = skg_col_to_srgb(col);
+			data[i] = {(uint8_t)(col.r*255), (uint8_t)(col.g*255), (uint8_t)(col.b*255), (uint8_t)(col.a*255)};
+		}
+		bmp_write(name, c_size, c_size, (uint8_t *)data);
+	}
+
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0.0f,.0f,0.1f} }) * HMM_Scale(hmm_vec3{ {5.f,5.f,5.f} }));
+	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
+	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+
+	skg_mesh_bind    (&app_mesh_quad.mesh);
+	skg_pipeline_bind(&app_mat_default);
+	skg_tex_bind     (&compute_tex, app_sh_default_tex_bind);
+	skg_draw(0, 0, app_mesh_quad.ind_count, 1);
 }
 
 ///////////////////////////////////////////
@@ -529,16 +655,19 @@ void app_render(float t, hmm_mat4 view, hmm_mat4 proj) {
 	skg_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
 	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
-	app_test_colors(t);
+	app_test_compute_update();
+	//app_test_colors(t);
 	app_test_cubemap();
-	app_test_dyn_update(t);
-	app_test_instancing();
-	app_test_blend();
+	//app_test_dyn_update(t);
+	//app_test_instancing();
+	//app_test_blend();
 }
 
 ///////////////////////////////////////////
 
 void app_shutdown() {
+	app_test_compute_destroy();
+
 	skg_buffer_destroy(&app_shader_data_buffer);
 	skg_buffer_destroy(&app_shader_inst_buffer);
 	skg_pipeline_destroy(&app_mat_default);
@@ -634,4 +763,44 @@ void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *d
 #endif
 }
 
+void bmp_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA) {
+#ifndef __EMSCRIPTEN__
+	FILE *fp = NULL;
+#ifdef __ANDROID__
+	fp = fopen(filename, "wb");
+#else
+	fopen_s(&fp, filename, "wb");
+#endif
+	if (fp == NULL) return;
+
+	uint16_t bfType = 0x4D42;                         fwrite(&bfType, sizeof(uint16_t), 1, fp);
+	uint32_t bfSize = 14 + 40 + (width * height * 4); fwrite(&bfSize, sizeof(uint32_t), 1, fp);
+	uint16_t bfReserved1 = 0;                         fwrite(&bfReserved1, sizeof(uint16_t), 1, fp);
+	uint16_t bfReserved2 = 0;                         fwrite(&bfReserved2, sizeof(uint16_t), 1, fp);
+	uint32_t bfOffBits = 14 + 40;                     fwrite(&bfOffBits, sizeof(uint32_t), 1, fp);
+
+	uint32_t biSize = 40;                             fwrite(&biSize, sizeof(uint32_t), 1, fp);
+	int32_t  biWidth = width;                         fwrite(&biWidth, sizeof(int32_t), 1, fp);
+	int32_t  biHeight = height;                       fwrite(&biHeight, sizeof(int32_t), 1, fp);
+	uint16_t biPlanes = 1;                            fwrite(&biPlanes, sizeof(uint16_t), 1, fp);
+	uint16_t biBitCount = 32;                         fwrite(&biBitCount, sizeof(uint16_t), 1, fp);
+	uint32_t biCompression = 0;                       fwrite(&biCompression, sizeof(uint32_t), 1, fp);
+	uint32_t biSizeImage = width * height * 4;        fwrite(&biSizeImage, sizeof(uint32_t), 1, fp);
+	int32_t  biXPelsPerMeter = 0;                     fwrite(&biXPelsPerMeter, sizeof(int32_t), 1, fp);
+	int32_t  biYPelsPerMeter = 0;                     fwrite(&biYPelsPerMeter, sizeof(int32_t), 1, fp);
+	uint32_t biClrUsed = 0;                           fwrite(&biClrUsed, sizeof(uint32_t), 1, fp);
+	uint32_t biClrImportant = 0;                      fwrite(&biClrImportant, sizeof(uint32_t), 1, fp);
+
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			int i = (x + ((height - 1) - y) * width) * 4;
+			fwrite(&dataRGBA[i+2], sizeof(uint8_t), 1, fp);
+			fwrite(&dataRGBA[i+1], sizeof(uint8_t), 1, fp);
+			fwrite(&dataRGBA[i  ], sizeof(uint8_t), 1, fp);
+			fwrite(&dataRGBA[i+3], sizeof(uint8_t), 1, fp);
+		}
+	}
+	fclose(fp);
+#endif
+}
 ///////////////////////////////////////////

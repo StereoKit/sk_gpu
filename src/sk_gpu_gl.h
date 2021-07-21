@@ -27,6 +27,7 @@ typedef struct skg_shader_t {
 	uint32_t           _vertex;
 	uint32_t           _pixel;
 	uint32_t           _program;
+	uint32_t           _compute;
 } skg_shader_t;
 
 typedef struct skg_pipeline_t {
@@ -51,6 +52,8 @@ typedef struct skg_tex_t {
 	uint32_t      _texture;
 	uint32_t      _framebuffer;
 	uint32_t      _target;
+	uint32_t      _access;
+	uint32_t      _format;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {

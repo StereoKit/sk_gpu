@@ -90,9 +90,16 @@ typedef enum skg_tex_type_ {
 } skg_tex_type_;
 
 typedef enum skg_use_ {
-	skg_use_static,
-	skg_use_dynamic,
+	skg_use_static        = 1 << 0,
+	skg_use_dynamic       = 1 << 2,
+	skg_use_compute_read  = 1 << 3,
+	skg_use_compute_write = 1 << 4,
 } skg_use_;
+
+typedef enum skg_read_ {
+	skg_read_only,
+	skg_read_write,
+} skg_read_;
 
 typedef enum skg_mip_ {
 	skg_mip_generate,
@@ -160,6 +167,15 @@ typedef enum skg_stage_ {
 	skg_stage_compute = 1 << 2,
 } skg_stage_;
 
+typedef enum skg_register_ {
+	skg_register_default,
+	skg_register_vertex,
+	skg_register_index,
+	skg_register_constant,
+	skg_register_resource,
+	skg_register_readwrite,
+} skg_register_;
+
 typedef enum skg_shader_var_ {
 	skg_shader_var_none,
 	skg_shader_var_int,
@@ -220,7 +236,8 @@ typedef struct skg_vert_t {
 
 typedef struct skg_bind_t {
 	uint16_t slot;
-	uint16_t stage_bits;
+	uint8_t  stage_bits;
+	uint8_t  register_type;
 } skg_bind_t;
 
 typedef struct skg_shader_var_t {
@@ -275,7 +292,16 @@ typedef struct skg_buffer_t {
 	skg_buffer_type_ type;
 	uint32_t         stride;
 	ID3D11Buffer    *_buffer;
+	ID3D11ShaderResourceView  *_resource;
+	ID3D11UnorderedAccessView *_unordered;
 } skg_buffer_t;
+
+typedef struct skg_computebuffer_t {
+	skg_read_                  read_write;
+	skg_buffer_t               buffer;
+	ID3D11ShaderResourceView  *_resource;
+	ID3D11UnorderedAccessView *_unordered;
+} skg_computebuffer_t;
 
 typedef struct skg_mesh_t {
 	ID3D11Buffer *_ind_buffer;
@@ -313,18 +339,19 @@ typedef struct skg_pipeline_t {
 } skg_pipeline_t;
 
 typedef struct skg_tex_t {
-	int32_t                   width;
-	int32_t                   height;
-	int32_t                   array_count;
-	skg_use_                  use;
-	skg_tex_type_             type;
-	skg_tex_fmt_              format;
-	skg_mip_                  mips;
-	ID3D11Texture2D          *_texture;
-	ID3D11SamplerState       *_sampler;
-	ID3D11ShaderResourceView *_resource;
-	ID3D11RenderTargetView   *_target_view;
-	ID3D11DepthStencilView   *_depth_view;
+	int32_t                    width;
+	int32_t                    height;
+	int32_t                    array_count;
+	skg_use_                   use;
+	skg_tex_type_              type;
+	skg_tex_fmt_               format;
+	skg_mip_                   mips;
+	ID3D11Texture2D           *_texture;
+	ID3D11SamplerState        *_sampler;
+	ID3D11ShaderResourceView  *_resource;
+	ID3D11UnorderedAccessView *_unordered;
+	ID3D11RenderTargetView    *_target_view;
+	ID3D11DepthStencilView    *_depth_view;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {
@@ -373,6 +400,7 @@ typedef struct skg_shader_t {
 	uint32_t           _vertex;
 	uint32_t           _pixel;
 	uint32_t           _program;
+	uint32_t           _compute;
 } skg_shader_t;
 
 typedef struct skg_pipeline_t {
@@ -397,6 +425,8 @@ typedef struct skg_tex_t {
 	uint32_t      _texture;
 	uint32_t      _framebuffer;
 	uint32_t      _target;
+	uint32_t      _access;
+	uint32_t      _format;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {
@@ -451,6 +481,7 @@ SKG_API bool                skg_capability               (skg_cap_ capability);
 
 SKG_API void                skg_draw_begin               ();
 SKG_API void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
+SKG_API void                skg_compute                  (uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z);
 SKG_API void                skg_viewport                 (const int32_t *xywh);
 SKG_API void                skg_viewport_get             (int32_t *out_xywh);
 SKG_API void                skg_scissor                  (const int32_t *xywh);
@@ -476,6 +507,7 @@ SKG_API skg_shader_t        skg_shader_create_file       (const char *sks_filena
 SKG_API skg_shader_t        skg_shader_create_memory     (const void *sks_memory, size_t sks_memory_size);
 SKG_API skg_shader_t        skg_shader_create_manual     (skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader);
 SKG_API bool                skg_shader_is_valid          (const skg_shader_t *shader);
+SKG_API void                skg_shader_compute_bind      (const skg_shader_t *shader);
 SKG_API skg_bind_t          skg_shader_get_tex_bind      (const skg_shader_t *shader, const char *name);
 SKG_API skg_bind_t          skg_shader_get_buffer_bind   (const skg_shader_t *shader, const char *name);
 SKG_API int32_t             skg_shader_get_var_count     (const skg_shader_t *shader);
@@ -823,6 +855,12 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_compute(uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z) {
+	d3d_context->Dispatch(thread_count_x, thread_count_y, thread_count_z);
+}
+
+///////////////////////////////////////////
+
 void skg_viewport(const int32_t *xywh) {
 	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT((float)xywh[0], (float)xywh[1], (float)xywh[2], (float)xywh[3]);
 	d3d_context->RSSetViewports(1, &viewport);
@@ -859,26 +897,55 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 	D3D11_BUFFER_DESC      buffer_desc = {};
 	buffer_desc.ByteWidth           = size_count * size_stride;
 	buffer_desc.StructureByteStride = size_stride;
-	switch (use) {
-	case skg_use_static:  buffer_desc.Usage = D3D11_USAGE_DEFAULT; break;
-	case skg_use_dynamic: {
+	buffer_desc.Usage               = D3D11_USAGE_DEFAULT;
+
+	if (use & skg_use_dynamic) {
 		buffer_desc.Usage          = D3D11_USAGE_DYNAMIC;
 		buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	}break;
 	}
-	switch (type) {
-	case skg_buffer_type_vertex:   buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;   break;
-	case skg_buffer_type_index:    buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;    break;
-	case skg_buffer_type_constant: buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; break;
-	case skg_buffer_type_compute:  {
+
+	if (use & skg_use_compute_write || use & skg_use_compute_read) {
 		buffer_desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE; 
-		buffer_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED; 
-		buffer_desc.Usage     = D3D11_USAGE_DEFAULT;
-	} break;
+		buffer_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	}
+
+	switch (type) {
+	case skg_buffer_type_vertex:   buffer_desc.BindFlags |= D3D11_BIND_VERTEX_BUFFER;   break;
+	case skg_buffer_type_index:    buffer_desc.BindFlags |= D3D11_BIND_INDEX_BUFFER;    break;
+	case skg_buffer_type_constant: buffer_desc.BindFlags |= D3D11_BIND_CONSTANT_BUFFER; break;
+	case skg_buffer_type_compute:  break;
 	}
 	if (FAILED(d3d_device->CreateBuffer(&buffer_desc, data == nullptr ? nullptr : &buffer_data, &result._buffer))) {
 		skg_log(skg_log_critical, "CreateBuffer failed!");
+		return {};
 	}
+
+	if (use & skg_use_compute_write) {
+		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
+		view.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+		view.Format        = DXGI_FORMAT_UNKNOWN;
+		view.Buffer.FirstElement = 0;
+		view.Buffer.NumElements  = size_count; 
+
+		if(FAILED(d3d_device->CreateUnorderedAccessView( result._buffer, &view, &result._unordered ))) {
+			skg_log(skg_log_critical, "CreateUnorderedAccessView failed!");
+			skg_buffer_destroy(&result);
+			return {};
+		}
+	} 
+	if (use & skg_use_compute_read) {
+		D3D11_SHADER_RESOURCE_VIEW_DESC view = {};
+		view.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		view.Format        = DXGI_FORMAT_UNKNOWN;
+		view.BufferEx.FirstElement = 0;
+		view.BufferEx.NumElements  = size_count;
+
+		if (FAILED(d3d_device->CreateShaderResourceView(result._buffer, &view, &result._resource))) {
+			skg_log(skg_log_critical, "CreateShaderResourceView failed!");
+			skg_buffer_destroy(&result);
+			return {};
+		}
+	} 
 	return result;
 }
 
@@ -924,8 +991,8 @@ void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint3
 
 	D3D11_MAPPED_SUBRESOURCE resource;
 	if (SUCCEEDED(d3d_context->Map(cpu_buff, 0, D3D11_MAP_READ, 0, &resource))) {
-		memcpy(ref_buffer, resource.pData, min(resource.DepthPitch * resource.DepthPitch, buffer_size));
-		d3d_context->Unmap(buffer->_buffer, 0);
+		memcpy(ref_buffer, resource.pData, buffer_size);
+		d3d_context->Unmap(cpu_buff, 0);
 	} else {
 		memset(ref_buffer, 0, buffer_size);
 		skg_log(skg_log_critical, "Failed to get contents of buffer!");
@@ -936,15 +1003,40 @@ void skg_buffer_get_contents(const skg_buffer_t *buffer, void *ref_buffer, uint3
 ///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
-	switch (buffer->type) {
-	case skg_buffer_type_vertex:   d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, &offset); break;
-	case skg_buffer_type_index:    d3d_context->IASetIndexBuffer  (buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
-	case skg_buffer_type_constant: {
-		if (bind.stage_bits & skg_stage_vertex)
-			d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
-		if (bind.stage_bits & skg_stage_pixel)
-			d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
-	} break;
+	if (buffer) {
+		switch (buffer->type) {
+		case skg_buffer_type_vertex:   d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, &offset); break;
+		case skg_buffer_type_index:    d3d_context->IASetIndexBuffer(buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
+		case skg_buffer_type_constant: {
+			if (bind.stage_bits & skg_stage_vertex)
+				d3d_context->VSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
+			if (bind.stage_bits & skg_stage_pixel)
+				d3d_context->PSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
+			if (bind.stage_bits & skg_stage_compute)
+				d3d_context->CSSetConstantBuffers(bind.slot, 1, &buffer->_buffer);
+		} break;
+		case skg_buffer_type_compute: {
+			if (bind.stage_bits & skg_stage_vertex) {
+				if (bind.register_type == skg_register_resource)
+					d3d_context->VSSetShaderResources(bind.slot, 1, &buffer->_resource);
+			}
+			if (bind.stage_bits & skg_stage_pixel) {
+				if (bind.register_type == skg_register_resource)
+					d3d_context->PSSetShaderResources(bind.slot, 1, &buffer->_resource);
+			}
+			if (bind.stage_bits & skg_stage_compute) {
+				if (bind.register_type == skg_register_resource)
+					d3d_context->CSSetShaderResources(bind.slot, 1, &buffer->_resource);
+				else if (bind.register_type == skg_register_readwrite)
+					d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &buffer->_unordered, nullptr);
+			}
+		} break;
+		}
+	} else {
+		if (bind.register_type == skg_register_readwrite) {
+			ID3D11UnorderedAccessView *null_uav = nullptr;
+			d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &null_uav, nullptr);
+		}
 	}
 }
 
@@ -1092,6 +1184,13 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 bool skg_shader_is_valid(const skg_shader_t *shader) {
 	return shader->meta
 		&& (shader->_vertex && shader->_pixel) || shader->_compute;
+}
+
+///////////////////////////////////////////
+
+void skg_shader_compute_bind(const skg_shader_t *shader) {
+	if (shader) d3d_context->CSSetShader(shader->_compute, nullptr, 0);
+	else        d3d_context->CSSetShader(nullptr, nullptr, 0);
 }
 
 ///////////////////////////////////////////
@@ -1634,6 +1733,23 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32
 			return false;
 		}
 	}
+
+	if (tex->use & skg_use_compute_write) {
+		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
+		view.Format = DXGI_FORMAT_UNKNOWN;
+		if (tex->type == skg_tex_type_cubemap || is_array) {
+			view.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
+			view.Texture2DArray.FirstArraySlice = array_start;
+			view.Texture2DArray.ArraySize       = array_size;
+		} else {
+			view.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+		}
+
+		if(FAILED(d3d_device->CreateUnorderedAccessView( tex->_texture, &view, &tex->_unordered ))) {
+			skg_log(skg_log_critical, "CreateUnorderedAccessView failed!");
+			return {};
+		}
+	} 
 	return true;
 }
 
@@ -1678,6 +1794,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
 		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags  = D3D11_RESOURCE_MISC_TEXTURECUBE;
+		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
 		if (data_frames != nullptr && data_frames[0] != nullptr) {
@@ -1807,12 +1924,31 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 			d3d_context->VSSetSamplers       (bind.slot, 1, &texture->_sampler);
 			d3d_context->VSSetShaderResources(bind.slot, 1, &texture->_resource);
 		}
+		if (bind.stage_bits & skg_stage_compute) {
+			if (bind.register_type == skg_register_readwrite) {
+				d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &texture->_unordered, nullptr);
+			} else {
+				d3d_context->CSSetSamplers       (bind.slot, 1, &texture->_sampler);
+				d3d_context->CSSetShaderResources(bind.slot, 1, &texture->_resource);
+			}
+		}
 	} else {
 		if (bind.stage_bits & skg_stage_pixel) {
 			d3d_context->PSSetShaderResources(bind.slot, 0, nullptr);
 		}
 		if (bind.stage_bits & skg_stage_vertex) {
 			d3d_context->VSSetShaderResources(bind.slot, 0, nullptr);
+		}
+		if (bind.stage_bits & skg_stage_compute) {
+			if (bind.register_type == skg_register_readwrite) {
+				ID3D11UnorderedAccessView *null_view = nullptr;
+				d3d_context->CSSetUnorderedAccessViews(bind.slot, 1, &null_view, nullptr);
+			} else {
+				ID3D11SamplerState       *null_state = nullptr;
+				ID3D11ShaderResourceView *null_view  = nullptr;
+				d3d_context->CSSetSamplers       (bind.slot, 1, &null_state);
+				d3d_context->CSSetShaderResources(bind.slot, 1, &null_view);
+			}
 		}
 	}
 }
@@ -2053,8 +2189,12 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_UNIFORM_BUFFER 0x8A11
+#define GL_SHADER_STORAGE_BUFFER 0x90D2
 #define GL_STATIC_DRAW 0x88E4
 #define GL_DYNAMIC_DRAW 0x88E8
+#define GL_READ_ONLY 0x88B8
+#define GL_WRITE_ONLY 0x88B9
+#define GL_READ_WRITE 0x88BA
 #define GL_TRIANGLES 0x0004
 #define GL_VERSION 0x1F02
 #define GL_CULL_FACE 0x0B44
@@ -2177,6 +2317,7 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_VERTEX_SHADER 0x8B31
+#define GL_COMPUTE_SHADER 0x91B9
 #define GL_COMPILE_STATUS 0x8B81
 #define GL_LINK_STATUS 0x8B82
 #define GL_INFO_LOG_LENGTH 0x8B84
@@ -2242,6 +2383,7 @@ GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, u
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
 GLE(void,     glDeleteTextures,          int32_t n, const uint32_t *textures) \
 GLE(void,     glBindTexture,             uint32_t target, uint32_t texture) \
+GLE(void,     glBindImageTexture,        uint32_t unit, uint32_t texture, int32_t level, unsigned char layered, int32_t layer, uint32_t access, uint32_t format) \
 GLE(void,     glTexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
 GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalformat, uint32_t pname, int32_t bufSize, int32_t *params)\
 GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
@@ -2270,6 +2412,7 @@ GLE(void,     glScissor,                 int32_t x, int32_t y, uint32_t width, u
 GLE(void,     glCullFace,                uint32_t mode) \
 GLE(void,     glBlendFunc,               uint32_t sfactor, uint32_t dfactor) \
 GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
+GLE(void,     glDispatchCompute,         uint32_t num_groups_x, uint32_t num_groups_y, uint32_t num_groups_z) \
 GLE(const char *, glGetString,           uint32_t name) \
 GLE(const char *, glGetStringi,          uint32_t name, uint32_t index)
 
@@ -2752,6 +2895,12 @@ void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int3
 
 ///////////////////////////////////////////
 
+void skg_compute(uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z) {
+	glDispatchCompute(thread_count_x, thread_count_y, thread_count_z);
+}
+
+///////////////////////////////////////////
+
 void skg_viewport(const int32_t *xywh) {
 	glViewport(xywh[0], xywh[1], xywh[2], xywh[3]);
 }
@@ -2807,7 +2956,7 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 ///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
-	if (buffer->type == skg_buffer_type_constant)
+	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute)
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
 	else if (buffer->type == skg_buffer_type_vertex) {
 #ifdef _SKG_GL_WEB
@@ -2888,6 +3037,8 @@ void skg_mesh_destroy(skg_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
+// skg_shader_t                          //
+///////////////////////////////////////////
 
 skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_size, skg_stage_ type) {
 	const char *file_chars = (const char *)file_data;
@@ -2903,7 +3054,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	switch (type) {
 	case skg_stage_pixel:   gl_type = GL_FRAGMENT_SHADER; break;
 	case skg_stage_vertex:  gl_type = GL_VERTEX_SHADER;   break;
-	case skg_stage_compute: skg_log(skg_log_critical, "GL compute shaders not implemented yet."); break;
+	case skg_stage_compute: gl_type = GL_COMPUTE_SHADER;  break;
 	}
 
 	// Convert the prefix if it doesn't match the GL version we're using
@@ -2962,19 +3113,19 @@ void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 }
 
 ///////////////////////////////////////////
-// skg_shader_t                          //
-///////////////////////////////////////////
 
 skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader) {
 	skg_shader_t result = {};
-	result.meta    = meta;
-	result._vertex = v_shader._shader;
-	result._pixel  = p_shader._shader;
+	result.meta     = meta;
+	result._vertex  = v_shader._shader;
+	result._pixel   = p_shader._shader;
+	result._compute = c_shader._shader;
 	skg_shader_meta_reference(result.meta);
 
 	result._program = glCreateProgram();
-	if (result._vertex) glAttachShader(result._program, result._vertex);
-	if (result._pixel)  glAttachShader(result._program, result._pixel);
+	if (result._vertex)  glAttachShader(result._program, result._vertex);
+	if (result._pixel)   glAttachShader(result._program, result._pixel);
+	if (result._compute) glAttachShader(result._program, result._compute);
 	glLinkProgram (result._program);
 
 	// check for errors?
@@ -3019,6 +3170,13 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	}
 
 	return result;
+}
+
+
+///////////////////////////////////////////
+
+void skg_shader_compute_bind(const skg_shader_t *shader) {
+	glUseProgram(shader->_program);
 }
 
 ///////////////////////////////////////////
@@ -3408,6 +3566,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result.height      = height;
 	result.array_count = array_count;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
+	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target     = type == skg_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: array_count > 1 
@@ -3446,6 +3605,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result.array_count = 1;
 	result.array_start = array_layer;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
+	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target     = type == skg_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP
 		: GL_TEXTURE_2D_ARRAY;
@@ -3468,9 +3628,15 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	result.use     = use;
 	result.format  = format;
 	result.mips    = mip_maps;
+	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target = type == skg_tex_type_cubemap 
 		? GL_TEXTURE_CUBE_MAP 
 		: GL_TEXTURE_2D;
+
+	if      (use & skg_use_compute_read && use & skg_use_compute_write) result._access = GL_READ_WRITE;
+	else if (use & skg_use_compute_read)                                result._access = GL_READ_ONLY;
+	else if (use & skg_use_compute_write)                               result._access = GL_WRITE_ONLY;
+	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 
 	glGenTextures(1, &result._texture);
 	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, 1);
@@ -3566,7 +3732,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 
 	glBindTexture(tex->_target, tex->_texture);
 
-	uint32_t format = (uint32_t)skg_tex_fmt_to_native   (tex->format);
+	tex->_format    = (uint32_t)skg_tex_fmt_to_native   (tex->format);
 	uint32_t layout =           skg_tex_fmt_to_gl_layout(tex->format);
 	uint32_t type   =           skg_tex_fmt_to_gl_type  (tex->format);
 	if (tex->type == skg_tex_type_cubemap) {
@@ -3575,9 +3741,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 			return;
 		}
 		for (int32_t f = 0; f < 6; f++)
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, format, width, height, 0, layout, type, data_frames[f]);
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, tex->_format, width, height, 0, layout, type, data_frames[f]);
 	} else {
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
+		glTexImage2D(GL_TEXTURE_2D, 0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
 	}
 	if (tex->mips == skg_mip_generate)
 		glGenerateMipmap(tex->_target);
@@ -3647,10 +3813,14 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	// have no idea what's happening here!
 	//if (texture)
 	//	glUniform1i(bind.slot, bind.slot);
-
+	
 	if (texture) {
-		glActiveTexture(GL_TEXTURE0 + bind.slot);
-		glBindTexture  (texture->_target, texture->_texture);
+		if (bind.stage_bits & skg_stage_compute) {
+			glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, skg_tex_fmt_to_native( texture->format ));
+		} else {
+			glActiveTexture(GL_TEXTURE0 + bind.slot);
+			glBindTexture(texture->_target, texture->_texture);
+		}
 	}
 }
 
@@ -3671,6 +3841,7 @@ uint32_t skg_buffer_type_to_gl(skg_buffer_type_ type) {
 	case skg_buffer_type_vertex:   return GL_ARRAY_BUFFER;
 	case skg_buffer_type_index:    return GL_ELEMENT_ARRAY_BUFFER;
 	case skg_buffer_type_constant: return GL_UNIFORM_BUFFER;
+	case skg_buffer_type_compute:  return GL_SHADER_STORAGE_BUFFER;
 	default: return 0;
 	}
 }

@@ -72,7 +72,7 @@ struct file_data_t {
 	void write(const char *item[_Size]) { data.add_range((uint8_t*)&item, sizeof(char)*_Size); }
 	template <typename T> 
 	void write(T &item) { data.add_range((uint8_t*)&item, sizeof(T)); }
-	void write(void *item, size_t size) { data.add_range((uint8_t*)item, size); }
+	void write(void *item, size_t size) { data.add_range((uint8_t*)item, (int32_t)size); }
 };
 
 enum log_level_ {
@@ -550,7 +550,7 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 
 	out_stage->language  = lang;
 	out_stage->stage     = type;
-	out_stage->code_size = spirv_optimized.size() * sizeof(unsigned int);
+	out_stage->code_size = (uint32_t)(spirv_optimized.size() * sizeof(unsigned int));
 	out_stage->code      = malloc(out_stage->code_size);
 	memcpy(out_stage->code, spirv_optimized.data(), out_stage->code_size);
 	
@@ -800,7 +800,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 	}
 
 	sksc_meta_find_defaults(hlsl_text, out_file->meta);
-	out_file->stage_count = stages.count;
+	out_file->stage_count = (uint32_t)stages.count;
 	out_file->stages      = stages.data;
 
 	if (!settings->silent_info) {
@@ -850,7 +850,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 			for (size_t i = 0; i < out_file->meta->texture_count; i++) {
 				skg_shader_texture_t *tex = &out_file->meta->textures[i];
 				if (tex->bind.stage_bits & compile_stages[s]) {
-					sksc_log(log_level_info, "|  s%u : %s\n", tex->bind.slot, tex->name );
+					sksc_log(log_level_info, "|  t%u : %s\n", tex->bind.slot, tex->name );
 				}
 			}
 		}
@@ -1030,7 +1030,7 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 			const char *name_end   = tag_str?tag_str:(value_str?value_str:comment_end);
 			trim_str(&name_start, &name_end);
 			char name[32];
-			int32_t ct = name_end - name_start;
+			int64_t ct = name_end - name_start;
 			memcpy(name, name_start, min(sizeof(name), ct));
 			name[ct] = '\0';
 
@@ -1327,7 +1327,7 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 			
 			strncpy(buffer->vars[m].name, name, sizeof(buffer->vars[m].name));
 			buffer->vars[m].offset     = member_offset;
-			buffer->vars[m].size       = member_size;
+			buffer->vars[m].size       = (uint32_t)member_size;
 			buffer->vars[m].type_count = dimensions > 0
 				? spvc_type_get_array_dimension(mem_type, 0)
 				: 1;
@@ -1352,7 +1352,7 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 		}
 		
 		if (strcmp(buffer->name, "$Global") == 0) {
-			ref_meta->global_buffer_id = id;
+			ref_meta->global_buffer_id = (int32_t)id;
 		}
 	}
 	
@@ -1367,8 +1367,8 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 			id = texture_list.add({});
 		
 		skg_shader_texture_t *tex = &texture_list[id];
-		tex->bind.slot       = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
-		tex->bind.stage_bits = spirv_stage->stage;
+		tex->bind.slot        = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		tex->bind.stage_bits |= spirv_stage->stage;
 		strncpy(tex->name, name, sizeof(tex->name));
 	}
 
@@ -1466,7 +1466,7 @@ void sksc_log_clear() {
 ///////////////////////////////////////////
 
 int32_t sksc_log_count() {
-	return sksc_log_list.count;
+	return (int32_t)sksc_log_list.count;
 }
 
 ///////////////////////////////////////////

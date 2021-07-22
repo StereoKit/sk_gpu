@@ -57,8 +57,7 @@ SKG_API bool                    skg_shader_file_load           (const char *file
 SKG_API skg_shader_stage_t      skg_shader_file_create_stage   (const skg_shader_file_t *file, skg_stage_ stage);
 SKG_API void                    skg_shader_file_destroy        (      skg_shader_file_t *file);
 
-SKG_API skg_bind_t              skg_shader_meta_get_tex_bind   (const skg_shader_meta_t *meta, const char *name);
-SKG_API skg_bind_t              skg_shader_meta_get_buffer_bind(const skg_shader_meta_t *meta, const char *name);
+SKG_API skg_bind_t              skg_shader_meta_get_bind       (const skg_shader_meta_t *meta, const char *name);
 SKG_API int32_t                 skg_shader_meta_get_var_count  (const skg_shader_meta_t *meta);
 SKG_API int32_t                 skg_shader_meta_get_var_index  (const skg_shader_meta_t *meta, const char *name);
 SKG_API int32_t                 skg_shader_meta_get_var_index_h(const skg_shader_meta_t *meta, uint64_t name_hash);

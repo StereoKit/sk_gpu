@@ -480,7 +480,7 @@ bool skg_shader_file_verify(const void *data, size_t size, uint16_t *out_version
 
 bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_t *out_file) {
 	uint16_t file_version = 0;
-	if (!skg_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 1) {
+	if (!skg_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 2) {
 		return false;
 	}
 	
@@ -495,14 +495,14 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skg_shader_meta_reference(out_file->meta);
-	memcpy( out_file->meta->name,          &bytes[at], sizeof(out_file->meta->name         )); at += sizeof(out_file->meta->name);
-	memcpy(&out_file->meta->buffer_count,  &bytes[at], sizeof(out_file->meta->buffer_count )); at += sizeof(out_file->meta->buffer_count);
-	memcpy(&out_file->meta->texture_count, &bytes[at], sizeof(out_file->meta->texture_count)); at += sizeof(out_file->meta->texture_count);
-	out_file->meta->buffers  = (skg_shader_buffer_t *)malloc(sizeof(skg_shader_buffer_t ) * out_file->meta->buffer_count );
-	out_file->meta->textures = (skg_shader_texture_t*)malloc(sizeof(skg_shader_texture_t) * out_file->meta->texture_count);
-	if (out_file->meta->buffers == nullptr || out_file->meta->textures == nullptr) { skg_log(skg_log_critical, "Out of memory"); return false; }
-	memset(out_file->meta->buffers,  0, sizeof(skg_shader_buffer_t ) * out_file->meta->buffer_count);
-	memset(out_file->meta->textures, 0, sizeof(skg_shader_texture_t) * out_file->meta->texture_count);
+	memcpy( out_file->meta->name,            &bytes[at], sizeof(out_file->meta->name          )); at += sizeof(out_file->meta->name);
+	memcpy(&out_file->meta->buffer_count,    &bytes[at], sizeof(out_file->meta->buffer_count  )); at += sizeof(out_file->meta->buffer_count);
+	memcpy(&out_file->meta->resource_count,  &bytes[at], sizeof(out_file->meta->resource_count)); at += sizeof(out_file->meta->resource_count);
+	out_file->meta->buffers   = (skg_shader_buffer_t  *)malloc(sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count  );
+	out_file->meta->resources = (skg_shader_resource_t*)malloc(sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
+	if (out_file->meta->buffers == nullptr || out_file->meta->resources == nullptr) { skg_log(skg_log_critical, "Out of memory"); return false; }
+	memset(out_file->meta->buffers,   0, sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count);
+	memset(out_file->meta->resources, 0, sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buffer = &out_file->meta->buffers[i];
@@ -538,12 +538,12 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 			out_file->meta->global_buffer_id = i;
 	}
 
-	for (uint32_t i = 0; i < out_file->meta->texture_count; i++) {
-		skg_shader_texture_t *tex = &out_file->meta->textures[i];
-		memcpy( tex->name,  &bytes[at], sizeof(tex->name )); at += sizeof(tex->name );
-		memcpy( tex->extra, &bytes[at], sizeof(tex->extra)); at += sizeof(tex->extra);
-		memcpy(&tex->bind,  &bytes[at], sizeof(tex->bind )); at += sizeof(tex->bind );
-		tex->name_hash = skg_hash(tex->name);
+	for (uint32_t i = 0; i < out_file->meta->resource_count; i++) {
+		skg_shader_resource_t *res = &out_file->meta->resources[i];
+		memcpy( res->name,  &bytes[at], sizeof(res->name )); at += sizeof(res->name );
+		memcpy( res->extra, &bytes[at], sizeof(res->extra)); at += sizeof(res->extra);
+		memcpy(&res->bind,  &bytes[at], sizeof(res->bind )); at += sizeof(res->bind );
+		res->name_hash = skg_hash(res->name);
 	}
 
 	for (uint32_t i = 0; i < out_file->stage_count; i++) {
@@ -604,21 +604,15 @@ void skg_shader_file_destroy(skg_shader_file_t *file) {
 // skg_shader_meta_t                     //
 ///////////////////////////////////////////
 
-skg_bind_t skg_shader_meta_get_tex_bind(const skg_shader_meta_t *meta, const char *name) {
-	for (uint32_t i = 0; i < meta->texture_count; i++) {
-		if (strcmp(name, meta->textures[i].name) == 0)
-			return meta->textures[i].bind;
-	}
-	skg_bind_t empty = {};
-	return empty;
-}
-
-///////////////////////////////////////////
-
-skg_bind_t skg_shader_meta_get_buffer_bind(const skg_shader_meta_t *meta, const char *name) {
+skg_bind_t skg_shader_meta_get_bind(const skg_shader_meta_t *meta, const char *name) {
+	uint64_t hash = skg_hash(name);
 	for (uint32_t i = 0; i < meta->buffer_count; i++) {
-		if (strcmp(name, meta->buffers[i].name) == 0)
+		if (meta->buffers[i].name_hash == hash)
 			return meta->buffers[i].bind;
+	}
+	for (uint32_t i = 0; i < meta->resource_count; i++) {
+		if (meta->resources[i].name_hash == hash)
+			return meta->resources[i].bind;
 	}
 	skg_bind_t empty = {};
 	return empty;
@@ -678,7 +672,7 @@ void skg_shader_meta_release(skg_shader_meta_t *meta) {
 			free(meta->buffers[i].defaults);
 		}
 		free(meta->buffers);
-		free(meta->textures);
+		free(meta->resources);
 		*meta = {};
 	}
 }
@@ -731,14 +725,8 @@ skg_shader_t skg_shader_create_memory(const void *sks_data, size_t sks_data_size
 
 ///////////////////////////////////////////
 
-skg_bind_t skg_shader_get_tex_bind(const skg_shader_t *shader, const char *name) {
-	return skg_shader_meta_get_tex_bind(shader->meta, name);
-}
-
-///////////////////////////////////////////
-
-skg_bind_t skg_shader_get_buffer_bind(const skg_shader_t *shader, const char *name) {
-	return skg_shader_meta_get_buffer_bind(shader->meta, name);
+skg_bind_t skg_shader_get_bind(const skg_shader_t *shader, const char *name) {
+	return skg_shader_meta_get_bind(shader->meta, name);
 }
 
 ///////////////////////////////////////////

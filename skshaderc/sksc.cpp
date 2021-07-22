@@ -276,7 +276,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shad
 	buffer_list.data     = out_meta->buffers;
 	buffer_list.capacity = out_meta->buffer_count;
 	buffer_list.count    = out_meta->buffer_count;
-	array_t<skg_shader_texture_t> texture_list = {};
+	array_t<skg_shader_resource_t> texture_list = {};
 	texture_list.data     = out_meta->textures;
 	texture_list.capacity = out_meta->texture_count;
 	texture_list.count    = out_meta->texture_count;
@@ -847,10 +847,10 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 					sksc_log(log_level_info, "|  b%u : %s\n", buff->bind.slot, buff->name);
 				}
 			}
-			for (size_t i = 0; i < out_file->meta->texture_count; i++) {
-				skg_shader_texture_t *tex = &out_file->meta->textures[i];
+			for (size_t i = 0; i < out_file->meta->resource_count; i++) {
+				skg_shader_resource_t *tex = &out_file->meta->resources[i];
 				if (tex->bind.stage_bits & compile_stages[s]) {
-					sksc_log(log_level_info, "|  t%u : %s\n", tex->bind.slot, tex->name );
+					sksc_log(log_level_info, "|  %c%u : %s\n", tex->bind.register_type == skg_register_resource ? 't' : 'u', tex->bind.slot, tex->name);
 				}
 			}
 		}
@@ -881,14 +881,14 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 	file_data_t data = {};
 
 	const char tag[8] = {'S','K','S','H','A','D','E','R'};
-	uint16_t version = 1;
+	uint16_t version = 2;
 	data.write(tag);
 	data.write(version);
 
 	data.write(file->stage_count);
 	data.write(file->meta->name);
 	data.write(file->meta->buffer_count);
-	data.write(file->meta->texture_count);
+	data.write(file->meta->resource_count);
 
 	for (size_t i = 0; i < file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buff = &file->meta->buffers[i];
@@ -915,11 +915,11 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 		}
 	}
 
-	for (uint32_t i = 0; i < file->meta->texture_count; i++) {
-		skg_shader_texture_t *tex = &file->meta->textures[i];
-		data.write(tex->name);
-		data.write(tex->extra);
-		data.write(tex->bind);
+	for (uint32_t i = 0; i < file->meta->resource_count; i++) {
+		skg_shader_resource_t *res = &file->meta->resources[i];
+		data.write(res->name);
+		data.write(res->extra);
+		data.write(res->bind);
 	}
 
 	for (uint32_t i = 0; i < file->stage_count; i++) {
@@ -1107,11 +1107,11 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 					break;
 				}
 			}
-			for (size_t i = 0; i < ref_meta->texture_count; i++) {
-				if (strcmp(ref_meta->textures[i].name, name) == 0) {
+			for (size_t i = 0; i < ref_meta->resource_count; i++) {
+				if (strcmp(ref_meta->resources[i].name, name) == 0) {
 					if (value_str) {
 						found += 1;
-						strncpy(ref_meta->textures[i].extra, value, sizeof(ref_meta->textures[i].extra));
+						strncpy(ref_meta->resources[i].extra, value, sizeof(ref_meta->resources[i].extra));
 					} else {
 						int32_t line, col;
 						sksc_line_col(hlsl_text, value_str, &line, &col);
@@ -1277,10 +1277,10 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 	buffer_list.data      = ref_meta->buffers;
 	buffer_list.capacity  = ref_meta->buffer_count;
 	buffer_list.count     = ref_meta->buffer_count;
-	array_t<skg_shader_texture_t> texture_list = {};
-	texture_list.data     = ref_meta->textures;
-	texture_list.capacity = ref_meta->texture_count;
-	texture_list.count    = ref_meta->texture_count;
+	array_t<skg_shader_resource_t> resource_list = {};
+	resource_list.data     = ref_meta->resources;
+	resource_list.capacity = ref_meta->resource_count;
+	resource_list.count    = ref_meta->resource_count;
 
 	const spvc_reflected_resource *list = nullptr;
 	size_t                         count;
@@ -1308,11 +1308,12 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 		size_t    type_size;
 		spvc_compiler_get_declared_struct_size(compiler, type, &type_size);
 
-		buffer->size            = (uint32_t)type_size;
-		buffer->bind.slot       = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
-		buffer->bind.stage_bits = spirv_stage->stage;
-		buffer->var_count       = count;
-		buffer->vars            = (skg_shader_var_t*)malloc(count * sizeof(skg_shader_var_t));
+		buffer->size               = (uint32_t)type_size;
+		buffer->bind.slot          = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		buffer->bind.stage_bits    = spirv_stage->stage;
+		buffer->bind.register_type = skg_register_constant;
+		buffer->var_count          = count;
+		buffer->vars               = (skg_shader_var_t*)malloc(count * sizeof(skg_shader_var_t));
 		strncpy(buffer->name, list[i].name, sizeof(buffer->name));
 
 		for(int32_t m=0; m<count; m+=1) {
@@ -1356,26 +1357,63 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 		}
 	}
 	
-	// Make sure sampler names stay the same in GLSL
+	// Find textures
 	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
 	for (size_t i = 0; i < count; i++) {
 		const char *name = spvc_compiler_get_name(compiler, list[i].id);
-		int64_t     id   = texture_list.index_where([](auto &tex, void *data) { 
+		int64_t     id   = resource_list.index_where([](auto &tex, void *data) { 
 			return strcmp(tex.name, (char*)data) == 0; 
 		}, (void*)name);
 		if (id == -1)
-			id = texture_list.add({});
+			id = resource_list.add({});
 		
-		skg_shader_texture_t *tex = &texture_list[id];
-		tex->bind.slot        = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
-		tex->bind.stage_bits |= spirv_stage->stage;
+		skg_shader_resource_t *tex = &resource_list[id]; 
+		tex->bind.slot          = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		tex->bind.stage_bits   |= spirv_stage->stage;
+		tex->bind.register_type = skg_register_resource;
 		strncpy(tex->name, name, sizeof(tex->name));
 	}
 
-	ref_meta->buffers       = buffer_list.data;
-	ref_meta->buffer_count  = (uint32_t)buffer_list.count;
-	ref_meta->textures      = texture_list.data;
-	ref_meta->texture_count = (uint32_t)texture_list.count;
+	// Look for RWTexture2D
+	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_STORAGE_IMAGE, &list, &count);
+	for (size_t i = 0; i < count; i++) {
+		const char *name = spvc_compiler_get_name(compiler, list[i].id);
+		int64_t     id   = resource_list.index_where([](auto &tex, void *data) { 
+			return strcmp(tex.name, (char*)data) == 0; 
+			}, (void*)name);
+		if (id == -1)
+			id = resource_list.add({});
+
+		skg_shader_resource_t *tex = &resource_list[id];
+		tex->bind.slot             = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		tex->bind.stage_bits      |= spirv_stage->stage;
+		tex->bind.register_type    = skg_register_readwrite;
+		strncpy(tex->name, name, sizeof(tex->name));
+	}
+
+	// Look for RWStructuredBuffers and StructuredBuffers
+	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_STORAGE_BUFFER, &list, &count);
+	for (size_t i = 0; i < count; i++) {
+		const char *name     = spvc_compiler_get_name             (compiler, list[i].id);
+		bool        readonly = spvc_compiler_has_member_decoration(compiler, list[i].base_type_id, 0, SpvDecorationNonWritable);
+
+		int64_t id = resource_list.index_where([](auto &tex, void *data) { 
+			return strcmp(tex.name, (char*)data) == 0; 
+			}, (void*)name);
+		if (id == -1)
+			id = resource_list.add({});
+
+		skg_shader_resource_t *tex = &resource_list[id];
+		tex->bind.slot          = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		tex->bind.stage_bits   |= spirv_stage->stage;
+		tex->bind.register_type = readonly ? skg_register_resource : skg_register_readwrite;
+		strncpy(tex->name, name, sizeof(tex->name));
+	}
+
+	ref_meta->buffers        = buffer_list.data;
+	ref_meta->buffer_count   = (uint32_t)buffer_list.count;
+	ref_meta->resources      = resource_list.data;
+	ref_meta->resource_count = (uint32_t)resource_list.count;
 
 	// Frees all memory we allocated so far.
 	spvc_context_destroy(context);

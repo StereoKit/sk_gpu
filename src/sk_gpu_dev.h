@@ -261,21 +261,21 @@ typedef struct skg_shader_buffer_t {
 	skg_shader_var_t *vars;
 } skg_shader_buffer_t;
 
-typedef struct skg_shader_texture_t {
+typedef struct skg_shader_resource_t {
 	char       name [32];
 	uint64_t   name_hash;
 	char       extra[64];
 	skg_bind_t bind;
-} skg_shader_texture_t;
+} skg_shader_resource_t;
 
 typedef struct skg_shader_meta_t {
-	char                  name[256];
-	uint32_t              buffer_count;
-	skg_shader_buffer_t  *buffers;
-	uint32_t              texture_count;
-	skg_shader_texture_t *textures;
-	int32_t               references;
-	int32_t               global_buffer_id;
+	char                   name[256];
+	uint32_t               buffer_count;
+	skg_shader_buffer_t   *buffers;
+	uint32_t               resource_count;
+	skg_shader_resource_t *resources;
+	int32_t                references;
+	int32_t                global_buffer_id;
 } skg_shader_meta_t;
 
 ///////////////////////////////////////////
@@ -330,8 +330,7 @@ SKG_API skg_shader_t        skg_shader_create_memory     (const void *sks_memory
 SKG_API skg_shader_t        skg_shader_create_manual     (skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader);
 SKG_API bool                skg_shader_is_valid          (const skg_shader_t *shader);
 SKG_API void                skg_shader_compute_bind      (const skg_shader_t *shader);
-SKG_API skg_bind_t          skg_shader_get_tex_bind      (const skg_shader_t *shader, const char *name);
-SKG_API skg_bind_t          skg_shader_get_buffer_bind   (const skg_shader_t *shader, const char *name);
+SKG_API skg_bind_t          skg_shader_get_bind          (const skg_shader_t *shader, const char *name);
 SKG_API int32_t             skg_shader_get_var_count     (const skg_shader_t *shader);
 SKG_API int32_t             skg_shader_get_var_index     (const skg_shader_t *shader, const char *name);
 SKG_API int32_t             skg_shader_get_var_index_h   (const skg_shader_t *shader, uint64_t name_hash);

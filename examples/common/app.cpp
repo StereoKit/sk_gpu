@@ -305,10 +305,10 @@ bool app_init() {
 	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, cube_face_size, cube_face_size);
 
 	app_sh_cube              = skg_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
-	app_sh_cube_tex_bind     = skg_shader_get_tex_bind   (&app_sh_cube, "tex");
-	app_sh_cube_cubemap_bind = skg_shader_get_tex_bind   (&app_sh_cube, "cubemap");
-	app_sh_cube_inst_bind    = skg_shader_get_buffer_bind(&app_sh_cube, "TransformBuffer");
-	app_sh_cube_data_bind    = skg_shader_get_buffer_bind(&app_sh_cube, "SystemBuffer");
+	app_sh_cube_tex_bind     = skg_shader_get_bind(&app_sh_cube, "tex");
+	app_sh_cube_cubemap_bind = skg_shader_get_bind(&app_sh_cube, "cubemap");
+	app_sh_cube_inst_bind    = skg_shader_get_bind(&app_sh_cube, "TransformBuffer");
+	app_sh_cube_data_bind    = skg_shader_get_bind(&app_sh_cube, "SystemBuffer");
 	app_mat_cube             = skg_pipeline_create(&app_sh_cube);
 	skg_pipeline_set_cull       (&app_mat_cube, skg_cull_front);
 	skg_pipeline_set_depth_write(&app_mat_cube, false);
@@ -320,9 +320,9 @@ bool app_init() {
 	skg_pipeline_set_transparency(&app_mat_transparent, skg_transparency_add);
 	
 	app_sh_default           = skg_shader_create_memory(sks_test_hlsl, sizeof(sks_test_hlsl));
-	app_sh_default_tex_bind  = skg_shader_get_tex_bind   (&app_sh_default, "tex");
-	app_sh_default_inst_bind = skg_shader_get_buffer_bind(&app_sh_default, "TransformBuffer");
-	app_sh_default_data_bind = skg_shader_get_buffer_bind(&app_sh_default, "SystemBuffer");
+	app_sh_default_tex_bind  = skg_shader_get_bind(&app_sh_default, "tex");
+	app_sh_default_inst_bind = skg_shader_get_bind(&app_sh_default, "TransformBuffer");
+	app_sh_default_data_bind = skg_shader_get_bind(&app_sh_default, "SystemBuffer");
 	app_mat_default          = skg_pipeline_create(&app_sh_default);
 	
 	app_shader_data_buffer = skg_buffer_create(&app_shader_data, 1,   sizeof(app_shader_data_t), skg_buffer_type_constant, skg_use_dynamic);
@@ -423,7 +423,7 @@ void app_test_compute_update() {
 		skg_buffer_clear({ 0, skg_stage_compute, skg_register_readwrite });
 		i += 1;
 	}
-	skg_tex_bind(nullptr, { 1, skg_stage_compute, skg_register_readwrite });
+	skg_tex_clear({ 1, skg_stage_compute, skg_register_readwrite });
 
 	static skg_color32_t *data = (skg_color32_t *)malloc(sizeof(skg_color32_t) * c_size * c_size);
 	static int32_t frame = 0;

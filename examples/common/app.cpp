@@ -440,7 +440,7 @@ void app_test_compute_update() {
 		bmp_write(name, c_size, c_size, (uint8_t *)data);
 	}
 
-	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0.0f,.0f,0.1f} }) * HMM_Scale(hmm_vec3{ {5.f,5.f,5.f} }));
+	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,-3,0} }) * HMM_Scale(hmm_vec3{ {9.f,9.f,9.f} }) * HMM_Rotate(90, hmm_vec3{ {1,0,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
 	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
@@ -488,7 +488,7 @@ void app_test_dyn_update(float time) {
 	skg_pipeline_bind(&app_mat_default);
 	skg_tex_bind     (&app_target, app_sh_default_tex_bind);
 	skg_draw         (0, 0, app_mesh_wave.ind_count, 1);
-	skg_tex_bind     (nullptr, app_sh_default_tex_bind);
+	skg_tex_clear    (app_sh_default_tex_bind);
 }
 
 ///////////////////////////////////////////
@@ -656,11 +656,11 @@ void app_render(float t, hmm_mat4 view, hmm_mat4 proj) {
 	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
 
 	app_test_compute_update();
-	//app_test_colors(t);
+	app_test_colors(t);
 	app_test_cubemap();
-	//app_test_dyn_update(t);
-	//app_test_instancing();
-	//app_test_blend();
+	app_test_dyn_update(t);
+	app_test_instancing();
+	app_test_blend();
 }
 
 ///////////////////////////////////////////

@@ -766,11 +766,7 @@ void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *d
 void bmp_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA) {
 #ifndef __EMSCRIPTEN__
 	FILE *fp = NULL;
-#ifdef __ANDROID__
 	fp = fopen(filename, "wb");
-#else
-	fopen_s(&fp, filename, "wb");
-#endif
 	if (fp == NULL) return;
 
 	uint16_t bfType = 0x4D42;                         fwrite(&bfType, sizeof(uint16_t), 1, fp);

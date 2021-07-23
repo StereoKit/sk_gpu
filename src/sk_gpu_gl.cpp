@@ -871,14 +871,6 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 ///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
-	if (buffer == nullptr && bind.stage_bits == skg_stage_compute) {
-		if (bind.register_type == skg_register_constant)
-			glBindBufferBase(GL_UNIFORM_BUFFER, bind.slot, 0);
-		if (bind.register_type == skg_register_readwrite)
-			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bind.slot, 0);
-		return;
-	}
-
 	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute)
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
 	else if (buffer->type == skg_buffer_type_vertex) {
@@ -889,6 +881,17 @@ void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offse
 #endif
 	} else
 		glBindBuffer(buffer->_target, buffer->_buffer);
+}
+
+///////////////////////////////////////////
+
+void skg_buffer_clear(skg_bind_t bind) {
+	if (bind.stage_bits == skg_stage_compute) {
+		if (bind.register_type == skg_register_constant)
+			glBindBufferBase(GL_UNIFORM_BUFFER, bind.slot, 0);
+		if (bind.register_type == skg_register_readwrite)
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bind.slot, 0);
+	}
 }
 
 ///////////////////////////////////////////
@@ -1738,14 +1741,17 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	//if (texture)
 	//	glUniform1i(bind.slot, bind.slot);
 	
-	if (texture) {
-		if (bind.stage_bits & skg_stage_compute) {
-			glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, skg_tex_fmt_to_native( texture->format ));
-		} else {
-			glActiveTexture(GL_TEXTURE0 + bind.slot);
-			glBindTexture(texture->_target, texture->_texture);
-		}
+	if (bind.stage_bits & skg_stage_compute) {
+		glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, skg_tex_fmt_to_native( texture->format ));
+	} else {
+		glActiveTexture(GL_TEXTURE0 + bind.slot);
+		glBindTexture(texture->_target, texture->_texture);
 	}
+}
+
+///////////////////////////////////////////
+
+void skg_tex_clear(skg_bind_t bind) {
 }
 
 ///////////////////////////////////////////

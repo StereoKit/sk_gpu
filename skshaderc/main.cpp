@@ -2,11 +2,20 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <windows.h>
+#include <sys/stat.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#if defined(_WIN32)
+#include <windows.h>
 #include <direct.h>
+#elif defined(__linux__)
+#include <sys/types.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <libgen.h>
+#endif
 
 #define SKG_IMPL
 #include "../sk_gpu.h"
@@ -20,14 +29,20 @@ uint64_t exe_file_time = 0;
 
 ///////////////////////////////////////////
 
-void            get_folder    (char *filename, char *out_dest,  size_t dest_size);
-bool            read_file     (char *filename, char **out_text, size_t *out_size);
-void            write_file    (char *filename, void *file_data, size_t file_size);
-void            write_header  (char *filename, void *file_data, size_t file_size);
-void            iterate_files (char *input_name, sksc_settings_t *settings);
+bool            read_file     (const char *filename, char **out_text, size_t *out_size);
+void            write_file    (const char *filename, void *file_data, size_t file_size);
+void            write_header  (const char *filename, void *file_data, size_t file_size);
+void            compile_file  (const char *filename,   sksc_settings_t *settings);
+void            iterate_dir   (const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file));
 sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
 void            show_usage    ();
-uint64_t        file_time     (char *file);
+uint64_t        file_time     (const char *file);
+void            file_name     (const char *file, char *out_name, size_t name_size);
+void            file_name_ext (const char *file, char *out_name, size_t name_size);
+void            file_dir      (const char *file, char *out_path, size_t path_size);
+bool            file_exists   (const char *path);
+bool            path_is_file  (const char *path);
+bool            path_is_wild  (const char *path);
 
 ///////////////////////////////////////////
 
@@ -40,7 +55,23 @@ int main(int argc, char **argv) {
 
 	sksc_init();
 
-	iterate_files(argv[argc - 1], &settings);
+#if defined(_WIN32)
+	const char *path = argv[argc - 1];
+	if (path_is_file(path) && !path_is_wild(path)) {
+		compile_file(path, &settings);
+	} else {
+		iterate_dir(path, &settings, [](void *callback_data, const char *src_filename, bool file) {
+			if (!file) return;
+			compile_file(src_filename, (sksc_settings_t *)callback_data);
+		});
+	}
+#else
+	for (size_t i = 1; i < argc; i++) {
+		if (file_exists(argv[i])) {
+			compile_file(argv[i], &settings);
+		}
+	}
+#endif
 
 	sksc_shutdown();
 
@@ -68,7 +99,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	result.only_if_changed = true;
 
 	// Get the inlcude folder
-	get_folder(argv[argc-1], result.folder, sizeof(result.folder));
+	file_dir(argv[argc-1], result.folder, sizeof(result.folder));
 
 	bool set_targets = false;
 	for (int32_t i=1; i<argc-1; i++) {
@@ -123,6 +154,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 			}
 			i++;
 		}
+		else if (file_exists(argv[i])) {}
 		else { printf("Unrecognized option '%s'\n", argv[i]); *exit = true; }
 	}
 
@@ -211,79 +243,59 @@ Options:
 
 ///////////////////////////////////////////
 
-void iterate_files(char *input_name, sksc_settings_t *settings) {
-	HANDLE           handle;
-	WIN32_FIND_DATAA file_info;
+void compile_file(const char *src_filename, sksc_settings_t *settings) {
+	char dir     [512];
+	char name    [128];
+	char name_ext[128];
+	file_dir     (src_filename, dir,      sizeof(dir));
+	file_name    (src_filename, name,     sizeof(name));
+	file_name_ext(src_filename, name_ext, sizeof(name_ext));
 
-	int count = 0;
-	char folder[512] = {};
-	get_folder(input_name, folder, sizeof(folder));
-
-	if((handle = FindFirstFileA(input_name, &file_info)) != INVALID_HANDLE_VALUE) {
-		do {
-			char filename[1024];
-			sprintf_s(filename, "%s%s", folder, file_info.cFileName);
-
-			char new_filename[1024];
-			sprintf_s(new_filename, "%s\\%s", settings->out_folder ? settings->out_folder : folder, file_info.cFileName);
-			char drive[16];
-			char dir  [512];
-			char name [128];
-			char ext  [32];
-			_splitpath_s(new_filename,
-				drive, sizeof(drive),
-				dir,   sizeof(dir),
-				name,  sizeof(name), 
-				ext,   sizeof(ext)); 
-
-			if (settings->replace_ext) {
-				sprintf_s(new_filename, "%s%s%s.%s", drive, dir, name, settings->output_header?"h":"sks");
-			} else {
-				sprintf_s(new_filename, "%s.%s", new_filename, settings->output_header?"h":"sks");
-			}
-
-			// Skip this file if it hasn't changed 
-			uint64_t src_file_time      = file_time(filename);
-			uint64_t compiled_file_time = file_time(new_filename);
-			if (settings->only_if_changed && src_file_time < compiled_file_time && exe_file_time < compiled_file_time) {
-				if (!settings->silent_info) {
-					printf("File '%s' is already up-to-date, skipping...\n", filename);
-				}
-				continue;
-			}
-
-			char  *file_text;
-			size_t file_size;
-			if (read_file(filename, &file_text, &file_size)) {
-				skg_shader_file_t file;
-				if (sksc_compile(filename, file_text, settings, &file)) {
-					void  *sks_data;
-					size_t sks_size;
-					sksc_build_file(&file, &sks_data, &sks_size);
-					if (settings->output_header)
-						write_header(new_filename, sks_data, sks_size);
-					else 
-						write_file  (new_filename, sks_data, sks_size);
-					free(sks_data);
-
-					skg_shader_file_destroy(&file);
-				}
-				sksc_log_print(settings);
-				sksc_log_clear();
-				free(file_text);
-			} else {
-				printf("Couldn't read file '%s'!\n", file_info.cFileName);
-			}
-		} while(FindNextFileA(handle, &file_info));
-		FindClose(handle);
+	char        new_filename[1024];
+	const char *dest_folder = settings->out_folder ? settings->out_folder : dir;
+	if (settings->replace_ext) {
+		snprintf(new_filename, sizeof(new_filename), "%s%s.%s", dest_folder, name, settings->output_header?"h":"sks");
 	} else {
-		printf("Couldn't find or read file from '%s'!\n", input_name);
+		snprintf(new_filename, sizeof(new_filename), "%s%s.%s", dest_folder, name_ext, settings->output_header?"h":"sks");
+	}
+
+	// Skip this file if it hasn't changed 
+	uint64_t src_file_time      = file_time(src_filename);
+	uint64_t compiled_file_time = file_time(new_filename);
+	if (settings->only_if_changed && src_file_time < compiled_file_time && exe_file_time < compiled_file_time) {
+		if (!settings->silent_info) {
+			printf("File '%s' is already up-to-date, skipping...\n", src_filename);
+		}
+		return;
+	}
+
+	char  *file_text;
+	size_t file_size;
+	if (read_file(src_filename, &file_text, &file_size)) {
+		skg_shader_file_t file;
+		if (sksc_compile(src_filename, file_text, settings, &file)) {
+			void  *sks_data;
+			size_t sks_size;
+			sksc_build_file(&file, &sks_data, &sks_size);
+			if (settings->output_header)
+				write_header(new_filename, sks_data, sks_size);
+			else 
+				write_file  (new_filename, sks_data, sks_size);
+			free(sks_data);
+
+			skg_shader_file_destroy(&file);
+		}
+		sksc_log_print(settings);
+		sksc_log_clear();
+		free(file_text);
+	} else {
+		printf("Couldn't read file '%s'!\n", src_filename);
 	}
 }
 
 ///////////////////////////////////////////
 
-bool read_file(char *filename, char **out_text, size_t *out_size) {
+bool read_file(const char *filename, char **out_text, size_t *out_size) {
 	*out_text = nullptr;
 	*out_size = 0;
 
@@ -307,17 +319,15 @@ bool read_file(char *filename, char **out_text, size_t *out_size) {
 
 ///////////////////////////////////////////
 
-void write_file(char *filename, void *file_data, size_t file_size) {
+void write_file(const char *filename, void *file_data, size_t file_size) {
 	// Make sure the folder exists
-	char drive[16];
-	char dir  [1024];
-	_splitpath_s(filename,
-		drive, sizeof(drive),
-		dir,   sizeof(dir),
-		nullptr, 0, nullptr, 0); 
-	char folder[1040];
-	snprintf(folder, sizeof(folder), "%s%s", drive, dir);
+	char folder[1024];
+	file_dir(filename, folder, sizeof(folder));
+#if defined(_WIN32)
 	_mkdir(folder);
+#else
+	mkdir(folder, ACCESSPERMS);
+#endif
 
 	// Open and write
 	FILE *fp = fopen(filename, "wb");
@@ -331,14 +341,9 @@ void write_file(char *filename, void *file_data, size_t file_size) {
 
 ///////////////////////////////////////////
 
-void write_header(char *filename, void *file_data, size_t file_size) {
-	char drive[16];
-	char dir  [512];
-	char name [128];
-	_splitpath_s(filename,
-		drive, sizeof(drive),
-		dir,   sizeof(dir),
-		name,  sizeof(name), nullptr, 0);
+void write_header(const char *filename, void *file_data, size_t file_size) {
+	char name[128];
+	file_name(filename, name, sizeof(name));
 
 	// '.' may be common, and will bork the variable name
 	size_t len = strlen(name);
@@ -351,32 +356,20 @@ void write_header(char *filename, void *file_data, size_t file_size) {
 		return;
 	}
 	fprintf(fp, "#pragma once\n\n");
-	fprintf_s(fp, "const unsigned char sks_%s[%zu] = {\n", name, file_size);
+	fprintf(fp, "const unsigned char sks_%s[%zu] = {\n", name, file_size);
 	for (size_t i = 0; i < file_size; i++) {
 		unsigned char byte = ((unsigned char *)file_data)[i];
-		fprintf_s(fp, "%d,\n", byte);
+		fprintf(fp, "%d,\n", byte);
 	}
-	fprintf_s(fp, "};\n");
+	fprintf(fp, "};\n");
 	fflush(fp);
 	fclose(fp);
 }
 
 ///////////////////////////////////////////
 
-void get_folder(char *filename, char *out_dest, size_t dest_size) {
-	char drive[16];
-	char dir  [512];
-	_splitpath_s(filename,
-		drive, sizeof(drive),
-		dir,   sizeof(dir),
-		nullptr, 0, nullptr, 0); 
-
-	sprintf_s(out_dest, dest_size, "%s%s", drive, dir);
-}
-
-///////////////////////////////////////////
-
-uint64_t file_time(char *file) {
+uint64_t file_time(const char *file) {
+#if defined(_WIN32)
 	HANDLE   handle = CreateFileA(file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	FILETIME write_time;
 
@@ -384,4 +377,151 @@ uint64_t file_time(char *file) {
 		return 0;
 	CloseHandle(handle);
 	return (static_cast<uint64_t>(write_time.dwHighDateTime) << 32) | write_time.dwLowDateTime;
+#elif defined(__linux__)
+	struct stat result;
+	if(stat(file, &result)==0)
+		return result.st_mtime;
+	return 0;
+#endif
+}
+
+///////////////////////////////////////////
+
+void file_name(const char *file, char *out_name, size_t name_size) {
+	size_t      len   = strlen(file);
+	const char *start = file + len;
+	const char *end   = file + len;
+
+	while (*start != '\\' && *start != '/' && start != file) start--;
+	if    (*start == '\\' || *start == '/') start++;
+
+	while (*end != '.' && end != start) end--;
+	if    (end == start) end = file + len;
+
+	for (int32_t i=0; start+i != end && i<name_size; i++) {
+		out_name[i] = start[i];
+	}
+	size_t last = end - start;
+	if (last > name_size) last = name_size;
+	out_name[last] = '\0';
+}
+
+///////////////////////////////////////////
+
+void file_name_ext(const char *file, char *out_name, size_t name_size) {
+	size_t      len   = strlen(file);
+	const char *start = file + len;
+	const char *end   = file + len;
+
+	while (*start != '\\' && *start != '/' && start != file) start--;
+	if    (*start == '\\' || *start == '/') start++;
+
+	for (int32_t i=0; start+i != end && i<name_size; i++) {
+		out_name[i] = start[i];
+	}
+	size_t last = end - start;
+	if (last > name_size) last = name_size;
+	out_name[last] = '\0';
+}
+
+///////////////////////////////////////////
+
+void file_dir(const char *file, char *out_path, size_t path_size) {
+	size_t      len   = strlen(file);
+	const char *end = file + len;
+
+	while (*end != '\\' && *end != '/' && end != file) end--;
+
+	for (int32_t i=0; file+i <= end && i<path_size; i++) {
+		out_path[i] = file[i];
+	}
+	size_t last = (end - file)+1;
+	if (last > path_size) last = path_size;
+	out_path[last] = '\0';
+}
+
+///////////////////////////////////////////
+
+bool file_exists(const char *path) {
+	struct stat buffer;
+	return (stat(path, &buffer) == 0);
+}
+
+///////////////////////////////////////////
+
+bool path_is_file(const char *path) {
+	size_t      len = strlen(path);
+	const char *end = path + len;
+
+	while (*end != '\\' && *end != '/' && end != path) {
+		if (*end == '.') return true;
+		end--;
+	}
+	return false;
+}
+
+///////////////////////////////////////////
+
+bool path_is_wild(const char *path) {
+	size_t      len = strlen(path);
+	const char *end = path + len;
+
+	while (*end != '\\' && *end != '/' && end != path) {
+		if (*end == '*') return true;
+		end--;
+	}
+	return false;
+}
+
+///////////////////////////////////////////
+
+void iterate_dir(const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file)) {
+#if defined(_WIN32)
+	if (strcmp(directory_path, "") == 0) {
+		char drive_names[256];
+		GetLogicalDriveStrings(sizeof(drive_names), drive_names);
+		char *curr = drive_names;
+		while (*curr != '\0') {
+			on_item(callback_data, curr, false);
+			curr = curr + strlen(curr)+1;
+		}
+		return;
+	}
+
+	WIN32_FIND_DATA info;
+	HANDLE          handle = nullptr;
+
+	char directory[1024];
+	file_dir(directory_path, directory, sizeof(directory));
+
+	char   filter[1024];
+	size_t path_len = strlen(directory_path);
+	if (path_is_wild(directory_path)) {
+		snprintf(filter, sizeof(filter), "%s", directory_path);
+	} else if (directory_path[path_len] == '\\' || directory_path[path_len] == '/') {
+		snprintf(filter, sizeof(filter), "%s*.*", directory_path);
+	} else {
+		snprintf(filter, sizeof(filter), "%s/*.*", directory_path);
+	}
+
+	handle = FindFirstFile(filter, &info);
+	if (handle == INVALID_HANDLE_VALUE) return;
+
+	while (handle) {
+		if (strcmp(info.cFileName, ".") != 0 && strcmp(info.cFileName, "..") != 0) {
+			char file[1024];
+			snprintf(file, sizeof(file), "%s%s", directory, info.cFileName);
+
+			if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				on_item(callback_data, file, false);
+			else
+				on_item(callback_data, file, true);
+		}
+
+		if (!FindNextFile(handle, &info)) {
+			FindClose(handle);
+			handle = nullptr;
+		}
+	}
+#endif
 }

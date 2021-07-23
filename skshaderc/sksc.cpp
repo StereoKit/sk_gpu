@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 ///////////////////////////////////////////
 
@@ -59,8 +60,8 @@ template <typename T> struct array_t {
 	void        free       ()                        { ::free(data); *this = {}; }
 	void        resize     (size_t to_capacity)      { if (count > to_capacity) count = to_capacity; void *old = data; void *new_mem = malloc(sizeof(T) * to_capacity); memcpy(new_mem, old, sizeof(T) * count); data = (T*)new_mem; ::free(old); capacity = to_capacity; }
 	int64_t     index_of   (const T &item) const     { for (size_t i = 0; i < count; i++) if (memcmp(data[i], item, sizeof(T)) == 0) return i; return -1; }
-	template <typename T, typename D>
-	int64_t     index_where(const D T::*key, const D &item) const { const size_t offset = (size_t)&((T*)0->*key); for (size_t i = 0; i < count; i++) if (memcmp(((uint8_t *)&data[i]) + offset, &item, sizeof(D)) == 0) return i; return -1; }
+	template <typename _T, typename D>
+	int64_t     index_where(const D _T::*key, const D &item) const { const size_t offset = (size_t)&((_T*)0->*key); for (size_t i = 0; i < count; i++) if (memcmp(((uint8_t *)&data[i]) + offset, &item, sizeof(D)) == 0) return i; return -1; }
 	int64_t     index_where(bool (*c)(const T &item, void *user_data), void *user_data) const { for (size_t i=0; i<count; i++) if (c(data[i], user_data)) return i; return -1;}
 	int64_t     index_where(bool (*c)(const T &item)) const                                   { for (size_t i=0; i<count; i++) if (c(data[i]))            return i; return -1;}
 };
@@ -458,8 +459,8 @@ void sksc_shutdown() {
 ///////////////////////////////////////////
 #include "glslang/Include/ShHandle.h"
 typedef struct glslang_shader_s {
-    glslang::TShader* shader;
-    std::string preprocessedGLSL;
+	glslang::TShader* shader;
+	std::string preprocessedGLSL;
 } glslang_shader_t;
 
 compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
@@ -470,7 +471,7 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 	input.client                  = GLSLANG_CLIENT_VULKAN;
 	input.client_version          = GLSLANG_TARGET_VULKAN_1_0,
 	input.target_language         = GLSLANG_TARGET_SPV;
-    input.target_language_version = GLSLANG_TARGET_SPV_1_0;
+	input.target_language_version = GLSLANG_TARGET_SPV_1_0;
 	input.default_version         = 100;
 	input.default_profile         = GLSLANG_NO_PROFILE;
 	input.messages                = GLSLANG_MSG_DEFAULT_BIT;
@@ -485,30 +486,30 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 	glslang_shader_t *shader = glslang_shader_create(&input);
 	shader->shader->setEntryPoint(entry);
 	
-    if (!glslang_shader_preprocess(shader, &input)) {
+	if (!glslang_shader_preprocess(shader, &input)) {
 		sksc_log(log_level_err, glslang_shader_get_info_log(shader));
 		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
 		glslang_shader_delete (shader);
 		return compile_result_fail;
-    }
+	}
 
-    if (!glslang_shader_parse(shader, &input)) {
-        sksc_log(log_level_err, glslang_shader_get_info_log(shader));
+	if (!glslang_shader_parse(shader, &input)) {
+		sksc_log(log_level_err, glslang_shader_get_info_log(shader));
 		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
 		glslang_shader_delete (shader);
 		return compile_result_fail;
-    }
+	}
 
-    glslang_program_t* program = glslang_program_create();
-    glslang_program_add_shader(program, shader);
+	glslang_program_t* program = glslang_program_create();
+	glslang_program_add_shader(program, shader);
 
-    if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT | GLSLANG_MSG_DEBUG_INFO_BIT)) {
-        sksc_log(log_level_err, glslang_shader_get_info_log(shader));
+	if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT | GLSLANG_MSG_DEBUG_INFO_BIT)) {
+		sksc_log(log_level_err, glslang_shader_get_info_log(shader));
 		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
 		glslang_shader_delete (shader);
 		glslang_program_delete(program);
 		return compile_result_fail;
-    }
+	}
 
 	// Check if we found an entry point
 	const char *link_info = glslang_program_get_info_log(program);
@@ -520,11 +521,11 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 		}
 	}
 	
-    glslang_program_SPIRV_generate(program, input.stage);
+	glslang_program_SPIRV_generate(program, input.stage);
 
-    if (glslang_program_SPIRV_get_messages(program)) {
-        sksc_log(log_level_info, glslang_program_SPIRV_get_messages(program));
-    }
+	if (glslang_program_SPIRV_get_messages(program)) {
+		sksc_log(log_level_info, glslang_program_SPIRV_get_messages(program));
+	}
 
 	// Get the generated SPIRV code, and wrap up glslang's responsibilities
 	size_t spirv_size = glslang_program_SPIRV_get_size(program) * sizeof(unsigned int);
@@ -763,9 +764,15 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		}
 #else
 		if (settings->target_langs[skg_shader_lang_hlsl]) {
-			sksc_log(log_level_err, "HLSL shader compiler not available in this build! Please don't include HLSL as a build target.\n");
-			sksc_log(log_level_info, "|_/__/__/__/__/__\n\n");
-			return false;
+			skg_shader_file_stage_t hlsl_stage = {};
+			hlsl_stage.language  = skg_shader_lang_hlsl;
+			hlsl_stage.stage     = compile_stages[i];
+			hlsl_stage.code_size = strlen(hlsl_text) + 1;
+			hlsl_stage.code      = malloc(hlsl_stage.code_size);
+			memcpy(hlsl_stage.code, hlsl_text, hlsl_stage.code_size);
+			stages.add(hlsl_stage);
+
+			sksc_log(log_level_warn, "HLSL shader compiler not available in this build! Shaders on windows may load slowly.\n");
 		}
 #endif
 
@@ -936,6 +943,9 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 
 ///////////////////////////////////////////
 
+int64_t mini(int64_t a, int64_t b) {return a<b?a:b;}
+int64_t maxi(int64_t a, int64_t b) {return a>b?a:b;}
+
 void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta) {
 	// Searches for metadata in comments that look like this:
 	//--name                 = unlit/test
@@ -1031,7 +1041,7 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 			trim_str(&name_start, &name_end);
 			char name[32];
 			int64_t ct = name_end - name_start;
-			memcpy(name, name_start, min(sizeof(name), ct));
+			memcpy(name, name_start, mini(sizeof(name), ct));
 			name[ct] = '\0';
 
 			char tag[64]; tag[0] = '\0';
@@ -1039,8 +1049,8 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 				const char *tag_start = tag_str + 1;
 				const char *tag_end   = value_str ? value_str : comment_end;
 				trim_str(&tag_start, &tag_end);
-				ct = max(0, tag_end - tag_start);
-				memcpy(tag, tag_start, min(sizeof(tag), ct));
+				ct = maxi(0, tag_end - tag_start);
+				memcpy(tag, tag_start, mini(sizeof(tag), ct));
 				tag[ct] = '\0';
 			}
 
@@ -1049,8 +1059,8 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 				const char *value_start = value_str + 1;
 				const char *value_end   = comment_end;
 				trim_str(&value_start, &value_end);
-				ct = max(0, value_end - value_start);
-				memcpy(value, value_start, min(sizeof(value), ct));
+				ct = maxi(0, value_end - value_start);
+				memcpy(value, value_start, mini(sizeof(value), ct));
 				value[ct] = '\0';
 			}
 
@@ -1083,8 +1093,8 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 							char *end   = strchr(start, ',');
 							char  item[64];
 							for (size_t c = 0; c <= commas; c++) {
-								int32_t length = (int32_t)(end == nullptr ? min(sizeof(item)-1, strlen(value)) : end - start);
-								memcpy(item, start, min(sizeof(item), length));
+								int32_t length = (int32_t)(end == nullptr ? mini(sizeof(item)-1, strlen(value)) : end - start);
+								memcpy(item, start, mini(sizeof(item), length));
 								item[length] = '\0';
 
 								double d = atof(item);
@@ -1455,9 +1465,12 @@ void sksc_log(log_level_ level, const char *text, ...) {
 
 	va_list args;
 	va_start(args, text);
+	va_list copy;
+	va_copy(copy, args);
 	size_t length = vsnprintf(nullptr, 0, text, args);
 	item.text = (char*)malloc(length + 2);
-	vsnprintf((char*)item.text, length + 2, text, args);
+	vsnprintf((char*)item.text, length + 2, text, copy);
+	va_end(copy);
 	va_end(args);
 
 	sksc_log_list.add(item);
@@ -1473,9 +1486,12 @@ void sksc_log_at(log_level_ level, int32_t line, int32_t column, const char *tex
 
 	va_list args;
 	va_start(args, text);
+	va_list copy;
+	va_copy(copy, args);
 	size_t length = vsnprintf(nullptr, 0, text, args);
 	item.text = (char*)malloc(length + 2);
-	vsnprintf((char*)item.text, length + 2, text, args);
+	vsnprintf((char*)item.text, length + 2, text, copy);
+	va_end(copy);
 	va_end(args);
 
 	sksc_log_list.add(item);
@@ -1489,7 +1505,7 @@ void sksc_log_print(const sksc_settings_t *settings) {
 			(sksc_log_list[i].level == log_level_warn && !settings->silent_warn) ||
 			(sksc_log_list[i].level == log_level_err  && !settings->silent_err )) {
 
-			printf(sksc_log_list[i].text);
+			printf("%s", sksc_log_list[i].text);
 		}
 	}
 }

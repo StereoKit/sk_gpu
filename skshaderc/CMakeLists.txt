@@ -75,6 +75,12 @@ CPMAddPackage(
     "SKIP_GLSLANG_INSTALL ON"
 )
 
+if (UNIX)
+    set(LINUX_LIBS
+        GL
+        GLEW)
+endif()
+
 add_executable(skshaderc
     main.cpp
     sksc.cpp
@@ -87,6 +93,7 @@ target_link_libraries(skshaderc
     SPIRV-Tools-opt
     glslang
     SPIRV
+    ${LINUX_LIBS}
 )
 
 set(SKSHADERC_EXE_PATH $<TARGET_FILE:skshaderc> PARENT_SCOPE)

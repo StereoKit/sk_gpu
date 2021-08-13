@@ -2,7 +2,6 @@
 #if defined(_WIN32)
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
-#define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #elif defined(__linux__)
 #include <X11/Xlib.h>
@@ -213,7 +212,7 @@ int main_step(double t, void *) {
 		HMM_Vec3(0, 1, 0));
 	hmm_mat4 proj = HMM_Perspective(90, app_swapchain.width / (float)app_swapchain.height, 0.01f, 1000);
 
-	app_render(t, view, proj);
+	app_render((float)t, view, proj);
 
 	skg_swapchain_present(&app_swapchain);
 	return 1;

@@ -772,9 +772,11 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	ID3D11Texture2D *back_buffer;
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	result._target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, result.width, result.height, 1);
-	result._depth  = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
-	skg_tex_set_contents(&result._depth, nullptr, result.width, result.height);
-	skg_tex_attach_depth(&result._target, &result._depth);
+	if (depth_format != skg_tex_fmt_none) {
+		result._depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
+		skg_tex_set_contents(&result._depth, nullptr, result.width, result.height);
+		skg_tex_attach_depth(&result._target, &result._depth);
+	}
 	back_buffer->Release();
 
 	dxgi_factory->Release();
@@ -802,9 +804,11 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	ID3D11Texture2D *back_buffer;
 	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	swapchain->_target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, width, height, 1);
-	swapchain->_depth  = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_fmt, skg_mip_none);
-	skg_tex_set_contents(&swapchain->_depth, nullptr, width, height);
-	skg_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
+	if (depth_fmt != skg_tex_fmt_none) {
+		swapchain->_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_fmt, skg_mip_none);
+		skg_tex_set_contents(&swapchain->_depth, nullptr, width, height);
+		skg_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
+	}
 	back_buffer->Release();
 }
 

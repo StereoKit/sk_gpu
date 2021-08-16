@@ -37,9 +37,14 @@ Display *x_dpy;
 
 void           *app_hwnd      = nullptr;
 skg_swapchain_t app_swapchain = {};
+skg_tex_t       app_screen       = {};
+skg_tex_t       app_screen_depth = {};
 bool            app_resize    = false;
-int             app_width     = 1280;
-int             app_height    = 720;
+int             app_width     = 0;
+int             app_height    = 0;
+int             app_resize_width  = 1280;
+int             app_resize_height = 720;
+const int       app_multisample = 8;
 bool            app_run       = true;
 bool            app_stereo    = false;
 const char     *app_name      = "sk_gpu.h";
@@ -79,6 +84,26 @@ int main() {
 
 ///////////////////////////////////////////
 
+void resize_swapchain(int width, int height) {
+	if (width == app_width && height == app_height)
+		return;
+	
+	app_width  = width;
+	app_height = height;
+
+	skg_tex_destroy(&app_screen);
+	skg_tex_destroy(&app_screen_depth);
+
+	skg_swapchain_resize(&app_swapchain, app_width, app_height);
+	app_screen       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
+	app_screen_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depthstencil,  skg_mip_none);
+	skg_tex_set_contents_arr(&app_screen,       nullptr, 1, app_width, app_height, app_multisample);
+	skg_tex_set_contents_arr(&app_screen_depth, nullptr, 1, app_width, app_height, app_multisample);
+	skg_tex_attach_depth    (&app_screen, &app_screen_depth);
+}
+
+///////////////////////////////////////////
+
 bool main_init() {
 #if defined(_WIN32)
 	WNDCLASS wc = {}; 
@@ -86,11 +111,11 @@ bool main_init() {
 		switch(message) {
 		case WM_CLOSE: app_run = false; PostQuitMessage(0); break;
 		case WM_SIZE: {
-			app_width  = (UINT)LOWORD(lParam);
-			app_height = (UINT)HIWORD(lParam);
+			app_resize_width  = (UINT)LOWORD(lParam);
+			app_resize_height = (UINT)HIWORD(lParam);
 			if (app_resize || wParam == SIZE_MAXIMIZED) {
 				app_resize = false;
-				skg_swapchain_resize(&app_swapchain, app_width, app_height);
+				resize_swapchain(app_resize_width, app_resize_height);
 			}
 		} return DefWindowProc(hWnd, message, wParam, lParam);
 		case WM_SYSCOMMAND: {
@@ -98,7 +123,7 @@ bool main_init() {
 				app_resize = true;
 		} return DefWindowProc(hWnd, message, wParam, lParam); 
 		case WM_EXITSIZEMOVE: {
-			skg_swapchain_resize(&app_swapchain, app_width, app_height);
+			resize_swapchain(app_resize_width, app_resize_height);
 		} return DefWindowProc(hWnd, message, wParam, lParam);
 		default: return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -111,15 +136,15 @@ bool main_init() {
 	app_hwnd = CreateWindow(
 		wc.lpszClassName, app_name, 
 		WS_OVERLAPPEDWINDOW | WS_VISIBLE, 
-		0, 0, app_width, app_height, 
+		0, 0, app_resize_width, app_resize_height, 
 		nullptr, nullptr, wc.hInstance, nullptr);
 
 	if( !app_hwnd ) return false;
 
 	RECT bounds;
 	GetClientRect((HWND)app_hwnd, &bounds);
-	app_width  = bounds.right  - bounds.left;
-	app_height = bounds.bottom - bounds.top;
+	app_resize_width  = bounds.right  - bounds.left;
+	app_resize_height = bounds.bottom - bounds.top;
 #elif defined(__linux__)
 	x_dpy = XOpenDisplay(0);
 	if (x_dpy == nullptr) return false;
@@ -166,10 +191,13 @@ bool main_init() {
 	app_hwnd = (void *)x_win;
 #endif
 
-	skg_callback_log([](skg_log_ level, const char *text) { printf("[%d] %s\n", level, text); });
+	skg_callback_log([](skg_log_ level, const char *text) { 
+		printf("[%d] %s\n", level, text);
+	});
 	if (!skg_init(app_name, nullptr)) 
 		return false;
-	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, app_width, app_height);
+	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_none, app_resize_width, app_resize_height);
+	resize_swapchain(app_resize_width, app_resize_height);
 
 	return app_init();
 }
@@ -189,7 +217,7 @@ int main_step(double t, void *) {
 
 #if defined(_WIN32)
 	MSG msg = {};
-	if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
+	while (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
@@ -203,7 +231,7 @@ int main_step(double t, void *) {
 
 	skg_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skg_swapchain_bind(&app_swapchain);
+	skg_tex_target_bind(&app_screen);
 	skg_target_clear(true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(
@@ -214,6 +242,7 @@ int main_step(double t, void *) {
 
 	app_render((float)t, view, proj);
 
+	skg_tex_copy_to_swapchain(&app_screen, &app_swapchain);
 	skg_swapchain_present(&app_swapchain);
 	return 1;
 }

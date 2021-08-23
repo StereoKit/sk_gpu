@@ -149,7 +149,7 @@ bool main_init() {
 	x_dpy = XOpenDisplay(0);
 	if (x_dpy == nullptr) return false;
 
-	GLint                   fb_att[] = {
+	GLint fb_att[] = {
 		GLX_DOUBLEBUFFER,  true,
 		GLX_RED_SIZE,      8,
 		GLX_GREEN_SIZE,    8,
@@ -162,16 +162,16 @@ bool main_init() {
 		None
 	};
 
-	Window       x_root = DefaultRootWindow(x_dpy);
+	Window       x_root         = DefaultRootWindow(x_dpy);
 	int          fbConfigNumber = 0;
-	GLXFBConfig *x_fb_config = glXChooseFBConfig       (x_dpy, 0, fb_att, &fbConfigNumber);
-	XVisualInfo *x_vi        = glXGetVisualFromFBConfig(x_dpy, *x_fb_config);
+	GLXFBConfig *x_fb_config    = glXChooseFBConfig       (x_dpy, 0, fb_att, &fbConfigNumber);
+	XVisualInfo *x_vi           = glXGetVisualFromFBConfig(x_dpy, *x_fb_config);
 	if (x_vi == nullptr) return false;
 
-	Colormap x_cmap = XCreateColormap(x_dpy, x_root, x_vi->visual, AllocNone);
-	XSetWindowAttributes x_swa = {};
-	x_swa.colormap   = x_cmap;
-	x_swa.event_mask = ExposureMask | KeyPressMask;
+	Colormap             x_cmap = XCreateColormap(x_dpy, x_root, x_vi->visual, AllocNone);
+	XSetWindowAttributes x_swa  = {};
+	x_swa.colormap              = x_cmap;
+	x_swa.event_mask            = ExposureMask | KeyPressMask;
 
 	Window x_win = XCreateWindow(x_dpy, x_root, 0, 0, 1280, 720, 0, x_vi->depth, InputOutput, x_vi->visual, CWColormap | CWEventMask, &x_swa);
 

@@ -296,7 +296,7 @@ bool app_init() {
 			cube_cols[f][p] = col;
 		}
 	}
-	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, cube_face_size, cube_face_size);
+	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, cube_face_size, cube_face_size, 1);
 
 	app_sh_cube              = skg_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
 	app_sh_cube_tex_bind     = skg_shader_get_tex_bind   (&app_sh_cube, "tex");

@@ -36,6 +36,7 @@ typedef struct skg_pipeline_t {
 	bool              depth_write;
 	bool              scissor;
 	skg_depth_test_   depth_test;
+	skg_shader_meta_t*meta;
 	skg_shader_t      _shader;
 } skg_pipeline_t;
 

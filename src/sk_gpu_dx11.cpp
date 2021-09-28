@@ -605,6 +605,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.wireframe    = false;
 	result.depth_write  = true;
 	result.depth_test   = skg_depth_test_less;
+	result.meta         = shader->meta;
 	result._vertex      = shader->_vertex;
 	result._pixel       = shader->_pixel;
 	result._layout      = shader->_layout;

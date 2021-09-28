@@ -1051,6 +1051,15 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 		for (size_t i = 0; i < meta->buffer_count; i++) {
 			char t_name[64];
 			snprintf(t_name, 64, "type_%s", meta->buffers[i].name);
+			// $Globals is a near universal buffer name, we need to scrape the
+			// '$' character out.
+			char *pr = t_name, *pw = t_name;
+			while (*pr) {
+				*pw = *pr++;
+				pw += (*pw != '$');
+			}
+			*pw = '\0';
+
 			uint32_t slot = glGetUniformBlockIndex(result._program, t_name);
 			glUniformBlockBinding(result._program, slot, slot);
 
@@ -1100,6 +1109,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.wireframe    = false;
 	result.depth_test   = skg_depth_test_less;
 	result.depth_write  = true;
+	result.meta         = shader->meta;
 	result._shader      = *shader;
 	skg_shader_meta_reference(result._shader.meta);
 

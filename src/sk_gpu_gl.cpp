@@ -221,6 +221,7 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_UNSIGNED_SHORT 0x1403
 #define GL_INT 0x1404
 #define GL_UNSIGNED_INT 0x1405
+#define GL_UNSIGNED_INT_24_8 0x84FA;
 #define GL_FLOAT 0x1406
 #define GL_DOUBLE 0x140A
 #define GL_UNSIGNED_INT_8_8_8_8 0x8035
@@ -1825,7 +1826,7 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba128:       return GL_FLOAT;
 	case skg_tex_fmt_depth16:       return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_depth32:       return GL_FLOAT;
-	case skg_tex_fmt_depthstencil:  return GL_DEPTH24_STENCIL8;
+	case skg_tex_fmt_depthstencil:  return GL_UNSIGNED_INT_24_8;
 	case skg_tex_fmt_r8:            return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_r16:           return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_r32:           return GL_FLOAT;

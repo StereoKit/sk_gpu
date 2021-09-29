@@ -316,6 +316,8 @@ typedef struct skg_tex_t {
 	int32_t                   width;
 	int32_t                   height;
 	int32_t                   array_count;
+	int32_t                   array_start;
+	int32_t                   multisample;
 	skg_use_                  use;
 	skg_tex_type_             type;
 	skg_tex_fmt_              format;
@@ -382,6 +384,7 @@ typedef struct skg_pipeline_t {
 	bool              depth_write;
 	bool              scissor;
 	skg_depth_test_   depth_test;
+	skg_shader_meta_t*meta;
 	skg_shader_t      _shader;
 } skg_pipeline_t;
 
@@ -390,6 +393,7 @@ typedef struct skg_tex_t {
 	int32_t       height;
 	int32_t       array_count;
 	int32_t       array_start;
+	int32_t       multisample;
 	skg_use_      use;
 	skg_tex_type_ type;
 	skg_tex_fmt_  format;
@@ -510,10 +514,12 @@ SKG_API skg_tex_t           skg_tex_create_from_existing (void *native_tex, skg_
 SKG_API skg_tex_t           skg_tex_create_from_layer    (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_layer);
 SKG_API skg_tex_t           skg_tex_create               (skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, skg_mip_ mip_maps);
 SKG_API bool                skg_tex_is_valid             (const skg_tex_t *tex);
+SKG_API void                skg_tex_copy_to              (const skg_tex_t *tex, skg_tex_t *destination);
+SKG_API void                skg_tex_copy_to_swapchain    (const skg_tex_t *tex, skg_swapchain_t *destination);
 SKG_API void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
 SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
 SKG_API void                skg_tex_set_contents         (      skg_tex_t *tex, const void *data, int32_t width, int32_t height);
-SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height);
+SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample);
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target);
@@ -625,7 +631,7 @@ skg_tex_t               *d3d_active_rendertarget = nullptr;
 
 ///////////////////////////////////////////
 
-bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32_t array_start, uint32_t array_size, bool use_in_shader);
+bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -694,10 +700,8 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 		d3d_info = nullptr;
 		if (SUCCEEDED(d3d_debug->QueryInterface(__uuidof(ID3D11InfoQueue), (void**)&d3d_info))) {
 			D3D11_MESSAGE_ID hide[] = {
-				D3D11_MESSAGE_ID_SETPRIVATEDATA_CHANGINGPARAMS, 
+				D3D11_MESSAGE_ID_SETPRIVATEDATA_CHANGINGPARAMS,
 				(D3D11_MESSAGE_ID)351,
-				(D3D11_MESSAGE_ID)49, // TODO: Figure out the Flip model for backbuffers!
-									  // Add more message IDs here as needed
 			};
 
 			D3D11_INFO_QUEUE_FILTER filter = {};
@@ -714,6 +718,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	desc_rasterizer.CullMode = D3D11_CULL_BACK;
 	desc_rasterizer.FrontCounterClockwise = true;
 	desc_rasterizer.DepthClipEnable       = true;
+	desc_rasterizer.MultisampleEnable     = true;
 	d3d_device->CreateRasterizerState(&desc_rasterizer, &d3d_rasterstate);
 	
 	D3D11_DEPTH_STENCIL_DESC desc_depthstate = {};
@@ -1072,6 +1077,13 @@ void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 ///////////////////////////////////////////
 
 skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader) {
+	if (v_shader._shader == nullptr && p_shader._shader == nullptr && c_shader._shader == nullptr) {
+		char text[290];
+		snprintf(text, sizeof(text), "Shader '%s' has no valid stages!", meta->name);
+		skg_log(skg_log_warning, text);
+		return {};
+	}
+
 	skg_shader_t result = {};
 	result.meta    = meta;
 	if (v_shader._shader) result._vertex  = (ID3D11VertexShader *)v_shader._shader;
@@ -1202,6 +1214,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.wireframe    = false;
 	result.depth_write  = true;
 	result.depth_test   = skg_depth_test_less;
+	result.meta         = shader->meta;
 	result._vertex      = shader->_vertex;
 	result._pixel       = shader->_pixel;
 	result._layout      = shader->_layout;
@@ -1346,6 +1359,7 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	swapchain_desc.Format      = (DXGI_FORMAT)skg_tex_fmt_to_native(format);
 	swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapchain_desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	swapchain_desc.AlphaMode   = DXGI_ALPHA_MODE_IGNORE;
 	swapchain_desc.SampleDesc.Count = 1;
 
 	IDXGIDevice2  *dxgi_device;  d3d_device  ->QueryInterface(__uuidof(IDXGIDevice2),  (void **)&dxgi_device);
@@ -1445,8 +1459,9 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result.width       = color_desc.Width;
 	result.height      = color_desc.Height;
 	result.array_count = color_desc.ArraySize;
+	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
-	skg_tex_make_view(&result, color_desc.MipLevels, array_count > 1, 0, color_desc.ArraySize, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
+	skg_tex_make_view(&result, color_desc.MipLevels, 0, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
 
 	return result;
 }
@@ -1466,8 +1481,9 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result.width       = color_desc.Width;
 	result.height      = color_desc.Height;
 	result.array_count = 1;
+	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
-	skg_tex_make_view(&result, color_desc.MipLevels, true, array_layer, 1, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
+	skg_tex_make_view(&result, color_desc.MipLevels, array_layer, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
 
 	return result;
 }
@@ -1485,6 +1501,26 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 		skg_log(skg_log_warning, "Dynamic textures don't support mip-maps!");
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_tex_copy_to(const skg_tex_t *tex, skg_tex_t *destination) {
+	if (destination->width != tex->width || destination->height != tex->height) {
+		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
+	}
+
+	if (tex->multisample > 1) {
+		d3d_context->ResolveSubresource(destination->_texture, 0, tex->_texture, 0, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
+	} else {
+		d3d_context->CopyResource(destination->_texture, tex->_texture);
+	}
+}
+
+///////////////////////////////////////////
+
+void skg_tex_copy_to_swapchain(const skg_tex_t *tex, skg_swapchain_t *destination) {
+	skg_tex_copy_to(tex, &destination->_target);
 }
 
 ///////////////////////////////////////////
@@ -1583,23 +1619,30 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 
 ///////////////////////////////////////////
 
-bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32_t array_start, uint32_t array_size, bool use_in_shader) {
+bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader) {
 	DXGI_FORMAT format = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
 
 	if (tex->type != skg_tex_type_depth) {
 		D3D11_SHADER_RESOURCE_VIEW_DESC res_desc = {};
 		res_desc.Format = format;
+		// This struct is a union, but all elements follow the same order in
+		// the struct. Texture2DArray is representative of the union with the
+		// most data in it, so if we fill it properly, all others should also
+		// be filled correctly. *Fingers crossed it stays that way*
+		res_desc.Texture2DArray.FirstArraySlice = array_start;
+		res_desc.Texture2DArray.ArraySize       = tex->array_count;
+		res_desc.Texture2DArray.MipLevels       = mip_count;
+
 		if (tex->type == skg_tex_type_cubemap) {
-			res_desc.TextureCube.MipLevels = mip_count;
-			res_desc.ViewDimension         = D3D11_SRV_DIMENSION_TEXTURECUBE;
-		} else if (is_array) {
-			res_desc.Texture2DArray.MipLevels       = mip_count;
-			res_desc.Texture2DArray.FirstArraySlice = array_start;
-			res_desc.Texture2DArray.ArraySize       = array_size;
-			res_desc.ViewDimension                  = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+			res_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+		} else if (tex->array_count > 1) {
+			res_desc.ViewDimension = tex->multisample > 1
+				? D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY
+				: D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
 		} else {
-			res_desc.Texture2D.MipLevels = mip_count;
-			res_desc.ViewDimension       = D3D11_SRV_DIMENSION_TEXTURE2D;
+			res_desc.ViewDimension = tex->multisample > 1 
+				? D3D11_SRV_DIMENSION_TEXTURE2DMS
+				: D3D11_SRV_DIMENSION_TEXTURE2D;
 		}
 
 		if (use_in_shader && FAILED(d3d_device->CreateShaderResourceView(tex->_texture, &res_desc, &tex->_resource))) {
@@ -1609,12 +1652,16 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32
 	} else {
 		D3D11_DEPTH_STENCIL_VIEW_DESC stencil_desc = {};
 		stencil_desc.Format = format;
-		if (tex->type == skg_tex_type_cubemap || is_array) {
-			stencil_desc.Texture2DArray.FirstArraySlice = array_start;
-			stencil_desc.Texture2DArray.ArraySize       = array_size;
-			stencil_desc.ViewDimension                  = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+		stencil_desc.Texture2DArray.FirstArraySlice = array_start;
+		stencil_desc.Texture2DArray.ArraySize       = tex->array_count;
+		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+			stencil_desc.ViewDimension = tex->multisample > 1
+				? D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY
+				: D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
 		} else {
-			stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+			stencil_desc.ViewDimension = tex->multisample > 1 
+				? D3D11_DSV_DIMENSION_TEXTURE2DMS
+				: D3D11_DSV_DIMENSION_TEXTURE2D;
 		}
 		if (FAILED(d3d_device->CreateDepthStencilView(tex->_texture, &stencil_desc, &tex->_depth_view))) {
 			skg_log(skg_log_critical, "Create Depth Stencil View error!");
@@ -1625,12 +1672,16 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32
 	if (tex->type == skg_tex_type_rendertarget) {
 		D3D11_RENDER_TARGET_VIEW_DESC target_desc = {};
 		target_desc.Format = format;
-		if (tex->type == skg_tex_type_cubemap || is_array) {
-			target_desc.Texture2DArray.FirstArraySlice = array_start;
-			target_desc.Texture2DArray.ArraySize       = array_size;
-			target_desc.ViewDimension                  = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+		target_desc.Texture2DArray.FirstArraySlice = array_start;
+		target_desc.Texture2DArray.ArraySize       = tex->array_count;
+		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+			target_desc.ViewDimension = tex->multisample > 1
+				? D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY
+				: D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
 		} else {
-			target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+			target_desc.ViewDimension = tex->multisample > 1
+				? D3D11_RTV_DIMENSION_TEXTURE2DMS
+				: D3D11_RTV_DIMENSION_TEXTURE2D;
 		}
 
 		if (FAILED(d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_view))) {
@@ -1645,12 +1696,12 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, bool is_array, uint32
 
 void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
 	const void *data_arr[1] = { data };
-	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
+	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height, 1);
 }
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample) {
 	// Some warning messages
 	if (tex->use != skg_use_dynamic && tex->_texture) {
 		skg_log(skg_log_warning, "Only dynamic textures can be updated!");
@@ -1664,6 +1715,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	tex->width       = width;
 	tex->height      = height;
 	tex->array_count = data_frame_count;
+	tex->multisample = multisample;
 	bool mips = tex->mips == skg_mip_generate && (width & (width - 1)) == 0 && (height & (height - 1)) == 0;
 
 	uint32_t mip_levels = (mips ? skg_mip_count(width, height) : 1);
@@ -1675,7 +1727,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		desc.Height           = height;
 		desc.MipLevels        = mip_levels;
 		desc.ArraySize        = data_frame_count;
-		desc.SampleDesc.Count = 1;
+		desc.SampleDesc.Count = multisample;
 		desc.Format           = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
 		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : D3D11_BIND_SHADER_RESOURCE;
 		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : D3D11_USAGE_DEFAULT;
@@ -1712,7 +1764,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 			free(tex_mem);
 		}
 
-		skg_tex_make_view(tex, mip_levels, data_frame_count > 1, 0, data_frame_count, true);
+		skg_tex_make_view(tex, mip_levels, 0, true);
 	} else {
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
@@ -1813,10 +1865,12 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 		}
 	} else {
 		if (bind.stage_bits & skg_stage_pixel) {
-			d3d_context->PSSetShaderResources(bind.slot, 0, nullptr);
+			ID3D11ShaderResourceView *null_srv = nullptr;
+			d3d_context->PSSetShaderResources(bind.slot, 1, &null_srv);
 		}
 		if (bind.stage_bits & skg_stage_vertex) {
-			d3d_context->VSSetShaderResources(bind.slot, 0, nullptr);
+			ID3D11ShaderResourceView *null_srv = nullptr;
+			d3d_context->VSSetShaderResources(bind.slot, 1, &null_srv);
 		}
 	}
 }
@@ -2055,6 +2109,7 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_VIEWPORT         0x0BA2
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_COLOR_BUFFER_BIT 0x00004000
+#define GL_STENCIL_BUFFER_BIT 0x400
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_UNIFORM_BUFFER 0x8A11
@@ -2107,6 +2162,8 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_TEXTURE0 0x84C0
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
+#define GL_READ_FRAMEBUFFER 0x8CA8
+#define GL_DRAW_FRAMEBUFFER 0x8CA9
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
@@ -2175,6 +2232,7 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_UNSIGNED_SHORT 0x1403
 #define GL_INT 0x1404
 #define GL_UNSIGNED_INT 0x1405
+#define GL_UNSIGNED_INT_24_8 0x84FA;
 #define GL_FLOAT 0x1406
 #define GL_DOUBLE 0x140A
 #define GL_UNSIGNED_INT_8_8_8_8 0x8035
@@ -2245,6 +2303,7 @@ GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) 
 GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
+GLE(void,     glBlitFramebuffer,         int32_t srcX0, int32_t srcY0, int32_t srcX1, int32_t srcY1, int32_t dstX0, int32_t dstY0, int32_t dstX1, int32_t dstY1, uint32_t mask, uint32_t filter) \
 GLE(void,     glDeleteTextures,          int32_t n, const uint32_t *textures) \
 GLE(void,     glBindTexture,             uint32_t target, uint32_t texture) \
 GLE(void,     glTexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
@@ -2252,6 +2311,7 @@ GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalforma
 GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
 GLE(void,     glTexParameterf,           uint32_t target, uint32_t pname, float param) \
 GLE(void,     glTexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
+GLE(void,     glCopyTexSubImage2D,       uint32_t target, int32_t level, int32_t xoffset, int32_t yoffset, int32_t x, int32_t y, uint32_t width, uint32_t height) \
 GLE(void,     glGetTexImage,             uint32_t target, int32_t level, uint32_t format, uint32_t type, void *img) \
 GLE(void,     glReadPixels,              int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t format, uint32_t type, void *data) \
 GLE(void,     glActiveTexture,           uint32_t texture) \
@@ -2936,8 +2996,25 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 
 	// create and compile the vertex shader
 	result._shader = glCreateShader(gl_type);
-	glShaderSource (result._shader, 1, &final_data, NULL);
-	glCompileShader(result._shader);
+	try {
+		glShaderSource (result._shader, 1, &final_data, NULL);
+		glCompileShader(result._shader);
+	} catch (...) {
+		// Some GL drivers have a habit of crashing during shader compile.
+		const char *stage_name = "";
+		char        text[64];
+		switch (type) {
+			case skg_stage_pixel:   stage_name = "Pixel";   break;
+			case skg_stage_vertex:  stage_name = "Vertex";  break;
+			case skg_stage_compute: stage_name = "Compute"; break; }
+		snprintf(text, sizeof(text), "%s shader compile exception", stage_name);
+		skg_log(skg_log_warning, text);
+		glDeleteShader(result._shader);
+		result._shader = 0;
+		if (needs_free)
+			free(final_data);
+		return result;
+	}
 
 	// check for errors?
 	int32_t err, length;
@@ -2952,6 +3029,9 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 		skg_log(skg_log_warning, "Unable to compile shader:\n");
 		skg_log(skg_log_warning, log);
 		free(log);
+
+		glDeleteShader(result._shader);
+		result._shader = 0;
 	}
 	if (needs_free)
 		free(final_data);
@@ -2971,6 +3051,13 @@ void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 ///////////////////////////////////////////
 
 skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader) {
+	if (v_shader._shader == 0 && p_shader._shader == 0 && c_shader._shader == 0) {
+		char text[290];
+		snprintf(text, sizeof(text), "Shader '%s' has no valid stages!", meta->name);
+		skg_log(skg_log_warning, text);
+		return {};
+	}
+
 	skg_shader_t result = {};
 	result.meta    = meta;
 	result._vertex = v_shader._shader;
@@ -2980,7 +3067,17 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	result._program = glCreateProgram();
 	if (result._vertex) glAttachShader(result._program, result._vertex);
 	if (result._pixel)  glAttachShader(result._program, result._pixel);
-	glLinkProgram (result._program);
+	try {
+		glLinkProgram(result._program);
+	} catch (...) {
+		// Some GL drivers have a habit of crashing during shader compile.
+		char text[286];
+		snprintf(text, sizeof(text), "Shader link exception in %s:", meta->name);
+		skg_log(skg_log_warning, text);
+		glDeleteProgram(result._program);
+		result._program = 0;
+		return result;
+	}
 
 	// check for errors?
 	int32_t err, length;
@@ -3005,6 +3102,15 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 		for (size_t i = 0; i < meta->buffer_count; i++) {
 			char t_name[64];
 			snprintf(t_name, 64, "type_%s", meta->buffers[i].name);
+			// $Globals is a near universal buffer name, we need to scrape the
+			// '$' character out.
+			char *pr = t_name, *pw = t_name;
+			while (*pr) {
+				*pw = *pr++;
+				pw += (*pw != '$');
+			}
+			*pw = '\0';
+
 			uint32_t slot = glGetUniformBlockIndex(result._program, t_name);
 			glUniformBlockBinding(result._program, slot, slot);
 
@@ -3054,6 +3160,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.wireframe    = false;
 	result.depth_test   = skg_depth_test_less;
 	result.depth_write  = true;
+	result.meta         = shader->meta;
 	result._shader      = *shader;
 	skg_shader_meta_reference(result._shader.meta);
 
@@ -3495,6 +3602,25 @@ bool skg_tex_is_valid(const skg_tex_t *tex) {
 
 ///////////////////////////////////////////
 
+void skg_tex_copy_to(const skg_tex_t *tex, skg_tex_t *destination) {
+	if (destination->width != tex->width || destination->height != tex->height) {
+		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
+	}
+
+	glBindTexture      (tex->_target, destination->_texture);
+	glCopyTexSubImage2D(destination->_target, 0, 0,0,0,0,tex->width,tex->height);
+}
+
+///////////////////////////////////////////
+
+void skg_tex_copy_to_swapchain(const skg_tex_t *tex, skg_swapchain_t *destination) {
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, tex->_framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glBlitFramebuffer(0,0,tex->width,tex->height,0,0,tex->width,tex->height,  GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+}
+
+///////////////////////////////////////////
+
 void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 	if (tex->type == skg_tex_type_rendertarget) {
 		uint32_t attach = depth->format == skg_tex_fmt_depthstencil 
@@ -3557,14 +3683,15 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
 	const void *data_arr[1] = { data };
-	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
+	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height, 1);
 }
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample) {
 	tex->width       = width;
 	tex->height      = height;
+	tex->multisample = multisample;
 	tex->array_count = data_frame_count;
 	if (tex->type != skg_tex_type_cubemap && tex->array_count > 1)
 		tex->_target = GL_TEXTURE_2D_ARRAY;
@@ -3769,7 +3896,7 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba128:       return GL_FLOAT;
 	case skg_tex_fmt_depth16:       return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_depth32:       return GL_FLOAT;
-	case skg_tex_fmt_depthstencil:  return GL_DEPTH24_STENCIL8;
+	case skg_tex_fmt_depthstencil:  return GL_UNSIGNED_INT_24_8;
 	case skg_tex_fmt_r8:            return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_r16:           return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_r32:           return GL_FLOAT;

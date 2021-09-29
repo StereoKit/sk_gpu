@@ -101,6 +101,7 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_VIEWPORT         0x0BA2
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_COLOR_BUFFER_BIT 0x00004000
+#define GL_STENCIL_BUFFER_BIT 0x400
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_UNIFORM_BUFFER 0x8A11
@@ -153,6 +154,8 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_TEXTURE0 0x84C0
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
+#define GL_READ_FRAMEBUFFER 0x8CA8
+#define GL_DRAW_FRAMEBUFFER 0x8CA9
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
@@ -292,6 +295,7 @@ GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) 
 GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
+GLE(void,     glBlitFramebuffer,         int32_t srcX0, int32_t srcY0, int32_t srcX1, int32_t srcY1, int32_t dstX0, int32_t dstY0, int32_t dstX1, int32_t dstY1, uint32_t mask, uint32_t filter) \
 GLE(void,     glDeleteTextures,          int32_t n, const uint32_t *textures) \
 GLE(void,     glBindTexture,             uint32_t target, uint32_t texture) \
 GLE(void,     glTexParameteri,           uint32_t target, uint32_t pname, int32_t param) \
@@ -299,6 +303,7 @@ GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalforma
 GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
 GLE(void,     glTexParameterf,           uint32_t target, uint32_t pname, float param) \
 GLE(void,     glTexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
+GLE(void,     glCopyTexSubImage2D,       uint32_t target, int32_t level, int32_t xoffset, int32_t yoffset, int32_t x, int32_t y, uint32_t width, uint32_t height) \
 GLE(void,     glGetTexImage,             uint32_t target, int32_t level, uint32_t format, uint32_t type, void *img) \
 GLE(void,     glReadPixels,              int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t format, uint32_t type, void *data) \
 GLE(void,     glActiveTexture,           uint32_t texture) \
@@ -983,8 +988,25 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 
 	// create and compile the vertex shader
 	result._shader = glCreateShader(gl_type);
-	glShaderSource (result._shader, 1, &final_data, NULL);
-	glCompileShader(result._shader);
+	try {
+		glShaderSource (result._shader, 1, &final_data, NULL);
+		glCompileShader(result._shader);
+	} catch (...) {
+		// Some GL drivers have a habit of crashing during shader compile.
+		const char *stage_name = "";
+		char        text[64];
+		switch (type) {
+			case skg_stage_pixel:   stage_name = "Pixel";   break;
+			case skg_stage_vertex:  stage_name = "Vertex";  break;
+			case skg_stage_compute: stage_name = "Compute"; break; }
+		snprintf(text, sizeof(text), "%s shader compile exception", stage_name);
+		skg_log(skg_log_warning, text);
+		glDeleteShader(result._shader);
+		result._shader = 0;
+		if (needs_free)
+			free(final_data);
+		return result;
+	}
 
 	// check for errors?
 	int32_t err, length;
@@ -999,6 +1021,9 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 		skg_log(skg_log_warning, "Unable to compile shader:\n");
 		skg_log(skg_log_warning, log);
 		free(log);
+
+		glDeleteShader(result._shader);
+		result._shader = 0;
 	}
 	if (needs_free)
 		free(final_data);
@@ -1018,6 +1043,13 @@ void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 ///////////////////////////////////////////
 
 skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader) {
+	if (v_shader._shader == 0 && p_shader._shader == 0 && c_shader._shader == 0) {
+		char text[290];
+		snprintf(text, sizeof(text), "Shader '%s' has no valid stages!", meta->name);
+		skg_log(skg_log_warning, text);
+		return {};
+	}
+
 	skg_shader_t result = {};
 	result.meta    = meta;
 	result._vertex = v_shader._shader;
@@ -1027,7 +1059,17 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	result._program = glCreateProgram();
 	if (result._vertex) glAttachShader(result._program, result._vertex);
 	if (result._pixel)  glAttachShader(result._program, result._pixel);
-	glLinkProgram (result._program);
+	try {
+		glLinkProgram(result._program);
+	} catch (...) {
+		// Some GL drivers have a habit of crashing during shader compile.
+		char text[286];
+		snprintf(text, sizeof(text), "Shader link exception in %s:", meta->name);
+		skg_log(skg_log_warning, text);
+		glDeleteProgram(result._program);
+		result._program = 0;
+		return result;
+	}
 
 	// check for errors?
 	int32_t err, length;
@@ -1552,6 +1594,25 @@ bool skg_tex_is_valid(const skg_tex_t *tex) {
 
 ///////////////////////////////////////////
 
+void skg_tex_copy_to(const skg_tex_t *tex, skg_tex_t *destination) {
+	if (destination->width != tex->width || destination->height != tex->height) {
+		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
+	}
+
+	glBindTexture      (tex->_target, destination->_texture);
+	glCopyTexSubImage2D(destination->_target, 0, 0,0,0,0,tex->width,tex->height);
+}
+
+///////////////////////////////////////////
+
+void skg_tex_copy_to_swapchain(const skg_tex_t *tex, skg_swapchain_t *destination) {
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, tex->_framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glBlitFramebuffer(0,0,tex->width,tex->height,0,0,tex->width,tex->height,  GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+}
+
+///////////////////////////////////////////
+
 void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 	if (tex->type == skg_tex_type_rendertarget) {
 		uint32_t attach = depth->format == skg_tex_fmt_depthstencil 
@@ -1614,14 +1675,15 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
 	const void *data_arr[1] = { data };
-	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height );
+	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height, 1);
 }
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height) {
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample) {
 	tex->width       = width;
 	tex->height      = height;
+	tex->multisample = multisample;
 	tex->array_count = data_frame_count;
 	if (tex->type != skg_tex_type_cubemap && tex->array_count > 1)
 		tex->_target = GL_TEXTURE_2D_ARRAY;

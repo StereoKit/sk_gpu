@@ -474,6 +474,13 @@ void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 ///////////////////////////////////////////
 
 skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader) {
+	if (v_shader._shader == nullptr && p_shader._shader == nullptr && c_shader._shader == nullptr) {
+		char text[290];
+		snprintf(text, sizeof(text), "Shader '%s' has no valid stages!", meta->name);
+		skg_log(skg_log_warning, text);
+		return {};
+	}
+
 	skg_shader_t result = {};
 	result.meta    = meta;
 	if (v_shader._shader) result._vertex  = (ID3D11VertexShader *)v_shader._shader;

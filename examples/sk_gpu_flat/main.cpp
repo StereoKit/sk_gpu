@@ -243,6 +243,7 @@ int main_step(double t, void *) {
 	app_render((float)t, view, proj);
 
 	skg_tex_copy_to_swapchain(&app_screen, &app_swapchain);
+	skg_swapchain_bind(&app_swapchain);
 	skg_swapchain_present(&app_swapchain);
 	return 1;
 }

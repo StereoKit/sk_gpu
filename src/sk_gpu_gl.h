@@ -37,6 +37,7 @@ typedef struct skg_pipeline_t {
 	bool              depth_write;
 	bool              scissor;
 	skg_depth_test_   depth_test;
+	skg_shader_meta_t*meta;
 	skg_shader_t      _shader;
 } skg_pipeline_t;
 
@@ -45,6 +46,7 @@ typedef struct skg_tex_t {
 	int32_t       height;
 	int32_t       array_count;
 	int32_t       array_start;
+	int32_t       multisample;
 	skg_use_      use;
 	skg_tex_type_ type;
 	skg_tex_fmt_  format;

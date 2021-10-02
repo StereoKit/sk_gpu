@@ -60,6 +60,8 @@ typedef struct skg_tex_t {
 	int32_t                    width;
 	int32_t                    height;
 	int32_t                    array_count;
+	int32_t                    array_start;
+	int32_t                    multisample;
 	skg_use_                   use;
 	skg_tex_type_              type;
 	skg_tex_fmt_               format;

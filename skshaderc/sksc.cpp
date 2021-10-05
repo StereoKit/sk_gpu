@@ -457,11 +457,89 @@ void sksc_shutdown() {
 }
 
 ///////////////////////////////////////////
+
+// Some nightmare code to deal with glslang's ...lacking C implementation
+
 #include "glslang/Include/ShHandle.h"
+#include "StandAlone/DirStackFileIncluder.h"
+
 typedef struct glslang_shader_s {
 	glslang::TShader* shader;
 	std::string preprocessedGLSL;
 } glslang_shader_t;
+
+
+static EProfile c_shader_profile(glslang_profile_t profile)
+{
+    switch (profile) {
+    case GLSLANG_BAD_PROFILE:
+        return EBadProfile;
+    case GLSLANG_NO_PROFILE:
+        return ENoProfile;
+    case GLSLANG_CORE_PROFILE:
+        return ECoreProfile;
+    case GLSLANG_COMPATIBILITY_PROFILE:
+        return ECompatibilityProfile;
+    case GLSLANG_ES_PROFILE:
+        return EEsProfile;
+    case GLSLANG_PROFILE_COUNT: // Should not use this
+        break;
+    }
+
+    return EProfile();
+}
+
+static int c_shader_messages(glslang_messages_t messages)
+{
+#define CONVERT_MSG(in, out)                                                                                           \
+    if ((messages & in) == in)                                                                                         \
+        res |= out;
+
+    int res = 0;
+
+    CONVERT_MSG(GLSLANG_MSG_RELAXED_ERRORS_BIT, EShMsgRelaxedErrors);
+    CONVERT_MSG(GLSLANG_MSG_SUPPRESS_WARNINGS_BIT, EShMsgSuppressWarnings);
+    CONVERT_MSG(GLSLANG_MSG_AST_BIT, EShMsgAST);
+    CONVERT_MSG(GLSLANG_MSG_SPV_RULES_BIT, EShMsgSpvRules);
+    CONVERT_MSG(GLSLANG_MSG_VULKAN_RULES_BIT, EShMsgVulkanRules);
+    CONVERT_MSG(GLSLANG_MSG_ONLY_PREPROCESSOR_BIT, EShMsgOnlyPreprocessor);
+    CONVERT_MSG(GLSLANG_MSG_READ_HLSL_BIT, EShMsgReadHlsl);
+    CONVERT_MSG(GLSLANG_MSG_CASCADING_ERRORS_BIT, EShMsgCascadingErrors);
+    CONVERT_MSG(GLSLANG_MSG_KEEP_UNCALLED_BIT, EShMsgKeepUncalled);
+    CONVERT_MSG(GLSLANG_MSG_HLSL_OFFSETS_BIT, EShMsgHlslOffsets);
+    CONVERT_MSG(GLSLANG_MSG_DEBUG_INFO_BIT, EShMsgDebugInfo);
+    CONVERT_MSG(GLSLANG_MSG_HLSL_ENABLE_16BIT_TYPES_BIT, EShMsgHlslEnable16BitTypes);
+    CONVERT_MSG(GLSLANG_MSG_HLSL_LEGALIZATION_BIT, EShMsgHlslLegalization);
+    CONVERT_MSG(GLSLANG_MSG_HLSL_DX9_COMPATIBLE_BIT, EShMsgHlslDX9Compatible);
+    CONVERT_MSG(GLSLANG_MSG_BUILTIN_SYMBOL_TABLE_BIT, EShMsgBuiltinSymbolTable);
+    return res;
+#undef CONVERT_MSG
+}
+
+int32_t sksc_glslang_shader_preprocess(glslang_shader_t* shader, const glslang_input_t* input, glslang::TShader::Includer &includer) {
+	return shader->shader->preprocess(
+		reinterpret_cast<const TBuiltInResource*>(input->resource),
+		input->default_version,
+		c_shader_profile(input->default_profile),
+		input->force_default_version_and_profile != 0,
+		input->forward_compatible != 0,
+		(EShMessages)c_shader_messages(input->messages),
+		&shader->preprocessedGLSL,
+		includer
+	);
+}
+
+class SkscIncluder : public DirStackFileIncluder {
+public:
+    virtual IncludeResult* includeSystem(const char* headerName,
+                                         const char* includerName,
+                                         size_t inclusionDepth) override
+    {
+        return readLocalPath(headerName, includerName, (int)inclusionDepth);
+    }
+};
+
+///////////////////////////////////////////
 
 compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
 	glslang_resource_s default_resource = {};
@@ -485,8 +563,12 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 
 	glslang_shader_t *shader = glslang_shader_create(&input);
 	shader->shader->setEntryPoint(entry);
-	
-	if (!glslang_shader_preprocess(shader, &input)) {
+
+	SkscIncluder includer;
+	for (int32_t i = 0; i < settings->include_folder_ct; i++) {
+		includer.pushExternalLocalDirectory(settings->include_folders[i]);
+	}
+	if (!sksc_glslang_shader_preprocess(shader, &input, includer)) {
 		sksc_log(log_level_err, glslang_shader_get_info_log(shader));
 		sksc_log(log_level_err, glslang_shader_get_info_debug_log(shader));
 		glslang_shader_delete (shader);

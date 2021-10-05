@@ -143,7 +143,7 @@ bool app_init() {
 	skg_vert_t *platform_verts;
 	uint32_t   *platform_inds;
 	int32_t     platform_v_count, platform_i_count;
-	if (ply_read_skg("../platform.ply", &platform_verts, &platform_v_count, &platform_inds, &platform_i_count)) {
+	if (ply_read_skg("platform.ply", &platform_verts, &platform_v_count, &platform_inds, &platform_i_count)) {
 		app_mesh_model = app_mesh_create(platform_verts, platform_v_count, false, platform_inds, platform_i_count);
 		free(platform_verts);
 		free(platform_inds );

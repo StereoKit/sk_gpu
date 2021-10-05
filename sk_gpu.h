@@ -4160,11 +4160,17 @@ void skg_callback_file_read(bool (*callback)(const char *filename, void **out_da
 }
 bool skg_read_file(const char *filename, void **out_data, size_t *out_size) {
 	if (_skg_read_file) return _skg_read_file(filename, out_data, out_size);
-#if _WIN32
 	FILE *fp;
+#if _WIN32
 	if (fopen_s(&fp, filename, "rb") != 0 || fp == nullptr) {
 		return false;
 	}
+#else
+	fp = fopen(filename, "rb");
+	if (fp == nullptr) {
+		return false;
+	}
+#endif
 
 	fseek(fp, 0L, SEEK_END);
 	*out_size = ftell(fp);
@@ -4176,9 +4182,6 @@ bool skg_read_file(const char *filename, void **out_data, size_t *out_size) {
 	fclose(fp);
 
 	return true;
-#else
-	return false;
-#endif
 }
 
 ///////////////////////////////////////////

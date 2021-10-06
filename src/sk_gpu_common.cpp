@@ -537,7 +537,7 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 			var->name_hash = skg_hash(var->name);
 		}
 
-		if (strcmp(buffer->name, "$Globals") == 0)
+		if (strcmp(buffer->name, "$Global") == 0)
 			out_file->meta->global_buffer_id = i;
 	}
 

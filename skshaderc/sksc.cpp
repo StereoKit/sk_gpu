@@ -375,7 +375,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shad
 	// Find the globals buffer, if there is one
 	out_meta->global_buffer_id = -1;
 	for (size_t i = 0; i < out_meta->buffer_count; i++) {
-		if (strcmp(out_meta->buffers[i].name, "$Globals") == 0) {
+		if (strcmp(out_meta->buffers[i].name, "$Global") == 0) {
 			out_meta->global_buffer_id = i;
 		}
 	}
@@ -565,6 +565,7 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 	shader->shader->setEntryPoint(entry);
 
 	SkscIncluder includer;
+	includer.pushExternalLocalDirectory(settings->folder);
 	for (int32_t i = 0; i < settings->include_folder_ct; i++) {
 		includer.pushExternalLocalDirectory(settings->include_folders[i]);
 	}
@@ -1270,7 +1271,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 	for (size_t i = 0; i < count; i++) {
 		for (size_t b = 0; b < meta->buffer_count; b++) {
 			const char *name = spvc_compiler_get_name(compiler_glsl, list[i].id);
-			if (strcmp(meta->buffers[b].name, name) == 0 || (strcmp(name, "_Globals") == 0 && strcmp(meta->buffers[b].name, "$Globals") == 0)) {
+			if (strcmp(meta->buffers[b].name, name) == 0 || (strcmp(name, "_Global") == 0 && strcmp(meta->buffers[b].name, "$Global") == 0)) {
 				spvc_compiler_set_decoration(compiler_glsl, list[i].id, SpvDecorationBinding, meta->buffers[b].bind.slot);
 				break;
 			}
@@ -1400,7 +1401,7 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 		size_t    type_size;
 		spvc_compiler_get_declared_struct_size(compiler, type, &type_size);
 
-		buffer->size               = (uint32_t)type_size;
+		buffer->size               = (uint32_t)(type_size%16==0? type_size : (type_size/16 + 1)*16);
 		buffer->bind.slot          = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
 		buffer->bind.stage_bits    = spirv_stage->stage;
 		buffer->bind.register_type = skg_register_constant;
@@ -1412,18 +1413,21 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 			spvc_type_id tid        = spvc_type_get_member_type(type, m);
 			spvc_type    mem_type   = spvc_compiler_get_type_handle(compiler, tid);
 			const char  *name       = spvc_compiler_get_member_name(compiler, list[i].base_type_id, m);
-			uint32_t     dimensions = spvc_type_get_num_array_dimensions(mem_type);
 			uint32_t     member_offset;
 			size_t       member_size;
 			spvc_compiler_type_struct_member_offset      (compiler, type, m, &member_offset);
 			spvc_compiler_get_declared_struct_member_size(compiler, type, m, &member_size);
+
+			uint32_t dimensions = spvc_type_get_num_array_dimensions(mem_type);
+			int32_t  dim_size   = 1;
+			for (uint32_t d = 0; d < dimensions; d++) {
+				dim_size = dim_size * spvc_type_get_array_dimension(mem_type, d);
+			}
 			
 			strncpy(buffer->vars[m].name, name, sizeof(buffer->vars[m].name));
 			buffer->vars[m].offset     = member_offset;
 			buffer->vars[m].size       = (uint32_t)member_size;
-			buffer->vars[m].type_count = dimensions > 0
-				? spvc_type_get_array_dimension(mem_type, 0)
-				: 1;
+			buffer->vars[m].type_count = dim_size * spvc_type_get_vector_size(mem_type) * spvc_type_get_columns(mem_type);
 
 			if (buffer->vars[m].type_count == 0)
 				buffer->vars[m].type_count = 1;

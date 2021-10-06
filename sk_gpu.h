@@ -3303,7 +3303,7 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 		for (size_t i = 0; i < meta->buffer_count; i++) {
 			char t_name[64];
 			snprintf(t_name, 64, "type_%s", meta->buffers[i].name);
-			// $Globals is a near universal buffer name, we need to scrape the
+			// $Global is a near universal buffer name, we need to scrape the
 			// '$' character out.
 			char *pr = t_name, *pw = t_name;
 			while (*pr) {
@@ -4669,7 +4669,7 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 			var->name_hash = skg_hash(var->name);
 		}
 
-		if (strcmp(buffer->name, "$Globals") == 0)
+		if (strcmp(buffer->name, "$Global") == 0)
 			out_file->meta->global_buffer_id = i;
 	}
 

@@ -444,7 +444,11 @@ void file_dir(const char *file, char *out_path, size_t path_size) {
 
 bool file_exists(const char *path) {
 	struct stat buffer;
+#if _WIN32
 	return (stat(path, &buffer) == 0);
+#else
+	return (stat(path, &buffer) == 0 && !(S_ISDIR(buffer.st_mode)));
+#endif
 }
 
 ///////////////////////////////////////////

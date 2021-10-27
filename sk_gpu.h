@@ -727,8 +727,8 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 		skg_log(skg_log_critical, d3d_info_txt);
 
 		// Get a human readable description of that error message.
-		LPTSTR error_text = NULL;
-		FormatMessage(
+		char *error_text = NULL;
+		FormatMessageA(
 			FORMAT_MESSAGE_FROM_SYSTEM |
 			FORMAT_MESSAGE_ALLOCATE_BUFFER |
 			FORMAT_MESSAGE_IGNORE_INSERTS,

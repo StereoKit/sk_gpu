@@ -735,7 +735,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 			NULL,
 			hr,
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			(LPTSTR)&error_text, 0,
+			(char*)&error_text, 0,
 			NULL);
 		skg_log(skg_log_critical, error_text);
 		LocalFree(error_text);

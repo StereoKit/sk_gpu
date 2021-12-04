@@ -194,7 +194,7 @@ bool main_init() {
 	skg_callback_log([](skg_log_ level, const char *text) { 
 		printf("[%d] %s\n", level, text);
 	});
-	if (!skg_init(app_name, nullptr)) 
+	if (skg_init(app_name, nullptr) <= 0)
 		return false;
 	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_none, app_resize_width, app_resize_height);
 	resize_swapchain(app_resize_width, app_resize_height);

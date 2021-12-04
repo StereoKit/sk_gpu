@@ -1320,7 +1320,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 	}
 
 	if (src_stage->stage == skg_stage_vertex || src_stage->stage == skg_stage_pixel) {
-		size_t             off = src_stage->stage == skg_stage_vertex ? 3 : 2;
+		size_t             off = src_stage->stage == skg_stage_vertex ? sizeof("@entryPointOutput.")-1 : sizeof("input.")-1;
 		spvc_resource_type res = src_stage->stage == skg_stage_vertex
 			? SPVC_RESOURCE_TYPE_STAGE_OUTPUT
 			: SPVC_RESOURCE_TYPE_STAGE_INPUT;
@@ -1328,8 +1328,9 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		spvc_resources_get_resource_list_for_type(resources, res, &list, &count);
 		for (size_t i = 0; i < count; i++) {
 			char fs_name[64];
-			snprintf(fs_name, sizeof(fs_name), "fs%s", list[i].name+off);
+			snprintf(fs_name, sizeof(fs_name), "fs_%s", list[i].name+off);
 			spvc_compiler_set_name(compiler_glsl, list[i].id, fs_name);
+			spvc_compiler
 		}
 	}
 

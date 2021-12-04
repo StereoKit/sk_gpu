@@ -675,8 +675,9 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 
 int32_t skg_init(const char *app_name, void *adapter_id) {
 	UINT creation_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-#if !defined(NDEBUG)
+#if defined(_DEBUG)
 	creation_flags |= D3D11_CREATE_DEVICE_DEBUG;
+	skg_log(skg_log_info, "Requesting debug Direct3D context.");
 #endif
 
 	// Find the right adapter to use:
@@ -3330,30 +3331,28 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 #ifdef _SKG_GL_WEB
 		for (size_t i = 0; i < meta->buffer_count; i++) {
 			char t_name[64];
-			snprintf(t_name, 64, "type_%s", meta->buffers[i].name);
+			snprintf(t_name, 64, "%s", meta->buffers[i].name);
 			// $Global is a near universal buffer name, we need to scrape the
 			// '$' character out.
-			char *pr = t_name, *pw = t_name;
+			char *pr = t_name;
 			while (*pr) {
-				*pw = *pr++;
-				pw += (*pw != '$');
+				if (*pr == '$')
+					*pr = '_';
+				pr++;
 			}
-			*pw = '\0';
 
 			uint32_t slot = glGetUniformBlockIndex(result._program, t_name);
-			glUniformBlockBinding(result._program, slot, slot);
+			glUniformBlockBinding(result._program, slot, meta->buffers[i].bind.slot);
 
 			if (slot == GL_INVALID_INDEX) {
-				skg_log(skg_log_warning, "Couldn't find uinform block index for:");
+				skg_log(skg_log_warning, "Couldn't find uniform block index for:");
 				skg_log(skg_log_warning, meta->buffers[i].name);
-			} else {
-				meta->buffers[i].bind.slot = (uint16_t)slot;
 			}
 		}
 		glUseProgram(result._program);
-		for (size_t i = 0; i < meta->texture_count; i++) {
-			uint32_t loc = glGetUniformLocation(result._program, meta->textures[i].name);
-			glUniform1i(loc , meta->textures[i].bind.slot);
+		for (size_t i = 0; i < meta->resource_count; i++) {
+			uint32_t loc = glGetUniformLocation(result._program, meta->resources[i].name);
+			glUniform1i(loc , meta->resources[i].bind.slot);
 		}
 #endif
 	}
@@ -3633,21 +3632,21 @@ void main() {
 
 	skg_shader_meta_t *meta = (skg_shader_meta_t *)malloc(sizeof(skg_shader_meta_t));
 	*meta = {};
-	meta->texture_count = 1;
-	meta->textures = (skg_shader_texture_t*)malloc(sizeof(skg_shader_texture_t));
-	meta->textures[0].bind = { 0, skg_stage_pixel };
-	strcpy(meta->textures[0].name, "tex");
-	meta->textures[0].name_hash = skg_hash(meta->textures[0].name);
+	meta->resource_count = 1;
+	meta->resources = (skg_shader_resource_t*)malloc(sizeof(skg_shader_resource_t));
+	meta->resources[0].bind = { 0, skg_stage_pixel };
+	strcpy(meta->resources[0].name, "tex");
+	meta->resources[0].name_hash = skg_hash(meta->resources[0].name);
 
 	skg_shader_stage_t v_stage = skg_shader_stage_create(vs, strlen(vs), skg_stage_vertex);
 	skg_shader_stage_t p_stage = skg_shader_stage_create(ps, strlen(ps), skg_stage_pixel);
 	result._convert_shader = skg_shader_create_manual(meta, v_stage, p_stage, {});
 	result._convert_pipe   = skg_pipeline_create(&result._convert_shader);
 
-	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_dynamic, skg_tex_fmt_rgba32, skg_mip_none);
+	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	skg_tex_set_contents(&result._surface, nullptr, result.width, result.height);
 
-	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_dynamic, depth_format, skg_mip_none);
+	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
 	skg_tex_set_contents(&result._surface_depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._surface, &result._surface_depth);
 
@@ -3680,10 +3679,10 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	skg_tex_destroy(&swapchain->_surface);
 	skg_tex_destroy(&swapchain->_surface_depth);
 
-	swapchain->_surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_dynamic, color_fmt, skg_mip_none);
+	swapchain->_surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, color_fmt, skg_mip_none);
 	skg_tex_set_contents(&swapchain->_surface, nullptr, swapchain->width, swapchain->height);
 
-	swapchain->_surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_dynamic, depth_fmt, skg_mip_none);
+	swapchain->_surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_fmt, skg_mip_none);
 	skg_tex_set_contents(&swapchain->_surface_depth, nullptr, swapchain->width, swapchain->height);
 	skg_tex_attach_depth(&swapchain->_surface, &swapchain->_surface_depth);
 #endif
@@ -3894,6 +3893,8 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 ///////////////////////////////////////////
 
 void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
+	if (!skg_tex_is_valid(tex)) return;
+
 	glBindTexture(tex->_target, tex->_texture);
 
 	uint32_t mode;
@@ -4026,7 +4027,9 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	//	glUniform1i(bind.slot, bind.slot);
 	
 	if (bind.stage_bits & skg_stage_compute) {
+#if !defined(_SKG_GL_WEB)
 		glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, skg_tex_fmt_to_native( texture->format ));
+#endif
 	} else {
 		glActiveTexture(GL_TEXTURE0 + bind.slot);
 		glBindTexture(texture->_target, texture->_texture);
@@ -4066,17 +4069,19 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	switch (format) {
 	case skg_tex_fmt_rgba32:        return GL_SRGB8_ALPHA8;
 	case skg_tex_fmt_rgba32_linear: return GL_RGBA8;
+	case skg_tex_fmt_bgra32:        return GL_RGBA8;
+	case skg_tex_fmt_bgra32_linear: return GL_RGBA8;
 	case skg_tex_fmt_rg11b10:       return GL_R11F_G11F_B10F;
 	case skg_tex_fmt_rgb10a2:       return GL_RGB10_A2;
-	case skg_tex_fmt_rgba64u:       return GL_RGBA16UI;
-	case skg_tex_fmt_rgba64s:       return GL_RGBA16I;
+	case skg_tex_fmt_rgba64u:       return GL_RGBA16F;
+	case skg_tex_fmt_rgba64s:       return GL_RGBA16F;
 	case skg_tex_fmt_rgba64f:       return GL_RGBA16F;
 	case skg_tex_fmt_rgba128:       return GL_RGBA32F;
 	case skg_tex_fmt_depth16:       return GL_DEPTH_COMPONENT16;
 	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT32F;
 	case skg_tex_fmt_depthstencil:  return GL_DEPTH24_STENCIL8;
 	case skg_tex_fmt_r8:            return GL_R8;
-	case skg_tex_fmt_r16:           return GL_R16UI;
+	case skg_tex_fmt_r16:           return GL_R16F;
 	case skg_tex_fmt_r32:           return GL_R32F;
 	default: return 0;
 	}

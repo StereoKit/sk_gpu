@@ -1329,22 +1329,57 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 ///////////////////////////////////////////
 
 bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
+	return skg_tex_get_mip_contents_arr(tex, 0, 0, ref_data, data_size);
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_get_mip_contents(skg_tex_t *tex, int32_t mip_level, void *ref_data, size_t data_size) {
+	return skg_tex_get_mip_contents_arr(tex, mip_level, 0, ref_data, data_size);
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size) {
+	// Double check on mips first
+	uint32_t mip_levels = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+	if (mip_level != 0) {
+		if (tex->mips != skg_mip_generate) {
+			skg_log(skg_log_critical, "Can't get mip data from a texture with no mips!");
+			return false;
+		}
+		if (mip_level >= mip_levels) {
+			skg_log(skg_log_critical, "This texture doesn't have quite as many mip levels as you think.");
+			return false;
+		}
+	}
+
 	// Make sure we've been provided enough memory to hold this texture
-	size_t format_size = skg_tex_fmt_size(tex->format);
-	if (data_size != (size_t)tex->width * (size_t)tex->height * format_size) {
-		skg_log(skg_log_critical, "Insufficient buffer size for skg_tex_get_contents");
+	int32_t width       = 0;
+	int32_t height      = 0;
+	size_t  format_size = skg_tex_fmt_size(tex->format);
+	skg_mip_dimensions(tex->width, tex->height, mip_level, &width, &height);
+
+	if (data_size != (size_t)width * (size_t)height * format_size) {
+		skg_log(skg_log_critical, "Insufficient buffer size for skg_tex_get_mip_contents_arr");
 		return false;
 	}
 
 	D3D11_TEXTURE2D_DESC desc             = {};
 	ID3D11Texture2D     *copy_tex         = nullptr;
 	bool                 copy_tex_release = true;
+	UINT                 subresource      = mip_level + (arr_index * mip_levels);
 	tex->_texture->GetDesc(&desc);
+	desc.Width     = width;
+	desc.Height    = height;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.MiscFlags = 0;
 
 	// Make sure copy_tex is a texture that we can read from!
 	if (desc.SampleDesc.Count > 1) {
 		// Not gonna bother with MSAA stuff
-		skg_log(skg_log_warning, "skg_tex_get_contents MSAA surfaces not implemented");
+		skg_log(skg_log_warning, "skg_tex_get_mip_contents_arr MSAA surfaces not implemented");
 		return false;
 	} else if ((desc.Usage == D3D11_USAGE_STAGING) && (desc.CPUAccessFlags & D3D11_CPU_ACCESS_READ)) {
 		// Handle case where the source is already a staging texture we can use directly
@@ -1360,12 +1395,18 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 			skg_log(skg_log_critical, "CreateTexture2D failed!");
 			return false;
 		}
-		d3d_context->CopyResource(copy_tex, tex->_texture);
+
+		D3D11_BOX box = {};
+		box.right  = width;
+		box.bottom = height;
+		box.back   = 1;
+		d3d_context->CopySubresourceRegion(copy_tex, 0, 0, 0, 0, tex->_texture, subresource, &box);
+		subresource = 0;
 	}
 
 	// Load the data into CPU RAM
 	D3D11_MAPPED_SUBRESOURCE data;
-	if (FAILED(d3d_context->Map(copy_tex, 0, D3D11_MAP_READ, 0, &data))) {
+	if (FAILED(d3d_context->Map(copy_tex, subresource, D3D11_MAP_READ, 0, &data))) {
 		skg_log(skg_log_critical, "Texture Map failed!");
 		return false;
 	}
@@ -1373,7 +1414,7 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 	// Copy it into our waiting buffer
 	uint8_t *srcPtr  = (uint8_t*)data.pData;
 	uint8_t *destPtr = (uint8_t*)ref_data;
-	size_t   msize   = tex->width*format_size;
+	size_t   msize   = width*format_size;
 	for (size_t h = 0; h < desc.Height; ++h) {
 		memcpy(destPtr, srcPtr, msize);
 		srcPtr  += data.RowPitch;

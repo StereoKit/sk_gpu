@@ -71,6 +71,13 @@ uint32_t skg_mip_count(int32_t width, int32_t height) {
 
 ///////////////////////////////////////////
 
+void skg_mip_dimensions(int32_t width, int32_t height, int32_t mip_level, int32_t *out_width, int32_t *out_height) {
+	*out_width  = width  >> mip_level;
+	*out_height = height >> mip_level;
+}
+
+///////////////////////////////////////////
+
 skg_color32_t skg_col_hsv32(float h, float s, float v, float a) {
 	skg_color128_t col = skg_col_hsv128(h,s,v,a);
 	return skg_color32_t{

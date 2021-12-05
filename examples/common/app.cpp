@@ -67,10 +67,10 @@ skg_color128_t   (*app_col_func128[4])(float h, float s, float v, float a) = {
 	skg_col_jsl128,
 	skg_col_lch128 };
 const char *app_col_name[4] = {
-	"hsl.tga",
-	"helix.tga",
-	"jsl.tga",
-	"lch.tga" };
+	"hsl.bmp",
+	"helix.bmp",
+	"jsl.bmp",
+	"lch.bmp" };
 
 skg_shader_t      app_sh_default           = {};
 skg_bind_t        app_sh_default_tex_bind  = {};
@@ -205,6 +205,21 @@ bool app_init() {
 	skg_tex_set_contents(&app_tex, colors, w, h);
 	free(colors);
 
+	// Test reading specific mip levels
+	for (int32_t m = 0; m < skg_mip_count(app_tex.width, app_tex.height); m++) {
+		int32_t  checker_w, checker_h;
+		skg_mip_dimensions(app_tex.width, app_tex.height, m, &checker_w, &checker_h);
+		size_t   checker_size       = skg_tex_fmt_size(skg_tex_fmt_rgba32) * checker_w * checker_h;
+		uint8_t *checker_color_data = (uint8_t*)malloc(checker_size);
+
+		char mip_name[64];
+		snprintf(mip_name, sizeof(mip_name), "mip_%d.bmp", m);
+		if (skg_tex_get_mip_contents(&app_tex, m, checker_color_data, checker_size))
+			bmp_write(mip_name, checker_w, checker_h, checker_color_data);
+
+		free(checker_color_data);
+	}
+
 	// Make a particle texture
 	w = 64; h = 64;
 	colors = (skg_color32_t*)malloc(sizeof(skg_color32_t)* w * h);
@@ -277,7 +292,7 @@ bool app_init() {
 		app_tex_colspace[c] = skg_tex_create(skg_tex_type_image, skg_use_dynamic, skg_tex_fmt_rgba32, skg_mip_none);
 		skg_tex_settings    (&app_tex_colspace[c], skg_tex_address_clamp, skg_tex_sample_linear, 1);
 		skg_tex_set_contents(&app_tex_colspace[c], space_colors, grad_size, grad_size);
-		tga_write(app_col_name[c], grad_size, grad_size, (uint8_t*)space_colors, 4, 4);
+		bmp_write(app_col_name[c], grad_size, grad_size, (uint8_t*)space_colors);
 	}
 	free(space_colors);
 
@@ -303,6 +318,15 @@ bool app_init() {
 		}
 	}
 	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, cube_face_size, cube_face_size, 1);
+
+	// Check array texture read
+	{
+		size_t   cube_size       = skg_tex_fmt_size(skg_tex_fmt_rgba32) * app_cubemap.width * app_cubemap.height; 
+		uint8_t *cube_color_data = (uint8_t*)malloc(cube_size);
+		if (skg_tex_get_mip_contents_arr(&app_cubemap, 0, 2, cube_color_data, cube_size))
+			bmp_write("cubemap_face.bmp", app_cubemap.width, app_cubemap.height, cube_color_data);
+		free(cube_color_data);
+	}
 
 	app_sh_cube              = skg_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
 	app_sh_cube_tex_bind     = skg_shader_get_bind(&app_sh_cube, "tex");
@@ -597,7 +621,7 @@ void app_test_rendertarget(float t) {
 		size_t   size       = skg_tex_fmt_size(app_target.format) * app_target.width * app_target.height;
 		uint8_t *color_data = (uint8_t*)malloc(size);
 		if (skg_tex_get_contents(&app_target, color_data, size))
-			tga_write("test.tga", app_target.width, app_target.height, color_data);
+			bmp_write("test.bmp", app_target.width, app_target.height, color_data);
 		free(color_data);
 	}
 }

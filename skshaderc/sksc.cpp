@@ -1330,7 +1330,6 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 			char fs_name[64];
 			snprintf(fs_name, sizeof(fs_name), "fs_%s", list[i].name+off);
 			spvc_compiler_set_name(compiler_glsl, list[i].id, fs_name);
-			spvc_compiler
 		}
 	}
 

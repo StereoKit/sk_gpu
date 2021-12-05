@@ -1766,7 +1766,43 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 ///////////////////////////////////////////
 
 bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
-	int64_t format = skg_tex_fmt_to_gl_layout(tex->format);
+	return skg_tex_get_mip_contents_arr(tex, 0, 0, ref_data, data_size);
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_get_mip_contents(skg_tex_t *tex, int32_t mip_level, void *ref_data, size_t data_size) {
+	return skg_tex_get_mip_contents_arr(tex, mip_level, 0, ref_data, data_size);
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size) {
+	// Double check on mips first
+	uint32_t mip_levels = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+	if (mip_level != 0) {
+		if (tex->mips != skg_mip_generate) {
+			skg_log(skg_log_critical, "Can't get mip data from a texture with no mips!");
+			return false;
+		}
+		if (mip_level >= mip_levels) {
+			skg_log(skg_log_critical, "This texture doesn't have quite as many mip levels as you think.");
+			return false;
+		}
+	}
+
+	// Make sure we've been provided enough memory to hold this texture
+	int32_t width       = 0;
+	int32_t height      = 0;
+	size_t  format_size = skg_tex_fmt_size(tex->format);
+	skg_mip_dimensions(tex->width, tex->height, mip_level, &width, &height);
+
+	if (data_size != (size_t)width * (size_t)height * format_size) {
+		skg_log(skg_log_critical, "Insufficient buffer size for skg_tex_get_mip_contents_arr");
+		return false;
+	}
+
+	int64_t layout = skg_tex_fmt_to_gl_layout(tex->format);
 	glBindTexture (tex->_target, tex->_texture);
 
 #if defined(_SKG_GL_WEB) || defined(_SKG_GL_ES)
@@ -1775,34 +1811,34 @@ bool skg_tex_get_contents(skg_tex_t *tex, void *ref_data, size_t data_size) {
 	uint32_t fbo = 0;
 	glGenFramebuffers     (1, &fbo); 
 	glBindFramebuffer     (GL_FRAMEBUFFER, fbo);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_target, tex->_texture, 0);
+	if (tex->_target == GL_TEXTURE_CUBE_MAP) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X+arr_index, tex->_texture, mip_level);
+	} else {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_target, tex->_texture, mip_level);
+	}
 
-	glReadPixels(0, 0, tex->width, tex->height, format, skg_tex_fmt_to_gl_type(tex->format), ref_data);
+	glReadPixels(0, 0, width, height, layout, skg_tex_fmt_to_gl_type(tex->format), ref_data);
 
 	glBindFramebuffer   (GL_FRAMEBUFFER, 0);
 	glDeleteFramebuffers(1, &fbo);
 #else
 	glBindTexture(tex->_target, tex->_texture);
-	glGetTexImage(tex->_target, 0, (uint32_t)format, skg_tex_fmt_to_gl_type(tex->format), ref_data);
+
+	if (tex->_target == GL_TEXTURE_CUBE_MAP) {
+		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X+arr_index, mip_level, (uint32_t)layout, skg_tex_fmt_to_gl_type(tex->format), ref_data);
+	} else {
+		glGetTexImage(tex->_target, mip_level, (uint32_t)layout, skg_tex_fmt_to_gl_type(tex->format), ref_data);
+	}
 #endif
 
-	bool result = glGetError() == 0;
-
-	// This is OpenGL, and textures are upside-down
-	if (result) {
-		int32_t line_size = skg_tex_fmt_size(tex->format) * tex->width;
-		void   *tmp       = malloc(line_size);
-		for (int32_t y = 0; y < tex->height/2; y++) {
-			void *top_line = ((uint8_t*)ref_data) + line_size * y;
-			void *bot_line = ((uint8_t*)ref_data) + line_size * ((tex->height-1) - y);
-			memcpy(tmp,      top_line, line_size);
-			memcpy(top_line, bot_line, line_size);
-			memcpy(bot_line, tmp,      line_size);
-		}
-		free(tmp);
+	uint32_t result = glGetError();
+	if (result != 0) {
+		char text[128];
+		snprintf(text, 128, "skg_tex_get_mip_contents_arr error: %d", result);
+		skg_log(skg_log_critical, text);
 	}
 
-	return result;
+	return result == 0;
 }
 
 ///////////////////////////////////////////

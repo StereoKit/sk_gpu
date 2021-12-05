@@ -4073,7 +4073,7 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_target, tex->_texture, mip_level);
 	}
 
-	glReadPixels(0, 0, width, height, format, skg_tex_fmt_to_gl_type(tex->format), ref_data);
+	glReadPixels(0, 0, width, height, layout, skg_tex_fmt_to_gl_type(tex->format), ref_data);
 
 	glBindFramebuffer   (GL_FRAMEBUFFER, 0);
 	glDeleteFramebuffers(1, &fbo);

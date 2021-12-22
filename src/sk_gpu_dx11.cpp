@@ -1348,7 +1348,7 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 			skg_log(skg_log_critical, "Can't get mip data from a texture with no mips!");
 			return false;
 		}
-		if (mip_level >= mip_levels) {
+		if (mip_level >= (int32_t)mip_levels) {
 			skg_log(skg_log_critical, "This texture doesn't have quite as many mip levels as you think.");
 			return false;
 		}

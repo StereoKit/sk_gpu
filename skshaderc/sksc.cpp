@@ -738,7 +738,7 @@ bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc
 	SKSCInclude includer(settings);
 	ID3DBlob *errors, *compiled = nullptr;
 	if (FAILED(D3DCompile(hlsl_text, strlen(hlsl_text), filename, nullptr, &includer, entrypoint, target, flags, 0, &compiled, &errors))) {
-		sksc_log(log_level_err, "D3DCompile failed: %s\n", (char *)errors->GetBufferPointer());
+		sksc_log(log_level_err, "%s", (char *)errors->GetBufferPointer());
 		if (errors) errors->Release();
 		return false;
 	}

@@ -4,14 +4,14 @@
 //--dense:thing=blue
 //--test
 
-cbuffer /* hehe */SystemBuffer : /* Here's some sneaky stuff */ register(b0) { // With some at the end
+cbuffer /* hehe */SystemBuffer : /* Here's some sneaky stuff */ register(b1) { // With some at the end
 	float4x4 viewproj;
 };
 
 struct Inst {
 	float4x4 world;
 };
-cbuffer TransformBuffer : register(b1) {
+cbuffer TransformBuffer : register(b2) {
 	Inst inst[100];
 };
 

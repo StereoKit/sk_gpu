@@ -195,6 +195,7 @@ python build_header.py</Command>
     <ClInclude Include="..\..\src\sk_gpu_dx12.h" />
     <ClInclude Include="..\..\src\sk_gpu_gl.h" />
     <ClInclude Include="..\..\src\sk_gpu_vk.h" />
+    <ClInclude Include="..\common\compute_test.hlsl.h" />
     <ClInclude Include="..\common\cubemap.hlsl.h" />
     <ClInclude Include="..\common\HandmadeMath.h" />
     <ClInclude Include="..\common\app.h" />
@@ -218,6 +219,13 @@ python build_header.py</Command>
       <Command>$(ProjectDir)..\..\bin\Release\skshaderc.exe -h %(FullPath)</Command>
       <Outputs>%(FullPath).sks</Outputs>
       <TreatOutputAsContent>true</TreatOutputAsContent>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\common\compute_test.hlsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)..\..\bin\Release\skshaderc.exe -cs cs -h %(FullPath)</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
   </ItemGroup>

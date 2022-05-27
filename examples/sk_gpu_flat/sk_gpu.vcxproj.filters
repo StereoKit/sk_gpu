@@ -61,6 +61,9 @@
     <ClInclude Include="..\common\micro_ply.h">
       <Filter>common</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\compute_test.hlsl.h">
+      <Filter>common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -78,6 +81,9 @@
       <Filter>common</Filter>
     </CustomBuild>
     <CustomBuild Include="..\common\test.hlsl">
+      <Filter>common</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\common\compute_test.hlsl">
       <Filter>common</Filter>
     </CustomBuild>
   </ItemGroup>

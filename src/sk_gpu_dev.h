@@ -90,9 +90,17 @@ typedef enum skg_tex_type_ {
 } skg_tex_type_;
 
 typedef enum skg_use_ {
-	skg_use_static,
-	skg_use_dynamic,
+	skg_use_static        = 1 << 0,
+	skg_use_dynamic       = 1 << 2,
+	skg_use_compute_read  = 1 << 3,
+	skg_use_compute_write = 1 << 4,
+	skg_use_compute_readwrite = skg_use_compute_read | skg_use_compute_write
 } skg_use_;
+
+typedef enum skg_read_ {
+	skg_read_only,
+	skg_read_write,
+} skg_read_;
 
 typedef enum skg_mip_ {
 	skg_mip_generate,
@@ -160,6 +168,15 @@ typedef enum skg_stage_ {
 	skg_stage_compute = 1 << 2,
 } skg_stage_;
 
+typedef enum skg_register_ {
+	skg_register_default,
+	skg_register_vertex,
+	skg_register_index,
+	skg_register_constant,
+	skg_register_resource,
+	skg_register_readwrite,
+} skg_register_;
+
 typedef enum skg_shader_var_ {
 	skg_shader_var_none,
 	skg_shader_var_int,
@@ -220,7 +237,8 @@ typedef struct skg_vert_t {
 
 typedef struct skg_bind_t {
 	uint16_t slot;
-	uint16_t stage_bits;
+	uint8_t  stage_bits;
+	uint8_t  register_type;
 } skg_bind_t;
 
 typedef struct skg_shader_var_t {
@@ -243,21 +261,21 @@ typedef struct skg_shader_buffer_t {
 	skg_shader_var_t *vars;
 } skg_shader_buffer_t;
 
-typedef struct skg_shader_texture_t {
+typedef struct skg_shader_resource_t {
 	char       name [32];
 	uint64_t   name_hash;
 	char       extra[64];
 	skg_bind_t bind;
-} skg_shader_texture_t;
+} skg_shader_resource_t;
 
 typedef struct skg_shader_meta_t {
-	char                  name[256];
-	uint32_t              buffer_count;
-	skg_shader_buffer_t  *buffers;
-	uint32_t              texture_count;
-	skg_shader_texture_t *textures;
-	int32_t               references;
-	int32_t               global_buffer_id;
+	char                   name[256];
+	uint32_t               buffer_count;
+	skg_shader_buffer_t   *buffers;
+	uint32_t               resource_count;
+	skg_shader_resource_t *resources;
+	int32_t                references;
+	int32_t                global_buffer_id;
 } skg_shader_meta_t;
 
 ///////////////////////////////////////////
@@ -284,6 +302,7 @@ SKG_API bool                skg_capability               (skg_cap_ capability);
 
 SKG_API void                skg_draw_begin               ();
 SKG_API void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
+SKG_API void                skg_compute                  (uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z);
 SKG_API void                skg_viewport                 (const int32_t *xywh);
 SKG_API void                skg_viewport_get             (int32_t *out_xywh);
 SKG_API void                skg_scissor                  (const int32_t *xywh);
@@ -294,6 +313,7 @@ SKG_API bool                skg_buffer_is_valid          (const skg_buffer_t *bu
 SKG_API void                skg_buffer_set_contents      (      skg_buffer_t *buffer, const void *data, uint32_t size_bytes);
 SKG_API void                skg_buffer_get_contents      (const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
 SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
+SKG_API void                skg_buffer_clear             (skg_bind_t bind);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 
 SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer);
@@ -309,8 +329,8 @@ SKG_API skg_shader_t        skg_shader_create_file       (const char *sks_filena
 SKG_API skg_shader_t        skg_shader_create_memory     (const void *sks_memory, size_t sks_memory_size);
 SKG_API skg_shader_t        skg_shader_create_manual     (skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader);
 SKG_API bool                skg_shader_is_valid          (const skg_shader_t *shader);
-SKG_API skg_bind_t          skg_shader_get_tex_bind      (const skg_shader_t *shader, const char *name);
-SKG_API skg_bind_t          skg_shader_get_buffer_bind   (const skg_shader_t *shader, const char *name);
+SKG_API void                skg_shader_compute_bind      (const skg_shader_t *shader);
+SKG_API skg_bind_t          skg_shader_get_bind          (const skg_shader_t *shader, const char *name);
 SKG_API int32_t             skg_shader_get_var_count     (const skg_shader_t *shader);
 SKG_API int32_t             skg_shader_get_var_index     (const skg_shader_t *shader, const char *name);
 SKG_API int32_t             skg_shader_get_var_index_h   (const skg_shader_t *shader, uint64_t name_hash);
@@ -350,7 +370,10 @@ SKG_API void                skg_tex_settings             (      skg_tex_t *tex, 
 SKG_API void                skg_tex_set_contents         (      skg_tex_t *tex, const void *data, int32_t width, int32_t height);
 SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample);
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
+SKG_API bool                skg_tex_get_mip_contents     (      skg_tex_t *tex, int32_t mip_level, void *ref_data, size_t data_size);
+SKG_API bool                skg_tex_get_mip_contents_arr (      skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
+SKG_API void                skg_tex_clear                (skg_bind_t bind);
 SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target);
 SKG_API skg_tex_t          *skg_tex_target_get           ();
 SKG_API void                skg_tex_destroy              (      skg_tex_t *tex);

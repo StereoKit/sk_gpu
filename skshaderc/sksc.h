@@ -2,9 +2,13 @@
 #pragma once
 
 #include <stdint.h>
-
-#define SKR_DIRECT3D11
 #include "../sk_gpu.h"
+
+#if defined(_WIN32)
+#define SKSC_D3D11
+#endif
+#define SKSC_SPIRV_GLSLANG
+//#define SKSC_SPIRV_DXC
 
 ///////////////////////////////////////////
 
@@ -21,8 +25,11 @@ typedef struct sksc_settings_t {
 	char folder[512];
 	char *out_folder;
 	char vs_entrypoint[64];
+	bool vs_entry_require;
 	char ps_entrypoint[64];
+	bool ps_entry_require;
 	char cs_entrypoint[64];
+	bool cs_entry_require;
 	char shader_model[64];
 	char shader_model_str[16];
 	int32_t gl_version;
@@ -40,10 +47,10 @@ typedef struct sksc_log_item_t {
 
 ///////////////////////////////////////////
 
-void    sksc_init       ();
-void    sksc_shutdown   ();
-bool    sksc_compile    (const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file);
-void    sksc_build_file (const skg_shader_file_t *file, void **out_data, size_t *out_size);
+void            sksc_init       ();
+void            sksc_shutdown   ();
+bool            sksc_compile    (const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file);
+void            sksc_build_file (const skg_shader_file_t *file, void **out_data, size_t *out_size);
 void            sksc_log_print  (const sksc_settings_t *settings);
 void            sksc_log_clear  ();
 int32_t         sksc_log_count  ();

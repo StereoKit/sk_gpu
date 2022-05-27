@@ -5,4 +5,5 @@ project(sk_gpu VERSION 0.1
                LANGUAGES CXX)
 
 add_subdirectory(src)
+add_subdirectory(skshaderc)
 add_subdirectory(examples/sk_gpu_flat)

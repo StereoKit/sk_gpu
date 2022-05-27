@@ -1,14 +1,14 @@
 //--name = Cubemap
 //--tex = white 
 
-cbuffer SystemBuffer : register(b0) {
+cbuffer SystemBuffer : register(b1) {
 	float4x4 viewproj;
 };
 
 struct Inst {
 	float4x4 world;
 };
-cbuffer TransformBuffer : register(b1) {
+cbuffer TransformBuffer : register(b2) {
 	Inst inst[100];
 };
 

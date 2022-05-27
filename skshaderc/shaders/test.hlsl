@@ -5,7 +5,7 @@
 //--chunks = 1, 2, 2, 1
 
 // This is for the system to load in global values
-cbuffer SystemBuffer : register(b0) {
+cbuffer SystemBuffer : register(b1) {
 	float4x4 viewproj;
 };
 
@@ -13,7 +13,7 @@ cbuffer SystemBuffer : register(b0) {
 struct Inst {
 	float4x4 world;
 };
-cbuffer TransformBuffer : register(b1) {
+cbuffer TransformBuffer : register(b2) {
 	Inst inst[100];
 };
 

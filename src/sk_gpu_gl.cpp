@@ -86,6 +86,8 @@ wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
 #define GL_ONE_MINUS_CONSTANT_COLOR 0x8002
 #define GL_CONSTANT_ALPHA           0x8003
 #define GL_ONE_MINUS_CONSTANT_ALPHA 0x8004
+#define GL_FUNC_ADD                 0x8006
+#define GL_MAX                      0x8008
 
 #define GL_NEVER                    0x0200 
 #define GL_LESS                     0x0201
@@ -333,6 +335,7 @@ GLE(void,     glScissor,                 int32_t x, int32_t y, uint32_t width, u
 GLE(void,     glCullFace,                uint32_t mode) \
 GLE(void,     glBlendFunc,               uint32_t sfactor, uint32_t dfactor) \
 GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
+GLE(void,     glBlendEquationSeparate,   uint32_t modeRGB, uint32_t modeAlpha) \
 GLE(void,     glDispatchCompute,         uint32_t num_groups_x, uint32_t num_groups_y, uint32_t num_groups_z) \
 GLE(const char *, glGetString,           uint32_t name) \
 GLE(const char *, glGetStringi,          uint32_t name, uint32_t index)
@@ -469,6 +472,8 @@ int32_t gl_init_wgl() {
 		WGL_COLOR_BITS_ARB,     32,
 		WGL_DEPTH_BITS_ARB,     24,
 		WGL_STENCIL_BITS_ARB,   8,
+		WGL_SAMPLE_BUFFERS_ARB, 1,
+		WGL_SAMPLES_ARB,        4,
 		0 };
 
 	pixel_format = 0;
@@ -643,6 +648,8 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback([](uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int32_t length, const char *message, const void *userParam) {
+		if (id == 0x7fffffff) return;
+
 		const char *src = "OTHER";
 		switch (source) {
 		case 0x8246: src = "API"; break;
@@ -796,7 +803,11 @@ bool skg_capability(skg_cap_ capability) {
 #ifdef _SKG_GL_WEB
 		return false;
 #else
+#pragma clang diagnostic push
+		// On some platforms, glPolygonMode is a function and not a function pointer, so glPolygonMode != nullptr is trivially true, and Clang wants to warn us about that. This isn't an actual problem, so let's suppress that warning.
+#pragma clang diagnostic ignored "-Wtautological-pointer-compare"
 		return glPolygonMode != nullptr;
+#pragma clang diagnostic pop
 #endif
 	default: return false;
 	}
@@ -1198,10 +1209,12 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	case skg_transparency_blend:
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glBlendEquationSeparate(GL_FUNC_ADD, GL_MAX);
 		break;
 	case skg_transparency_add:
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
+		glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
 		break;
 	case skg_transparency_none:
 		glDisable(GL_BLEND);
@@ -1350,6 +1363,8 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 		WGL_COLOR_BITS_ARB,     32,
 		WGL_DEPTH_BITS_ARB,     24,
 		WGL_STENCIL_BITS_ARB,   8,
+		WGL_SAMPLE_BUFFERS_ARB, 1,
+		WGL_SAMPLES_ARB,        4,
 		0 };
 
 	int  pixel_format = 0;
@@ -1586,9 +1601,9 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 
 	if (type == skg_tex_type_rendertarget) {
 		glGenFramebuffers(1, &result._framebuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, result._framebuffer);
+		glBindFramebuffer        (GL_FRAMEBUFFER, result._framebuffer);
 		glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0, array_layer);
-		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
+		glBindFramebuffer        (GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
 
 	return result;
@@ -1635,7 +1650,8 @@ void skg_tex_copy_to(const skg_tex_t *tex, skg_tex_t *destination) {
 		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
 	}
 
-	glBindTexture      (tex->_target, destination->_texture);
+	glBindFramebuffer  (GL_FRAMEBUFFER, tex->_framebuffer);
+	glBindTexture      (destination->_target, destination->_texture);
 	glCopyTexSubImage2D(destination->_target, 0, 0,0,0,0,tex->width,tex->height);
 }
 
@@ -1692,12 +1708,12 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 	uint32_t filter, min_filter;
 	switch (sample) {
 	case skg_tex_sample_linear:     filter = GL_LINEAR;  min_filter = tex->mips == skg_mip_generate ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR; break; // Technically trilinear
-	case skg_tex_sample_point:      filter = GL_NEAREST; min_filter = GL_NEAREST;              break;
+	case skg_tex_sample_point:      filter = GL_NEAREST; min_filter = GL_NEAREST;                                                          break;
 	case skg_tex_sample_anisotropic:filter = GL_LINEAR;  min_filter = tex->mips == skg_mip_generate ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR; break;
 	default: filter = GL_LINEAR; min_filter = GL_LINEAR;
 	}
 
-	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);	
+	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_T, mode);
 	if (tex->type == skg_tex_type_cubemap) {
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
@@ -1818,6 +1834,8 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 	glBindFramebuffer   (GL_FRAMEBUFFER, 0);
 	glDeleteFramebuffers(1, &fbo);
 #else
+	glBindTexture(tex->_target, tex->_texture);
+
 	if (tex->_target == GL_TEXTURE_CUBE_MAP) {
 		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X+arr_index, mip_level, (uint32_t)layout, skg_tex_fmt_to_gl_type(tex->format), ref_data);
 	} else {

@@ -37,7 +37,7 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 
 ///////////////////////////////////////////
 
-int32_t skg_init(const char *app_name, void *adapter_id) {
+int32_t skg_init(const char *, void *adapter_id) {
 	UINT creation_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #if defined(_DEBUG)
 	creation_flags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -627,8 +627,8 @@ void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 		desc_blend.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
 		desc_blend.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
 		desc_blend.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
-		desc_blend.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
-		desc_blend.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+		desc_blend.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ONE;
+		desc_blend.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_MAX;
 		break;
 	case skg_transparency_add:
 		desc_blend.RenderTarget[0].BlendEnable           = true;
@@ -948,9 +948,9 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	// Get information about the image!
 	D3D11_TEXTURE2D_DESC color_desc;
 	result._texture->GetDesc(&color_desc);
-	result.width       = color_desc.Width;
-	result.height      = color_desc.Height;
-	result.array_count = color_desc.ArraySize;
+	result.width       = color_desc.Width;     (void)width;
+	result.height      = color_desc.Height;    (void)height;
+	result.array_count = color_desc.ArraySize; (void)array_count;
 	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, 0, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
@@ -970,8 +970,8 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	// Get information about the image!
 	D3D11_TEXTURE2D_DESC color_desc;
 	result._texture->GetDesc(&color_desc);
-	result.width       = color_desc.Width;
-	result.height      = color_desc.Height;
+	result.width       = color_desc.Width;  (void)width;
+	result.height      = color_desc.Height; (void)height;
 	result.array_count = 1;
 	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
@@ -1266,7 +1266,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		desc.SampleDesc.Count = multisample;
 		desc.Format           = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
 		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : D3D11_BIND_SHADER_RESOURCE;
-		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : D3D11_USAGE_DEFAULT;
+		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || data_frames != nullptr || data_frames[0] != nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
 		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags  = D3D11_RESOURCE_MISC_TEXTURECUBE;
@@ -1342,13 +1342,13 @@ bool skg_tex_get_mip_contents(skg_tex_t *tex, int32_t mip_level, void *ref_data,
 
 bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size) {
 	// Double check on mips first
-	uint32_t mip_levels = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+	int32_t mip_levels = tex->mips == skg_mip_generate ? (int32_t)skg_mip_count(tex->width, tex->height) : 1;
 	if (mip_level != 0) {
 		if (tex->mips != skg_mip_generate) {
 			skg_log(skg_log_critical, "Can't get mip data from a texture with no mips!");
 			return false;
 		}
-		if (mip_level >= (int32_t)mip_levels) {
+		if (mip_level >= mip_levels) {
 			skg_log(skg_log_critical, "This texture doesn't have quite as many mip levels as you think.");
 			return false;
 		}

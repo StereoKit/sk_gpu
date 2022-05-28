@@ -30,8 +30,8 @@ uint64_t exe_file_time = 0;
 ///////////////////////////////////////////
 
 bool            read_file     (const char *filename, char **out_text, size_t *out_size);
-void            write_file    (const char *filename, void *file_data, size_t file_size);
-void            write_header  (const char *filename, void *file_data, size_t file_size);
+bool            write_file    (const char *filename, void *file_data, size_t file_size);
+bool            write_header  (const char *filename, void *file_data, size_t file_size);
 void            compile_file  (const char *filename,   sksc_settings_t *settings);
 void            iterate_dir   (const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file));
 sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
@@ -278,14 +278,18 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 			void  *sks_data;
 			size_t sks_size;
 			sksc_build_file(&file, &sks_data, &sks_size);
+			bool written = false;
 			if (settings->output_header)
-				write_header(new_filename, sks_data, sks_size);
+				written = write_header(new_filename, sks_data, sks_size);
 			else 
-				write_file  (new_filename, sks_data, sks_size);
+				written = write_file  (new_filename, sks_data, sks_size);
 			free(sks_data);
 
 			skg_shader_file_destroy(&file);
-			sksc_log(log_level_info, "Compiled successfully to %s", new_filename);
+			if (written)
+				sksc_log(log_level_info, "Compiled successfully to %s", new_filename);
+			else
+				sksc_log(log_level_err, "Failed to write file! %s", new_filename);
 		}
 		sksc_log_print(src_filename, settings);
 		sksc_log_clear();
@@ -321,29 +325,82 @@ bool read_file(const char *filename, char **out_text, size_t *out_size) {
 
 ///////////////////////////////////////////
 
-void write_file(const char *filename, void *file_data, size_t file_size) {
+#ifdef _WIN32
+const char SEP = '\\';
+#else
+const char SEP = '/';
+#endif
+
+bool recurse_mkdir(const char* dirname) {
+	const char* p;
+	char*       temp;
+	bool        ret = true;
+
+	temp = (char*)calloc(1, strlen(dirname) + 1);
+	/* Skip Windows drive letter. */
+#ifdef _WIN32
+	if ((p = strchr(dirname, ':')) != NULL) {
+		p++;
+	}
+	else {
+#endif
+		p = dirname;
+#ifdef _WIN32
+	}
+#endif
+
+	while ((p = strchr(p, SEP)) != NULL) {
+		/* Skip empty elements. Could be a Windows UNC path or
+		   just multiple separators which is okay. */
+		if (p != dirname && *(p - 1) == SEP) {
+			p++;
+			continue;
+		}
+		/* Put the path up to this point into a temporary to
+		   pass to the make directory function. */
+		memcpy(temp, dirname, p - dirname);
+		temp[p - dirname] = '\0';
+		p++;
+#ifdef _WIN32
+		if (CreateDirectory(temp, NULL) == FALSE) {
+			if (GetLastError() != ERROR_ALREADY_EXISTS) {
+				ret = false;
+				break;
+			}
+		}
+#else
+		if (mkdir(temp, 0774) != 0) {
+			if (errno != EEXIST) {
+				ret = false;
+				break;
+			}
+		}
+#endif
+	}
+	free(temp);
+	return ret;
+}
+
+bool write_file(const char *filename, void *file_data, size_t file_size) {
 	// Make sure the folder exists
 	char folder[1024];
 	file_dir(filename, folder, sizeof(folder));
-#if defined(_WIN32)
-	_mkdir(folder);
-#else
-	mkdir(folder, ACCESSPERMS);
-#endif
+	recurse_mkdir(folder);
 
 	// Open and write
 	FILE *fp = fopen(filename, "wb");
 	if (fp == nullptr) {
-		return;
+		return false;
 	}
 	fwrite(file_data, file_size, 1, fp);
 	fflush(fp);
 	fclose(fp);
+	return true;
 }
 
 ///////////////////////////////////////////
 
-void write_header(const char *filename, void *file_data, size_t file_size) {
+bool write_header(const char *filename, void *file_data, size_t file_size) {
 	char name[128];
 	file_name(filename, name, sizeof(name));
 
@@ -355,7 +412,7 @@ void write_header(const char *filename, void *file_data, size_t file_size) {
 
 	FILE *fp = fopen(filename, "w");
 	if (fp == nullptr) {
-		return;
+		return false;
 	}
 	fprintf(fp, "#pragma once\n\n");
 	fprintf(fp, "const unsigned char sks_%s[%zu] = {\n", name, file_size);
@@ -366,6 +423,8 @@ void write_header(const char *filename, void *file_data, size_t file_size) {
 	fprintf(fp, "};\n");
 	fflush(fp);
 	fclose(fp);
+
+	return true;
 }
 
 ///////////////////////////////////////////

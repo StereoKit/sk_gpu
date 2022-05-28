@@ -273,6 +273,7 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 	size_t file_size;
 	if (read_file(src_filename, &file_text, &file_size)) {
 		skg_shader_file_t file;
+		sksc_log(log_level_info, "Compiling %s..", new_filename);
 		if (sksc_compile(src_filename, file_text, settings, &file)) {
 			void  *sks_data;
 			size_t sks_size;
@@ -284,8 +285,9 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 			free(sks_data);
 
 			skg_shader_file_destroy(&file);
+			sksc_log(log_level_info, "Compiled successfully to %s", new_filename);
 		}
-		sksc_log_print(settings);
+		sksc_log_print(src_filename, settings);
 		sksc_log_clear();
 		free(file_text);
 	} else {

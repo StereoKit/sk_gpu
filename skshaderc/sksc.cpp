@@ -1311,7 +1311,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 	spvc_context context = nullptr;
 	spvc_context_create            (&context);
 	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
-		sksc_log(log_level_err, "[GLSL] %s", error);
+		sksc_log(log_level_err, "[SPIRV-Cross] %s", error);
 	}, nullptr);
 
 	spvc_compiler  compiler_glsl = nullptr;
@@ -1361,6 +1361,13 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		spvc_compiler_add_header_line(compiler_glsl, "#else");
 		spvc_compiler_add_header_line(compiler_glsl, "#define gl_Layer int _dummy_gl_layer_var");
 		spvc_compiler_add_header_line(compiler_glsl, "#endif");
+	}
+
+	spvc_variable_id id;
+	spvc_compiler_build_dummy_sampler_for_combined_images(compiler_glsl, &id);
+	if (id) {
+		spvc_compiler_set_decoration(compiler_glsl, id, SpvDecorationDescriptorSet, 0);
+		spvc_compiler_set_decoration(compiler_glsl, id, SpvDecorationBinding, 0);
 	}
 
 	// combiner samplers/textures for OpenGL/ES
@@ -1670,6 +1677,7 @@ void sksc_log_print(const char *file, const sksc_settings_t *settings) {
 			}
 		}
 	}
+	printf("\n");
 }
 
 ///////////////////////////////////////////

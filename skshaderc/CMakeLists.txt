@@ -38,7 +38,7 @@ include(../cmake/CPM.cmake)
 CPMAddPackage(
     NAME SPIRV-Cross
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
-    GIT_TAG 1ae2b58f19a935494363559f2fb41d7154261933
+    GIT_TAG 50b4d5389b6a06f86fb63a2848e1a7da6d9755ca # May 27, 2022
     OPTIONS 
     "SPIRV_CROSS_CLI OFF" 
     "SPIRV_CROSS_ENABLE_TESTS OFF" 
@@ -49,7 +49,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME SPIRV-Headers
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
-    GIT_TAG 1d4e3a7e3a04ba205ed8cb1485f7cb7369bec609
+    GIT_TAG 5a121866927a16ab9d49bed4788b532c7fcea766 # May 25, 2022
 )
 
 # For optimizing SPIR-V shaders, a baseline amount of
@@ -58,10 +58,11 @@ CPMAddPackage(
 CPMAddPackage(
     NAME SPIRV-Tools
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
-    GIT_TAG 3a68a7274022f75d1a54baebda313820010b1c9c
+    GIT_TAG v2022.2
     OPTIONS
     "SPIRV_SKIP_TESTS ON"
     "SPIRV_SKIP_EXECUTABLES ON"
+    "SPIRV_WERROR OFF"
 )
 
 # This is used to convert HLSL to SPIR-V. DXC is an
@@ -70,7 +71,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME glslang
     GITHUB_REPOSITORY KhronosGroup/glslang
-    GIT_TAG ae2a562936cc8504c9ef2757cceaff163147834f
+    GIT_TAG 7dda6a6347b0bd550e202942adee475956ef462a # May 26, 2022
     OPTIONS 
     "SKIP_GLSLANG_INSTALL ON"
 )

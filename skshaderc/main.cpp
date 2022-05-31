@@ -316,7 +316,7 @@ bool read_file(const char *filename, char **out_text, size_t *out_size) {
 
 	*out_text = (char*)malloc(*out_size+1);
 	if (*out_text == nullptr) { *out_size = 0; fclose(fp); return false; }
-	fread (*out_text, 1, *out_size, fp);
+	if (fread(*out_text, 1, *out_size, fp) == 0) return false;
 	fclose(fp);
 
 	(*out_text)[*out_size] = 0;
@@ -324,6 +324,8 @@ bool read_file(const char *filename, char **out_text, size_t *out_size) {
 }
 
 ///////////////////////////////////////////
+
+#include <errno.h>
 
 #ifdef _WIN32
 const char SEP = '\\';

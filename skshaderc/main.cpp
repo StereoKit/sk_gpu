@@ -43,6 +43,7 @@ void            file_dir      (const char *file, char *out_path, size_t path_siz
 bool            file_exists   (const char *path);
 bool            path_is_file  (const char *path);
 bool            path_is_wild  (const char *path);
+char           *path_absolute (const char *relative_dir);
 
 ///////////////////////////////////////////
 
@@ -252,11 +253,13 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 	file_name_ext(src_filename, name_ext, sizeof(name_ext));
 
 	char        new_filename[1024];
-	const char *dest_folder = settings->out_folder ? settings->out_folder : dir;
+	const char *dest_folder    = settings->out_folder ? settings->out_folder : dir;
+	char        trailing_char  = dest_folder[strlen(dest_folder) - 1];
+	bool        trailing_slash = trailing_char == '/' || trailing_char == '\\';
 	if (settings->replace_ext) {
-		snprintf(new_filename, sizeof(new_filename), "%s%s.%s", dest_folder, name, settings->output_header?"h":"sks");
+		snprintf(new_filename, sizeof(new_filename), "%s%s%s.%s", dest_folder, trailing_slash ? "":"/", name,     settings->output_header?"h":"sks");
 	} else {
-		snprintf(new_filename, sizeof(new_filename), "%s%s.%s", dest_folder, name_ext, settings->output_header?"h":"sks");
+		snprintf(new_filename, sizeof(new_filename), "%s%s%s.%s", dest_folder, trailing_slash ? "":"/", name_ext, settings->output_header?"h":"sks");
 	}
 
 	// Skip this file if it hasn't changed 
@@ -286,10 +289,12 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 			free(sks_data);
 
 			skg_shader_file_destroy(&file);
+
+			char *abs_path = path_absolute(new_filename);
 			if (written)
-				sksc_log(log_level_info, "Compiled successfully to %s", new_filename);
+				sksc_log(log_level_info, "Compiled successfully to %s", abs_path);
 			else
-				sksc_log(log_level_err, "Failed to write file! %s", new_filename);
+				sksc_log(log_level_err, "Failed to write file! %s", abs_path);
 		}
 		sksc_log_print(src_filename, settings);
 		sksc_log_clear();
@@ -325,62 +330,110 @@ bool read_file(const char *filename, char **out_text, size_t *out_size) {
 
 ///////////////////////////////////////////
 
+#ifdef _WIN32
+#define SEPARATOR '\\'
+#else
+#define SEPARATOR '/'
+#endif
+
+// Windows does have a _fullpath function, but there is no Linux equivalent, so
+// to keep the code consistent, both will use this code.
+char *path_absolute(const char *relative_dir) {
+	static char result[2048];
+	result[0] = '\0';
+	
+	// This is not an absolute path, prefix the working directory
+	if (relative_dir[0] != '/') {
+#ifdef _WIN32
+		if (_getcwd(result, sizeof(result)) == nullptr)
+			return nullptr;
+#else
+		if (getcwd(result, sizeof(result)) == nullptr)
+			return nullptr;
+#endif
+	}
+	// Ensure that the working path ends with a separator
+	size_t write_at = strlen(result);
+	if (result[write_at] != '/' && result[write_at] != '\\') {
+		result[write_at] = SEPARATOR;
+		write_at++;
+	}
+	
+	const char *curr  = relative_dir;
+	const char *start = relative_dir;
+	while (*curr != '\0') {
+		// Find the next path element
+		while (*curr == '\\' || *curr == '/') {
+			curr++;
+		}
+		start = curr;
+		if (*curr == '\0') break;
+		while (*curr != '\\' && *curr != '/' && *curr != '\0') {
+			curr++;
+		}
+
+		if (curr - start == 2 && start[0] == '.' && start[1] == '.') {
+			// Handle "up" a directory, the '..' path
+			write_at--;
+			while (write_at > 0) {
+				write_at--;
+				if (result[write_at] == '/' || result[write_at] == '\\') {
+					write_at++;
+					break;
+				}
+			}
+		} else if (curr - start == 1 && start[0] == '.') {
+			// We should be able to more or less ignore the current directory
+			// indicator, '.'
+		} else {
+			// Otherwise, just copy in the path element!
+			memcpy(&result[write_at], start, curr - start);
+			write_at += curr - start;
+			
+			result[write_at] = SEPARATOR;
+			write_at += 1;
+		}
+	}
+	// Terminate the path
+	if (write_at > 0) write_at--;
+	result[write_at] = '\0';
+	
+	return result;
+}
+
 #include <errno.h>
-
-#ifdef _WIN32
-const char SEP = '\\';
-#else
-const char SEP = '/';
-#endif
-
-bool recurse_mkdir(const char* dirname) {
-	const char* p;
-	char*       temp;
-	bool        ret = true;
-
-	temp = (char*)calloc(1, strlen(dirname) + 1);
-	/* Skip Windows drive letter. */
-#ifdef _WIN32
-	if ((p = strchr(dirname, ':')) != NULL) {
-		p++;
-	}
-	else {
-#endif
-		p = dirname;
-#ifdef _WIN32
-	}
-#endif
-
-	while ((p = strchr(p, SEP)) != NULL) {
-		/* Skip empty elements. Could be a Windows UNC path or
-		   just multiple separators which is okay. */
-		if (p != dirname && *(p - 1) == SEP) {
-			p++;
-			continue;
+bool recurse_mkdir(const char *dirname) {
+	char *full = path_absolute(dirname);
+	if (full == nullptr) return false;
+	
+	char *curr  = full;
+	while (*curr != '\0') {
+		while (*curr == '\\' || *curr == '/') {
+			curr++;
 		}
-		/* Put the path up to this point into a temporary to
-		   pass to the make directory function. */
-		memcpy(temp, dirname, p - dirname);
-		temp[p - dirname] = '\0';
-		p++;
+		if (*curr == '\0') return true;
+		while (*curr != '\\' && *curr != '/' && *curr != '\0') {
+			curr++;
+		}
+		
+		char old = *curr;
+		*curr = '\0';
 #ifdef _WIN32
-		if (CreateDirectory(temp, NULL) == FALSE) {
+		if (CreateDirectory(full, NULL) == FALSE) {
 			if (GetLastError() != ERROR_ALREADY_EXISTS) {
-				ret = false;
-				break;
+				return false;
 			}
 		}
 #else
-		if (mkdir(temp, 0774) != 0) {
+		if (mkdir(full, 0774) != 0) {
 			if (errno != EEXIST) {
-				ret = false;
-				break;
+				return false;
 			}
 		}
 #endif
+		*curr = old;
 	}
-	free(temp);
-	return ret;
+	return true;
 }
 
 bool write_file(const char *filename, void *file_data, size_t file_size) {

@@ -1,5 +1,6 @@
 #pragma once
 #include "sk_gpu_dev.h"
+#define WIN32_LEAN_AND_MEAN
 #include <d3d11.h>
 #include <dxgi1_6.h>
 

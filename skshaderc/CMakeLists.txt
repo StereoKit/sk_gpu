@@ -86,6 +86,8 @@ add_executable(skshaderc
     main.cpp
     sksc.cpp
     sksc.h
+    miniz.cpp
+    miniz.h
 )
 
 target_link_libraries(skshaderc

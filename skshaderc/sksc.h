@@ -17,6 +17,7 @@ typedef struct sksc_settings_t {
 	bool debug;
 	bool row_major;
 	bool output_header;
+	bool output_zipped;
 	bool silent_info;
 	bool silent_err;
 	bool silent_warn;

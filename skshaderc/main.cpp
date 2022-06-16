@@ -23,15 +23,18 @@
 #define SKSC_IMPL
 #include "sksc.h"
 
+#include "miniz.h"
+
 ///////////////////////////////////////////
 
 uint64_t exe_file_time = 0;
+const int32_t path_size = 2048;
 
 ///////////////////////////////////////////
 
 bool            read_file     (const char *filename, char **out_text, size_t *out_size);
 bool            write_file    (const char *filename, void *file_data, size_t file_size);
-bool            write_header  (const char *filename, void *file_data, size_t file_size);
+bool            write_header  (const char *filename, void *file_data, size_t file_size, bool zipped);
 void            compile_file  (const char *filename,   sksc_settings_t *settings);
 void            iterate_dir   (const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file));
 sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
@@ -44,6 +47,7 @@ bool            file_exists   (const char *path);
 bool            path_is_file  (const char *path);
 bool            path_is_wild  (const char *path);
 char           *path_absolute (const char *relative_dir);
+bool            recurse_mkdir (const char *dirname);
 
 ///////////////////////////////////////////
 
@@ -105,6 +109,7 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	bool set_targets = false;
 	for (int32_t i=1; i<argc-1; i++) {
 		if      (strcmp(argv[i], "-h" ) == 0) result.output_header = true;
+		else if (strcmp(argv[i], "-z" ) == 0) result.output_zipped = true;
 		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = false;
 		else if (strcmp(argv[i], "-r" ) == 0) result.row_major     = true;
 		else if (strcmp(argv[i], "-d" ) == 0) result.debug         = true;
@@ -196,6 +201,7 @@ Usage: skshaderc [options] target_file
 Options:
 	-r		Specify row-major matrices, column-major is default.
 	-h		Output a C header file with a byte array instead of a binary file.
+	-z		Zips and compresses output data with miniz
 	-e		Appends the sks extension to the resulting file instead of 
 			replacing the extension with sks. Default will replace the 
 			extension.
@@ -245,14 +251,14 @@ Options:
 ///////////////////////////////////////////
 
 void compile_file(const char *src_filename, sksc_settings_t *settings) {
-	char dir     [512];
-	char name    [128];
-	char name_ext[128];
+	char dir     [path_size];
+	char name    [path_size];
+	char name_ext[path_size];
 	file_dir     (src_filename, dir,      sizeof(dir));
 	file_name    (src_filename, name,     sizeof(name));
 	file_name_ext(src_filename, name_ext, sizeof(name_ext));
 
-	char        new_filename[1024];
+	char        new_filename[path_size];
 	const char *dest_folder    = settings->out_folder ? settings->out_folder : dir;
 	char        trailing_char  = dest_folder[strlen(dest_folder) - 1];
 	bool        trailing_slash = trailing_char == '/' || trailing_char == '\\';
@@ -278,25 +284,51 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 		skg_shader_file_t file;
 		sksc_log(log_level_info, "Compiling %s..", src_filename);
 		if (sksc_compile(src_filename, file_text, settings, &file)) {
+			
+			// Turn the shader data into a binary file
 			void  *sks_data;
 			size_t sks_size;
 			sksc_build_file(&file, &sks_data, &sks_size);
-			bool written = false;
-			if (settings->output_header)
-				written = write_header(new_filename, sks_data, sks_size);
-			else 
-				written = write_file  (new_filename, sks_data, sks_size);
+			
+			// Zip data
+			bool err = false;
+			if (settings->output_zipped) {
+				mz_ulong sks_size_z = mz_compressBound(sks_size);
+				void*    sks_data_z = malloc(sks_size_z);
+				
+				int status = mz_compress2((unsigned char*)sks_data_z, &sks_size_z, (unsigned char*)sks_data, sks_size, MZ_BEST_COMPRESSION);
+				if (status != MZ_OK) {
+					sksc_log(log_level_err, "Failed to compress data! %d\n", status);
+					err = true;
+				}
+				
+				free(sks_data);
+				sks_data = sks_data_z;
+				sks_size = sks_size_z;
+			}
+
+			// Write to file
+			if (!err) {
+				// Make sure the folder exists
+				char folder[path_size];
+				file_dir(new_filename, folder, sizeof(folder));
+				recurse_mkdir(folder);
+
+				char* abs_file = path_absolute(new_filename);
+				bool written = settings->output_header
+					? write_header(abs_file, sks_data, sks_size, settings->output_zipped)
+					: write_file  (abs_file, sks_data, sks_size);
+
+				if (written) sksc_log(log_level_info, "Compiled successfully to %s", abs_file);
+				else         sksc_log(log_level_err,  "Failed to write file! %s", abs_file);
+			}
 			free(sks_data);
 
 			skg_shader_file_destroy(&file);
-
-			char *abs_path = path_absolute(new_filename);
-			if (written)
-				sksc_log(log_level_info, "Compiled successfully to %s", abs_path);
-			else
-				sksc_log(log_level_err, "Failed to write file! %s", abs_path);
 		}
-		sksc_log_print(src_filename, settings);
+		
+		char* abs_src_file = path_absolute(src_filename);
+		sksc_log_print(abs_src_file, settings);
 		sksc_log_clear();
 		free(file_text);
 	} else {
@@ -339,11 +371,12 @@ bool read_file(const char *filename, char **out_text, size_t *out_size) {
 // Windows does have a _fullpath function, but there is no Linux equivalent, so
 // to keep the code consistent, both will use this code.
 char *path_absolute(const char *relative_dir) {
-	static char result[2048];
+	static char result[path_size];
+	size_t write_at = 0;
 	result[0] = '\0';
 	
 	// This is not an absolute path, prefix the working directory
-	if (relative_dir[0] != '/') {
+	if (relative_dir[0] != '/' && relative_dir[1] != ':') {
 #ifdef _WIN32
 		if (_getcwd(result, sizeof(result)) == nullptr)
 			return nullptr;
@@ -351,14 +384,17 @@ char *path_absolute(const char *relative_dir) {
 		if (getcwd(result, sizeof(result)) == nullptr)
 			return nullptr;
 #endif
+		// Ensure that the working path ends with a separator
+		write_at = strlen(result);
+		if (result[write_at] != '/' && result[write_at] != '\\') {
+			result[write_at] = SEPARATOR;
+			write_at++;
+		}
+	} else if (relative_dir[0] == '/') {
+		result[0] = '/';
+		write_at += 1;
 	}
-	// Ensure that the working path ends with a separator
-	size_t write_at = strlen(result);
-	if (result[write_at] != '/' && result[write_at] != '\\') {
-		result[write_at] = SEPARATOR;
-		write_at++;
-	}
-	
+
 	const char *curr  = relative_dir;
 	const char *start = relative_dir;
 	while (*curr != '\0') {
@@ -437,11 +473,6 @@ bool recurse_mkdir(const char *dirname) {
 }
 
 bool write_file(const char *filename, void *file_data, size_t file_size) {
-	// Make sure the folder exists
-	char folder[1024];
-	file_dir(filename, folder, sizeof(folder));
-	recurse_mkdir(folder);
-
 	// Open and write
 	FILE *fp = fopen(filename, "wb");
 	if (fp == nullptr) {
@@ -455,8 +486,8 @@ bool write_file(const char *filename, void *file_data, size_t file_size) {
 
 ///////////////////////////////////////////
 
-bool write_header(const char *filename, void *file_data, size_t file_size) {
-	char name[128];
+bool write_header(const char *filename, void *file_data, size_t file_size, bool zipped) {
+	char name[path_size];
 	file_name(filename, name, sizeof(name));
 
 	// '.' may be common, and will bork the variable name
@@ -470,7 +501,7 @@ bool write_header(const char *filename, void *file_data, size_t file_size) {
 		return false;
 	}
 	fprintf(fp, "#pragma once\n\n");
-	fprintf(fp, "const unsigned char sks_%s[%zu] = {\n", name, file_size);
+	fprintf(fp, "const unsigned char sks_%s%s[%zu] = {\n", name, zipped ? "_zip" : "", file_size);
 	for (size_t i = 0; i < file_size; i++) {
 		unsigned char byte = ((unsigned char *)file_data)[i];
 		fprintf(fp, "%d,\n", byte);
@@ -598,7 +629,7 @@ bool path_is_wild(const char *path) {
 void iterate_dir(const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file)) {
 #if defined(_WIN32)
 	if (strcmp(directory_path, "") == 0) {
-		char drive_names[256];
+		char drive_names[path_size];
 		GetLogicalDriveStrings(sizeof(drive_names), drive_names);
 		char *curr = drive_names;
 		while (*curr != '\0') {
@@ -611,10 +642,10 @@ void iterate_dir(const char *directory_path, void *callback_data, void (*on_item
 	WIN32_FIND_DATA info;
 	HANDLE          handle = nullptr;
 
-	char directory[1024];
+	char directory[path_size];
 	file_dir(directory_path, directory, sizeof(directory));
 
-	char   filter[1024];
+	char   filter[path_size];
 	size_t path_len = strlen(directory_path);
 	if (path_is_wild(directory_path)) {
 		snprintf(filter, sizeof(filter), "%s", directory_path);
@@ -629,7 +660,7 @@ void iterate_dir(const char *directory_path, void *callback_data, void (*on_item
 
 	while (handle) {
 		if (strcmp(info.cFileName, ".") != 0 && strcmp(info.cFileName, "..") != 0) {
-			char file[1024];
+			char file[path_size];
 			snprintf(file, sizeof(file), "%s%s", directory, info.cFileName);
 
 			if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)

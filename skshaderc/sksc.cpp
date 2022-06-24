@@ -69,8 +69,17 @@ template <typename T> struct array_t {
 struct file_data_t {
 	array_t<uint8_t> data;
 
-	template <size_t _Size> 
-	void write(const char *item[_Size]) { data.add_range((uint8_t*)&item, sizeof(char)*_Size); }
+	void write_fixed_str(const char *item, int32_t _Size) {
+		size_t len = strlen(item);
+		data.add_range((uint8_t*)item, sizeof(char) * len);
+
+		int32_t count = _Size - len;
+		if (_Size - len > 0) {
+			while (data.count + count > data.capacity) { data.resize(data.capacity * 2 < 4 ? 4 : data.capacity * 2); }
+		}
+		memset(&data.data[data.count], 0, count);
+		data.count += count;
+	}
 	template <typename T> 
 	void write(T &item) { data.add_range((uint8_t*)&item, sizeof(T)); }
 	void write(void *item, size_t size) { data.add_range((uint8_t*)item, (int32_t)size); }
@@ -312,7 +321,7 @@ void sksc_dxc_shader_meta(IDxcResult *compile_result, skg_stage_ stage, skg_shad
 			buffer_list[id].size      = shader_buff.Size;
 			buffer_list[id].var_count = shader_buff.Variables;
 			buffer_list[id].vars      = (skg_shader_var_t*)malloc(sizeof(skg_shader_var_t) * buffer_list[i].var_count);
-			*buffer_list[id].vars     = {};
+			memset(buffer_list[id].vars, 0, sizeof(skg_shader_var_t) * buffer_list[i].var_count);
 
 			for (uint32_t v = 0; v < shader_buff.Variables; v++) {
 				ID3D12ShaderReflectionVariable *var  = cb->GetVariableByIndex(v);
@@ -1034,13 +1043,13 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 	data.write(version);
 
 	data.write(file->stage_count);
-	data.write(file->meta->name);
+	data.write_fixed_str(file->meta->name, sizeof(file->meta->name));
 	data.write(file->meta->buffer_count);
 	data.write(file->meta->resource_count);
 
 	for (size_t i = 0; i < file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buff = &file->meta->buffers[i];
-		data.write(buff->name);
+		data.write_fixed_str(buff->name, sizeof(buff->name));
 		data.write(buff->bind);
 		data.write(buff->size);
 		data.write(buff->var_count);
@@ -1054,8 +1063,8 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 
 		for (uint32_t t = 0; t < buff->var_count; t++) {
 			skg_shader_var_t *var = &buff->vars[t];
-			data.write(var->name);
-			data.write(var->extra);
+			data.write_fixed_str(var->name,  sizeof(var->name));
+			data.write_fixed_str(var->extra, sizeof(var->extra));
 			data.write(var->offset);
 			data.write(var->size);
 			data.write(var->type);
@@ -1065,8 +1074,8 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 
 	for (uint32_t i = 0; i < file->meta->resource_count; i++) {
 		skg_shader_resource_t *res = &file->meta->resources[i];
-		data.write(res->name);
-		data.write(res->extra);
+		data.write_fixed_str(res->name,  sizeof(res->name));
+		data.write_fixed_str(res->extra, sizeof(res->extra));
 		data.write(res->bind);
 	}
 
@@ -1472,6 +1481,7 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 		buffer->bind.register_type = skg_register_constant;
 		buffer->var_count          = count;
 		buffer->vars               = (skg_shader_var_t*)malloc(count * sizeof(skg_shader_var_t));
+		memset(buffer->vars, 0, count * sizeof(skg_shader_var_t));
 		strncpy(buffer->name, list[i].name, sizeof(buffer->name));
 
 		for(int32_t m=0; m<count; m+=1) {

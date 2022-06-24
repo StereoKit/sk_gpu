@@ -909,10 +909,13 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 #endif
 
 #if defined(SKSC_D3D11)
-		stages.add({});
-		if (settings->target_langs[skg_shader_lang_hlsl] && !sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
-			sksc_log(log_level_err, "HLSL shader compile failed");
-			return false;
+		
+		if (settings->target_langs[skg_shader_lang_hlsl]) {
+			stages.add({});
+			if (!sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
+				sksc_log(log_level_err, "HLSL shader compile failed");
+				return false;
+			}
 		}
 #else
 		if (settings->target_langs[skg_shader_lang_hlsl]) {
@@ -928,23 +931,25 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		}
 #endif
 
-		stages.add({});
-		if (settings->target_langs[skg_shader_lang_glsl] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
-			sksc_log(log_level_err, "GLSL shader compile failed");
-			return false;
+		if (settings->target_langs[skg_shader_lang_glsl]) {
+			stages.add({});
+			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
+				sksc_log(log_level_err, "GLSL shader compile failed");
+				return false;
+			}
 		}
 
-		if (compile_stages[i] != skg_stage_compute) {
+		if (compile_stages[i] != skg_stage_compute && settings->target_langs[skg_shader_lang_glsl_es]) {
 			stages.add({});
-			if (settings->target_langs[skg_shader_lang_glsl_es] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
+			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
 				sksc_log(log_level_err, "GLES shader compile failed");
 				return false;
 			}
 		}
 
-		if (compile_stages[i] != skg_stage_compute) {
+		if (compile_stages[i] != skg_stage_compute && settings->target_langs[skg_shader_lang_glsl_web]) {
 			stages.add({});
-			if (settings->target_langs[skg_shader_lang_glsl_web] && !sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
+			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
 				sksc_log(log_level_err, "GLSL web shader compile failed");
 				return false;
 			}

@@ -1455,6 +1455,12 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 
 ///////////////////////////////////////////
 
+void* skg_tex_get_native(const skg_tex_t* tex) {
+	return tex->_texture;
+}
+
+///////////////////////////////////////////
+
 void skg_tex_clear(skg_bind_t bind) {
 	switch (bind.register_type) {
 	case skg_register_resource: {

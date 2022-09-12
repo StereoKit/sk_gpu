@@ -1855,6 +1855,12 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 
 ///////////////////////////////////////////
 
+void* skg_tex_get_native(const skg_tex_t* tex) {
+	return (void*)((uint64_t)tex->_texture);
+}
+
+///////////////////////////////////////////
+
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	if (bind.stage_bits & skg_stage_compute) {
 #if !defined(_SKG_GL_WEB)

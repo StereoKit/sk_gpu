@@ -17,6 +17,8 @@ add_custom_command(
         sk_gpu_dx11.cpp
         sk_gpu_gl.h
         sk_gpu_gl.cpp
+        sk_gpu_null.h
+        sk_gpu_null.cpp
 )
 
 add_custom_target(sk_gpu_header ALL

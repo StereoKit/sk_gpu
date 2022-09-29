@@ -20,7 +20,9 @@ sk_gpu.h
 //#define SKG_FORCE_DIRECT3D11
 //#define SKG_FORCE_OPENGL
 
-#if   defined( SKG_FORCE_DIRECT3D11 )
+#if   defined( SKG_FORCE_NULL )
+#define SKG_NULL
+#elif defined( SKG_FORCE_DIRECT3D11 )
 #define SKG_DIRECT3D11
 #elif defined( SKG_FORCE_OPENGL )
 #define SKG_OPENGL
@@ -288,6 +290,8 @@ typedef struct skg_shader_meta_t {
 #include "sk_gpu_vk.h"
 #elif defined(SKG_OPENGL)
 #include "sk_gpu_gl.h"
+#elif defined(SKG_NULL)
+#include "sk_gpu_null.h"
 #endif
 
 ///////////////////////////////////////////

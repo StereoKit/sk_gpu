@@ -77,9 +77,7 @@ CPMAddPackage(
 )
 
 if (UNIX)
-    set(LINUX_LIBS
-        GL
-        GLEW)
+    set(LINUX_LIBS)
 endif()
 
 add_executable(skshaderc

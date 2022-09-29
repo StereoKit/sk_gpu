@@ -18,6 +18,7 @@
 #endif
 
 #define SKG_IMPL
+#define SKG_FORCE_NULL 
 #include "../sk_gpu.h"
 
 #define SKSC_IMPL

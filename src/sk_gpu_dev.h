@@ -50,6 +50,7 @@ sk_gpu.h
 		#else
 			#define _SKG_GL_DESKTOP
 			#define _SKG_GL_LOAD_GLX
+			#define _SKG_GL_MAKE_FUNCTIONS
 		#endif
 	#elif defined(_WIN32)
 		#define _SKG_GL_DESKTOP

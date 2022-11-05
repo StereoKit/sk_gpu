@@ -50,8 +50,8 @@ if (SKGPU_TEST_USE_GL)
     if (UNIX)
         set( GL_LIBRARIES
             ${X11_LIBRARIES}
+            dl
             GL
-            GLEW
             GLX)
     elseif(WIN32)
         target_compile_definitions(skg_flatscreen PUBLIC SKG_FORCE_OPENGL)

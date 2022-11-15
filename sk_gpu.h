@@ -657,6 +657,7 @@ typedef struct {
 ///////////////////////////////////////////
 
 SKG_API void                    skg_log                        (skg_log_ level, const char *text);
+SKG_API void                    skg_logf                       (skg_log_ level, const char *text, ...);
 SKG_API bool                    skg_read_file                  (const char *filename, void **out_data, size_t *out_size);
 SKG_API uint64_t                skg_hash                       (const char *string);
 SKG_API uint32_t                skg_mip_count                  (int32_t width, int32_t height);
@@ -779,16 +780,14 @@ int32_t skg_init(const char *, void *adapter_id) {
 	if (FAILED(hr)) {
 
 		// Message that we failed to initialize with the selected adapter.
-		char d3d_info_txt[128];
 		if (final_adapter != nullptr) {
 			DXGI_ADAPTER_DESC1 final_adapter_info;
 			final_adapter->GetDesc1(&final_adapter_info);
-			snprintf(d3d_info_txt, sizeof(d3d_info_txt), "Failed starting Direct3D 11 adapter '%ls': 0x%08X", &final_adapter_info.Description, hr);
+			skg_logf(skg_log_critical, "Failed starting Direct3D 11 adapter '%ls': 0x%08X", &final_adapter_info.Description, hr);
 			final_adapter->Release();
 		} else {
-			snprintf(d3d_info_txt, sizeof(d3d_info_txt), "Failed starting Direct3D 11 adapter 'Default adapter': 0x%08X", hr);
+			skg_logf(skg_log_critical, "Failed starting Direct3D 11 adapter 'Default adapter': 0x%08X", hr);
 		}
-		skg_log(skg_log_critical, d3d_info_txt);
 
 		// Get a human readable description of that error message.
 		char *error_text = NULL;
@@ -811,9 +810,7 @@ int32_t skg_init(const char *, void *adapter_id) {
 	if (final_adapter != nullptr) {
 		DXGI_ADAPTER_DESC1 final_adapter_info;
 		final_adapter->GetDesc1(&final_adapter_info);
-		char d3d_info_txt[128];
-		snprintf(d3d_info_txt, sizeof(d3d_info_txt), "Using Direct3D 11: %ls", &final_adapter_info.Description);
-		skg_log(skg_log_info, d3d_info_txt);
+		skg_logf(skg_log_info, "Using Direct3D 11: %ls", &final_adapter_info.Description);
 		final_adapter->Release();
 	} else {
 		skg_log(skg_log_info, "Using Direct3D 11: default device");
@@ -4459,6 +4456,7 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdarg.h>
 
 #if __ANDROID__
 #include <android/asset_manager.h>
@@ -4470,6 +4468,17 @@ void skg_callback_log(void (*callback)(skg_log_ level, const char *text)) {
 }
 void skg_log(skg_log_ level, const char *text) {
 	if (_skg_log) _skg_log(level, text);
+}
+void skg_logf (skg_log_ level, const char *text, ...) {
+	va_list args;
+	va_start(args, text);
+	size_t length = vsnprintf(nullptr, 0, text, args);
+	char*  buffer = (char*)malloc(sizeof(char) * (length + 2));
+	vsnprintf(buffer, length + 2, text, args);
+
+	skg_log(level, buffer);
+	free(buffer);
+	va_end(args);
 }
 
 ///////////////////////////////////////////

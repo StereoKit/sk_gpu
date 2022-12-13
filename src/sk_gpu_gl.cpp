@@ -148,6 +148,7 @@
 #define GL_READ_WRITE 0x88BA
 #define GL_TRIANGLES 0x0004
 #define GL_VERSION 0x1F02
+#define GL_RENDERER 0x1F01
 #define GL_CULL_FACE 0x0B44
 #define GL_BACK 0x0405
 #define GL_FRONT 0x0404
@@ -405,10 +406,11 @@ static void gl_load_extensions( ) {
 
 ///////////////////////////////////////////
 
-int32_t    gl_active_width        = 0;
-int32_t    gl_active_height       = 0;
-skg_tex_t *gl_active_rendertarget = nullptr;
-uint32_t   gl_current_framebuffer = 0;
+int32_t     gl_active_width        = 0;
+int32_t     gl_active_height       = 0;
+skg_tex_t  *gl_active_rendertarget = nullptr;
+uint32_t    gl_current_framebuffer = 0;
+const char *gl_adapter_name        = nullptr;
 
 ///////////////////////////////////////////
 
@@ -682,8 +684,9 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	gl_load_extensions();
 #endif
 
-	skg_log(skg_log_info, "Using OpenGL");
-	skg_log(skg_log_info, (char*)glGetString(GL_VERSION));
+	gl_adapter_name = glGetString(GL_RENDERER);
+	skg_logf(skg_log_info, "Using OpenGL: %s", glGetString(GL_VERSION));
+	skg_logf(skg_log_info, "Device: %s", gl_adapter_name);
 
 #if !defined(NDEBUG) && !defined(_SKG_GL_WEB)
 	skg_log(skg_log_info, "Debug info enabled.");

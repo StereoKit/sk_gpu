@@ -299,6 +299,7 @@ typedef struct skg_shader_meta_t {
 
 SKG_API void                skg_setup_xlib               (void *dpy, void *vi, void *fbconfig, void *drawable);
 SKG_API int32_t             skg_init                     (const char *app_name, void *adapter_id);
+SKG_API const char*         skg_adapter_name             ();
 SKG_API void                skg_shutdown                 ();
 SKG_API void                skg_callback_log             (void (*callback)(skg_log_ level, const char *text));
 SKG_API void                skg_callback_file_read       (bool (*callback)(const char *filename, void **out_data, size_t *out_size));

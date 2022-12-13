@@ -22,6 +22,7 @@ ID3D11InfoQueue         *d3d_info        = nullptr;
 ID3D11RasterizerState   *d3d_rasterstate = nullptr;
 ID3D11DepthStencilState *d3d_depthstate  = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
+char                    *d3d_adapter_name = nullptr;
 
 ///////////////////////////////////////////
 
@@ -107,11 +108,19 @@ int32_t skg_init(const char *, void *adapter_id) {
 	if (final_adapter != nullptr) {
 		DXGI_ADAPTER_DESC1 final_adapter_info;
 		final_adapter->GetDesc1(&final_adapter_info);
-		skg_logf(skg_log_info, "Using Direct3D 11: %ls", &final_adapter_info.Description);
+
+		int32_t utf8_size = WideCharToMultiByte(CP_UTF8, 0, final_adapter_info.Description, -1, NULL, 0, NULL, NULL);
+		d3d_adapter_name = (char*)malloc(utf8_size * sizeof(char));
+		WideCharToMultiByte(CP_UTF8, 0, final_adapter_info.Description, -1, d3d_adapter_name, utf8_size, NULL, NULL);
+
+		skg_logf(skg_log_info, "Using Direct3D 11: vendor 0x%04X, device 0x%04X", final_adapter_info.VendorId, final_adapter_info.DeviceId);
 		final_adapter->Release();
 	} else {
-		skg_log(skg_log_info, "Using Direct3D 11: default device");
+		const char default_name[] = "Default Device";
+		d3d_adapter_name = (char*)malloc(sizeof(default_name));
+		memcpy(d3d_adapter_name, default_name, sizeof(default_name));
 	}
+	skg_logf(skg_log_info, "Device: %s", d3d_adapter_name);
 
 	// Hook into debug information
 	ID3D11Debug *d3d_debug = nullptr;
@@ -165,7 +174,14 @@ int32_t skg_init(const char *, void *adapter_id) {
 
 ///////////////////////////////////////////
 
+const char* skg_adapter_name() {
+	return d3d_adapter_name;
+}
+
+///////////////////////////////////////////
+
 void skg_shutdown() {
+	free(d3d_adapter_name);
 	if (d3d_rasterstate) { d3d_rasterstate->Release(); d3d_rasterstate = nullptr; }
 	if (d3d_depthstate ) { d3d_depthstate ->Release(); d3d_depthstate  = nullptr; }
 	if (d3d_info       ) { d3d_info       ->Release(); d3d_info        = nullptr; }

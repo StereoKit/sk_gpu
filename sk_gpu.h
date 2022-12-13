@@ -819,7 +819,7 @@ int32_t skg_init(const char *, void *adapter_id) {
 		d3d_adapter_name = (char*)malloc(utf8_size * sizeof(char));
 		WideCharToMultiByte(CP_UTF8, 0, final_adapter_info.Description, -1, d3d_adapter_name, utf8_size, NULL, NULL);
 
-		skg_logf(skg_log_info, "Using Direct3D 11: 0x%08X, 0x%08X", final_adapter_info.VendorId, final_adapter_info.DeviceId);
+		skg_logf(skg_log_info, "Using Direct3D 11: vendor 0x%04X, device 0x%04X", final_adapter_info.VendorId, final_adapter_info.DeviceId);
 		final_adapter->Release();
 	} else {
 		const char default_name[] = "Default Device";

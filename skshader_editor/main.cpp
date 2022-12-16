@@ -155,7 +155,8 @@ float4 ps(psIn input) : SV_TARGET {
 
 		// Rendering
 		ImGui::Render();
-		skg_swapchain_bind(&g_pSwapChain, true, (float*)&clear_color);
+		skg_swapchain_bind(&g_pSwapChain);
+		skg_target_clear(true, (float*)&clear_color);
 		ImGui_ImplSkg_RenderDrawData(ImGui::GetDrawData());
 
 		skg_swapchain_present(&g_pSwapChain);

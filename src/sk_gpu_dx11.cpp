@@ -14,6 +14,9 @@
 
 #include <stdio.h>
 
+// Manually defining this lets us skip d3dcommon.h and dxguid.lib
+const GUID WKPDID_D3DDebugObjectName = { 0x429b8c22, 0x9188, 0x4b0c, { 0x87,0x42,0xac,0xb0,0xbf,0x85,0xc2,0x00 } };
+
 ///////////////////////////////////////////
 
 ID3D11Device            *d3d_device      = nullptr;
@@ -362,6 +365,23 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 
 ///////////////////////////////////////////
 
+void skg_buffer_name(skg_buffer_t *buffer, const char* name) {
+	if (buffer->_buffer != nullptr)
+		buffer->_buffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+
+	char postfix_name[256];
+	if (buffer->_resource != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_srv", name);
+		buffer->_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (buffer->_unordered != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_uav", name);
+		buffer->_unordered->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+}
+
+///////////////////////////////////////////
+
 bool skg_buffer_is_valid(const skg_buffer_t *buffer) {
 	return buffer->_buffer != nullptr;
 }
@@ -470,6 +490,20 @@ skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *
 	if (result._vert_buffer) result._vert_buffer->AddRef();
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_mesh_name(skg_mesh_t* mesh, const char* name) {
+	char postfix_name[256];
+	if (mesh->_ind_buffer != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_verts", name);
+		mesh->_ind_buffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (mesh->_vert_buffer != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_inds", name);
+		mesh->_vert_buffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
 }
 
 ///////////////////////////////////////////
@@ -619,6 +653,25 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	return result;
 }
 
+
+///////////////////////////////////////////
+
+void skg_shader_name(skg_shader_t *shader, const char* name) {
+	char postfix_name[256];
+	if (shader->_pixel != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_ps", name);
+		shader->_pixel->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (shader->_vertex != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_vs", name);
+		shader->_vertex->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (shader->_compute != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_cs", name);
+		shader->_compute->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+}
+
 ///////////////////////////////////////////
 
 bool skg_shader_is_valid(const skg_shader_t *shader) {
@@ -758,6 +811,28 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	skg_pipeline_update_rasterizer(&result);
 	skg_pipeline_update_depth     (&result);
 	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_pipeline_name(skg_pipeline_t *pipeline, const char* name) {
+	char postfix_name[256];
+	if (pipeline->_blend != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_blendstate", name);
+		pipeline->_blend->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (pipeline->_depth != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_depthstate", name);
+		pipeline->_depth->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (pipeline->_layout != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_layout", name);
+		pipeline->_layout->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (pipeline->_rasterize != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_rasterizestate", name);
+		pipeline->_rasterize->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
 }
 
 ///////////////////////////////////////////
@@ -1047,6 +1122,34 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 		skg_log(skg_log_warning, "Dynamic textures don't support mip-maps!");
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_tex_name(skg_tex_t *tex, const char* name) {
+	if (tex->_texture != nullptr) tex->_texture->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+
+	char postfix_name[256];
+	if (tex->_depth_view != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_depthview", name);
+		tex->_depth_view->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (tex->_resource != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_srv", name);
+		tex->_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (tex->_sampler != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_sampler", name);
+		tex->_sampler->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (tex->_target_view != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_targetview", name);
+		tex->_target_view->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
+	if (tex->_unordered != nullptr) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_uav", name);
+		tex->_unordered->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(postfix_name), postfix_name);
+	}
 }
 
 ///////////////////////////////////////////

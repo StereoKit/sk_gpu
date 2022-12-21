@@ -199,6 +199,11 @@
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
+#define GL_BUFFER  0x82E0
+#define GL_SHADER  0x82E1
+#define GL_PROGRAM 0x82E2
+#define GL_SAMPLER 0x82E6
+#define GL_TEXTURE 0x1702
 
 #define GL_RED 0x1903
 #define GL_RGB 0x1907
@@ -371,6 +376,7 @@ GLE(void,     glBlendFunc,               uint32_t sfactor, uint32_t dfactor) \
 GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint32_t srcAlpha, uint32_t dstAlpha) \
 GLE(void,     glBlendEquationSeparate,   uint32_t modeRGB, uint32_t modeAlpha) \
 GLE(void,     glDispatchCompute,         uint32_t num_groups_x, uint32_t num_groups_y, uint32_t num_groups_z) \
+GLE(void,     glObjectLabel,             uint32_t identifier, uint32_t name, uint32_t length, const char* label) \
 GLE(const char *, glGetString,           uint32_t name) \
 GLE(const char *, glGetStringi,          uint32_t name, uint32_t index)
 
@@ -913,6 +919,13 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 
 ///////////////////////////////////////////
 
+void skg_buffer_name(skg_buffer_t *buffer, const char* name) {
+	if (buffer->_buffer != 0)
+		glObjectLabel(GL_BUFFER, buffer->_buffer, strlen(name), name);
+}
+
+///////////////////////////////////////////
+
 bool skg_buffer_is_valid(const skg_buffer_t *buffer) {
 	return buffer->_buffer != 0;
 }
@@ -971,6 +984,20 @@ skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *
 	skg_mesh_set_inds (&result, ind_buffer);
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_mesh_name(skg_mesh_t *mesh, const char* name) {
+	char postfix_name[256];
+	if (mesh->_vert_buffer != 0) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_verts", name);
+		glObjectLabel(GL_BUFFER, mesh->_vert_buffer,  strlen(postfix_name), postfix_name);
+	}
+	if (mesh->_vert_buffer != 0) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_inds", name);
+		glObjectLabel(GL_BUFFER, mesh->_ind_buffer,  strlen(postfix_name), postfix_name);
+	}
 }
 
 ///////////////////////////////////////////
@@ -1203,6 +1230,27 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	return result;
 }
 
+///////////////////////////////////////////
+
+void skg_shader_name(skg_shader_t *shader, const char* name) {
+	char postfix_name[256];
+	if (shader->_program != 0) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_program", name);
+		glObjectLabel(GL_PROGRAM, shader->_program, strlen(postfix_name), postfix_name);
+	}
+	if (shader->_compute != 0) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_cs", name);
+		glObjectLabel(GL_SHADER, shader->_compute, strlen(postfix_name), postfix_name);
+	}
+	if (shader->_pixel != 0) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_ps", name);
+		glObjectLabel(GL_SHADER, shader->_pixel, strlen(postfix_name), postfix_name);
+	}
+	if (shader->_vertex != 0) {
+		snprintf(postfix_name, sizeof(postfix_name), "%s_vs", name);
+		glObjectLabel(GL_SHADER, shader->_vertex, strlen(postfix_name), postfix_name);
+	}
+}
 
 ///////////////////////////////////////////
 
@@ -1244,6 +1292,11 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	skg_shader_meta_reference(result._shader.meta);
 
 	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_pipeline_name(skg_pipeline_t *pipeline, const char* name) {
 }
 
 ///////////////////////////////////////////
@@ -1681,6 +1734,21 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	}
 	
 	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_tex_name(skg_tex_t *tex, const char* name) {
+	if (tex->_texture != 0)
+		glObjectLabel(GL_TEXTURE, tex->_texture, (uint32_t)strlen(name), name);
+
+	char postfix_name[256];
+	if (tex->_framebuffer != 0) {
+		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
+		snprintf(postfix_name, sizeof(postfix_name), "%s_framebuffer", name);
+		printf("Attempting to label framebuffer %u as %s\n", tex->_framebuffer, postfix_name);
+		glObjectLabel(GL_FRAMEBUFFER, tex->_framebuffer, strlen(postfix_name), postfix_name);
+	}
 }
 
 ///////////////////////////////////////////

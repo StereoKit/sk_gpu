@@ -315,6 +315,7 @@ SKG_API void                skg_scissor                  (const int32_t *xywh);
 SKG_API void                skg_target_clear             (bool depth, const float *clear_color_4);
 
 SKG_API skg_buffer_t        skg_buffer_create            (const void *data, uint32_t size_count, uint32_t size_stride, skg_buffer_type_ type, skg_use_ use);
+SKG_API void                skg_buffer_name              (      skg_buffer_t *buffer, const char* name);
 SKG_API bool                skg_buffer_is_valid          (const skg_buffer_t *buffer);
 SKG_API void                skg_buffer_set_contents      (      skg_buffer_t *buffer, const void *data, uint32_t size_bytes);
 SKG_API void                skg_buffer_get_contents      (const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
@@ -323,6 +324,7 @@ SKG_API void                skg_buffer_clear             (skg_bind_t bind);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 
 SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer);
+SKG_API void                skg_mesh_name                (      skg_mesh_t *mesh, const char* name);
 SKG_API void                skg_mesh_set_verts           (      skg_mesh_t *mesh, const skg_buffer_t *vert_buffer);
 SKG_API void                skg_mesh_set_inds            (      skg_mesh_t *mesh, const skg_buffer_t *ind_buffer);
 SKG_API void                skg_mesh_bind                (const skg_mesh_t *mesh);
@@ -334,6 +336,7 @@ SKG_API void                skg_shader_stage_destroy     (skg_shader_stage_t *st
 SKG_API skg_shader_t        skg_shader_create_file       (const char *sks_filename);
 SKG_API skg_shader_t        skg_shader_create_memory     (const void *sks_memory, size_t sks_memory_size);
 SKG_API skg_shader_t        skg_shader_create_manual     (skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader);
+SKG_API void                skg_shader_name               (     skg_shader_t *shader, const char* name);
 SKG_API bool                skg_shader_is_valid          (const skg_shader_t *shader);
 SKG_API void                skg_shader_compute_bind      (const skg_shader_t *shader);
 SKG_API skg_bind_t          skg_shader_get_bind          (const skg_shader_t *shader, const char *name);
@@ -344,6 +347,7 @@ SKG_API const skg_shader_var_t *skg_shader_get_var_info  (const skg_shader_t *sh
 SKG_API void                skg_shader_destroy           (      skg_shader_t *shader);
 
 SKG_API skg_pipeline_t      skg_pipeline_create          (skg_shader_t *shader);
+SKG_API void                skg_pipeline_name            (      skg_pipeline_t *pipeline, const char* name);
 SKG_API void                skg_pipeline_bind            (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_transparency(      skg_pipeline_t *pipeline, skg_transparency_ transparency);
 SKG_API skg_transparency_   skg_pipeline_get_transparency(const skg_pipeline_t *pipeline);
@@ -368,6 +372,7 @@ SKG_API void                skg_swapchain_destroy        (      skg_swapchain_t 
 SKG_API skg_tex_t           skg_tex_create_from_existing (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
 SKG_API skg_tex_t           skg_tex_create_from_layer    (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_layer);
 SKG_API skg_tex_t           skg_tex_create               (skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, skg_mip_ mip_maps);
+SKG_API void                skg_tex_name                 (      skg_tex_t *tex, const char* name);
 SKG_API bool                skg_tex_is_valid             (const skg_tex_t *tex);
 SKG_API void                skg_tex_copy_to              (const skg_tex_t *tex, skg_tex_t *destination);
 SKG_API void                skg_tex_copy_to_swapchain    (const skg_tex_t *tex, skg_swapchain_t *destination);

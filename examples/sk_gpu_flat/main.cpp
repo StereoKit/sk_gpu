@@ -1,4 +1,3 @@
-
 #if defined(_WIN32)
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
@@ -190,7 +189,7 @@ bool main_init() {
 	});
 	if (skg_init(app_name, nullptr) <= 0)
 		return false;
-	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_none, app_resize_width, app_resize_height);
+	app_swapchain = skg_swapchain_create(app_hwnd, skg_tex_fmt_rgba32_linear, skg_tex_fmt_depth32, app_resize_width, app_resize_height);
 	resize_swapchain(app_resize_width, app_resize_height);
 
 	return app_init();

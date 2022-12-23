@@ -193,6 +193,7 @@ bool app_init() {
 		}
 	}
 	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skg_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t), skg_ind_fmt_u32);
+	skg_mesh_name(&app_mesh_wave.mesh, "wave_mesh");
 
 	// Make a checkered texture
 	int32_t w = 512, h = 512;
@@ -205,6 +206,7 @@ bool app_init() {
 		colors[i] = { c8,c8,c8,c8 };
 	} }
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
+	skg_tex_name        (&app_tex, "checker_tex");
 	skg_tex_settings    (&app_tex, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_tex, colors, w, h);
 	free(colors);
@@ -239,6 +241,7 @@ bool app_init() {
 		colors[i] = { c8,c8,c8,c8 };
 	} }
 	app_particle = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
+	skg_tex_name        (&app_particle, "particle_tex");
 	skg_tex_settings    (&app_particle, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_particle, colors, w, h);
 	free(colors);
@@ -249,6 +252,7 @@ bool app_init() {
 		colors_wht[i] = {255,255,255,255};
 	}
 	app_tex_white = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
+	skg_tex_name        (&app_tex_white, "white_tex");
 	skg_tex_set_contents(&app_tex_white, colors_wht, 2, 2);
 
 	// Make srgb and linear gradients
@@ -266,6 +270,8 @@ bool app_init() {
 	skg_tex_settings    (&app_tex_gradient_linear, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_tex_gradient_srgb,   colors, gw, gh);
 	skg_tex_set_contents(&app_tex_gradient_linear, colors, gw, gh);
+	skg_tex_name        (&app_tex_gradient_srgb,   "gradient_srgb_tex");
+	skg_tex_name        (&app_tex_gradient_linear, "gradient_linear_tex");
 	free(colors);
 
 	// make color space gradients
@@ -302,11 +308,14 @@ bool app_init() {
 
 	app_target       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	app_target_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depth16,       skg_mip_none);
+	skg_tex_name        (&app_target,       "main_rtex");
+	skg_tex_name        (&app_target_depth, "depth_rtex");
 	skg_tex_set_contents(&app_target,       nullptr, 512, 512);
 	skg_tex_set_contents(&app_target_depth, nullptr, 512, 512);
 	skg_tex_attach_depth(&app_target, &app_target_depth);
 
 	app_cubemap = skg_tex_create(skg_tex_type_cubemap, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
+	skg_tex_name(&app_cubemap, "cubemap_tex");
 	skg_color32_t *cube_cols[6];
 	const int32_t  cube_face_size = 64;
 	for (size_t f = 0; f < 6; f++) {
@@ -332,29 +341,36 @@ bool app_init() {
 		free(cube_color_data);
 	}
 
-	app_sh_cube              = skg_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
+	app_sh_cube = skg_shader_create_memory(sks_cubemap_hlsl, sizeof(sks_cubemap_hlsl));
+	skg_shader_name(&app_sh_cube, "cubemap_shader");
 	app_sh_cube_tex_bind     = skg_shader_get_bind(&app_sh_cube, "tex");
 	app_sh_cube_cubemap_bind = skg_shader_get_bind(&app_sh_cube, "cubemap");
 	app_sh_cube_inst_bind    = skg_shader_get_bind(&app_sh_cube, "TransformBuffer");
 	app_sh_cube_data_bind    = skg_shader_get_bind(&app_sh_cube, "SystemBuffer");
-	app_mat_cube             = skg_pipeline_create(&app_sh_cube);
+	app_mat_cube = skg_pipeline_create(&app_sh_cube);
+	skg_pipeline_name           (&app_mat_cube, "cubemap_mat");
 	skg_pipeline_set_cull       (&app_mat_cube, skg_cull_front);
 	skg_pipeline_set_depth_write(&app_mat_cube, false);
 	skg_pipeline_set_scissor    (&app_mat_cube, true);
 
 	app_mat_transparent = skg_pipeline_create(&app_sh_cube);
+	skg_pipeline_name            (&app_mat_transparent, "transparent_mat");
 	skg_pipeline_set_depth_write (&app_mat_transparent, false);
 	skg_pipeline_set_cull        (&app_mat_transparent, skg_cull_none);
 	skg_pipeline_set_transparency(&app_mat_transparent, skg_transparency_add);
 	
-	app_sh_default           = skg_shader_create_memory(sks_test_hlsl, sizeof(sks_test_hlsl));
+	app_sh_default = skg_shader_create_memory(sks_test_hlsl, sizeof(sks_test_hlsl));
+	skg_shader_name(&app_sh_default, "default_shader");
 	app_sh_default_tex_bind  = skg_shader_get_bind(&app_sh_default, "tex");
 	app_sh_default_inst_bind = skg_shader_get_bind(&app_sh_default, "TransformBuffer");
 	app_sh_default_data_bind = skg_shader_get_bind(&app_sh_default, "SystemBuffer");
 	app_mat_default          = skg_pipeline_create(&app_sh_default);
+	skg_pipeline_name(&app_mat_default, "default_mat");
 	
 	app_shader_data_buffer = skg_buffer_create(&app_shader_data, 1,   sizeof(app_shader_data_t), skg_buffer_type_constant, skg_use_dynamic);
 	app_shader_inst_buffer = skg_buffer_create(&app_shader_inst, 100, sizeof(app_shader_inst_t), skg_buffer_type_constant, skg_use_dynamic);
+	skg_buffer_name(&app_shader_data_buffer, "shader_data_buffer");
+	skg_buffer_name(&app_shader_inst_buffer, "shader_inst_buffer");
 
 	app_test_compute_init();
 
@@ -419,12 +435,17 @@ void app_test_compute_init() {
 	}}
 
 	compute_tex = skg_tex_create(skg_tex_type_image, skg_use_compute_write, skg_tex_fmt_rgba32_linear, skg_mip_none);
+	skg_tex_name        (&compute_tex, "compute_result_tex");
 	skg_tex_set_contents(&compute_tex, nullptr, c_size, c_size);
 
 	compute_buff_args = skg_buffer_create(&compute_args, 1, sizeof(reaction_diffusion_args_t), skg_buffer_type_constant, skg_use_static);
 	compute_buff_a    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
 	compute_buff_b    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
-	compute_shader    = skg_shader_create_memory(sks_compute_test_hlsl, sizeof(sks_compute_test_hlsl));
+	compute_shader   = skg_shader_create_memory(sks_compute_test_hlsl, sizeof(sks_compute_test_hlsl));
+	skg_shader_name(&compute_shader,    "compute_shader");
+	skg_buffer_name(&compute_buff_args, "compute_args_buffer");
+	skg_buffer_name(&compute_buff_args, "compute_data_swap_a_buffer");
+	skg_buffer_name(&compute_buff_args, "compute_data_swap_b_buffer");
 	
 	free(data);
 }

@@ -15,6 +15,7 @@ typedef struct skg_mesh_t {
 	uint32_t _ind_buffer;
 	uint32_t _vert_buffer;
 	uint32_t _layout;
+	uint32_t _ind_format;
 } skg_mesh_t;
 
 typedef struct skg_shader_stage_t {

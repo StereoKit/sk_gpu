@@ -92,7 +92,7 @@ skg_vert_t    app_wave_verts[app_wave_size * app_wave_size];
 
 // Make a cube
 skg_vert_t app_cube_verts[24];
-uint32_t   app_cube_inds [36] = {
+uint8_t    app_cube_inds [36] = {
 	0, 1, 2,  0, 2, 3,  4, 5, 6,  4, 6, 7, 
 	8, 9, 10, 8, 10,11, 12,13,14, 12,14,15, 
 	16,17,18, 16,18,19, 20,21,22, 20,22,23 };
@@ -104,7 +104,7 @@ skg_vert_t app_pyramid_verts[] = {
 	skg_vert_t{ { 1,-1,-1}, { 1,-1,-1}, {0.25f,0}, {0,0,255,255}},
 	skg_vert_t{ { 1,-1, 1}, {-1,-1, 1}, {0.50f,0}, {255,255,0,255}},
 	skg_vert_t{ {-1,-1, 1}, { 1,-1, 1}, {0.75f,0}, {255,0,255,255}},};
-uint32_t app_pyramid_inds[] = {
+uint8_t app_pyramid_inds[] = {
 	2,1,0, 3,2,0, 4,3,0, 1,4,0, 1,2,3, 1,3,4 };
 
 // make a double-sided triangle
@@ -112,7 +112,7 @@ skg_vert_t app_tri_verts[] = {
 	skg_vert_t{ {-.7f,-.5f,0}, {0,1,0}, {0,0}, {255,0,0,255}},
 	skg_vert_t{ { .0f, .5f,0}, {0,1,0}, {0,0}, {0,255,0,255}},
 	skg_vert_t{ { .7f,-.5f,0}, {0,1,0}, {0,0}, {0,0,255,255}},};
-uint32_t app_tri_inds[] = {
+uint8_t app_tri_inds[] = {
 	0,1,2, 2,1,0 };
 
 // make a double-sided quad
@@ -121,12 +121,12 @@ skg_vert_t app_quad_verts[] = {
 	skg_vert_t{ { .5f, .5f,0}, {0,1,0}, {1,0}, {255,255,255,255}},
 	skg_vert_t{ { .5f,-.5f,0}, {0,1,0}, {1,1}, {255,255,255,255}},
 	skg_vert_t{ {-.5f,-.5f,0}, {0,1,0}, {0,1}, {255,255,255,255}},};
-uint32_t app_quad_inds[] = {
+uint8_t app_quad_inds[] = {
 	0,1,2, 2,1,0, 0,2,3, 3,2,0 };
 
 ///////////////////////////////////////////
 
-app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count);
+app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool vert_dyn, const void *inds, int32_t ind_count, skg_ind_fmt_ ind_format);
 void       app_mesh_destroy(app_mesh_t *mesh);
 bool       ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_vert_count, uint32_t **out_indices, int32_t *out_ind_count);
 void       tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataBGRA, uint8_t dataChannels = 4, uint8_t fileChannels = 3);
@@ -144,7 +144,7 @@ bool app_init() {
 	uint32_t   *platform_inds;
 	int32_t     platform_v_count, platform_i_count;
 	if (ply_read_skg("platform.ply", &platform_verts, &platform_v_count, &platform_inds, &platform_i_count)) {
-		app_mesh_model = app_mesh_create(platform_verts, platform_v_count, false, platform_inds, platform_i_count);
+		app_mesh_model = app_mesh_create(platform_verts, platform_v_count, false, platform_inds, platform_i_count, skg_ind_fmt_u32);
 		free(platform_verts);
 		free(platform_inds );
 	} else {
@@ -169,10 +169,14 @@ bool app_init() {
 		app_cube_verts[i] = vert;
 	}
 
-	app_mesh_cube    = app_mesh_create(app_cube_verts,    sizeof(app_cube_verts   )/sizeof(skg_vert_t), false, app_cube_inds,    sizeof(app_cube_inds   )/sizeof(uint32_t));
-	app_mesh_pyramid = app_mesh_create(app_pyramid_verts, sizeof(app_pyramid_verts)/sizeof(skg_vert_t), false, app_pyramid_inds, sizeof(app_pyramid_inds)/sizeof(uint32_t));
-	app_mesh_tri     = app_mesh_create(app_tri_verts,     sizeof(app_tri_verts    )/sizeof(skg_vert_t), false, app_tri_inds,     sizeof(app_tri_inds    )/sizeof(uint32_t));
-	app_mesh_quad    = app_mesh_create(app_quad_verts,    sizeof(app_quad_verts   )/sizeof(skg_vert_t), false, app_quad_inds,    sizeof(app_quad_inds   )/sizeof(uint32_t));
+	app_mesh_cube    = app_mesh_create(app_cube_verts,    sizeof(app_cube_verts   )/sizeof(skg_vert_t), false, app_cube_inds,    sizeof(app_cube_inds   )/sizeof(uint8_t), skg_ind_fmt_u8);
+	app_mesh_pyramid = app_mesh_create(app_pyramid_verts, sizeof(app_pyramid_verts)/sizeof(skg_vert_t), false, app_pyramid_inds, sizeof(app_pyramid_inds)/sizeof(uint8_t), skg_ind_fmt_u8);
+	app_mesh_tri     = app_mesh_create(app_tri_verts,     sizeof(app_tri_verts    )/sizeof(skg_vert_t), false, app_tri_inds,     sizeof(app_tri_inds    )/sizeof(uint8_t), skg_ind_fmt_u8);
+	app_mesh_quad    = app_mesh_create(app_quad_verts,    sizeof(app_quad_verts   )/sizeof(skg_vert_t), false, app_quad_inds,    sizeof(app_quad_inds   )/sizeof(uint8_t), skg_ind_fmt_u8);
+	skg_mesh_name(&app_mesh_cube   .mesh, "cube_mesh");
+	skg_mesh_name(&app_mesh_pyramid.mesh, "pyramid_mesh");
+	skg_mesh_name(&app_mesh_tri    .mesh, "triangle_mesh");
+	skg_mesh_name(&app_mesh_quad   .mesh, "quad_mesh");
 
 	// Make wave indices
 	uint32_t inds_wave[(app_wave_size - 1) * (app_wave_size - 1) * 6];
@@ -188,7 +192,7 @@ bool app_init() {
 			inds_wave[curr++] = (x  ) + (y  ) * app_wave_size;
 		}
 	}
-	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skg_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t));
+	app_mesh_wave = app_mesh_create(app_wave_verts, sizeof(app_wave_verts)/sizeof(skg_vert_t), true, inds_wave, sizeof(inds_wave)/sizeof(uint32_t), skg_ind_fmt_u32);
 
 	// Make a checkered texture
 	int32_t w = 512, h = 512;
@@ -709,11 +713,18 @@ void app_shutdown() {
 
 ///////////////////////////////////////////
 
-app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool vert_dyn, const uint32_t *inds, int32_t ind_count) {
+app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool vert_dyn, const void *inds, int32_t ind_count, skg_ind_fmt_ ind_format) {
+	uint32_t ind_stride = 0;
+	switch (ind_format) {
+	case skg_ind_fmt_u32: ind_stride = sizeof(uint32_t); break;
+	case skg_ind_fmt_u16: ind_stride = sizeof(uint16_t); break;
+	case skg_ind_fmt_u8:  ind_stride = sizeof(uint8_t);  break;
+	}
+
 	app_mesh_t result = {};
 	result.vert_buffer = skg_buffer_create(verts, vert_count, sizeof(skg_vert_t), skg_buffer_type_vertex, vert_dyn ? skg_use_dynamic : skg_use_static);
-	result.ind_buffer  = skg_buffer_create(inds,  ind_count,  sizeof(uint32_t),   skg_buffer_type_index,  skg_use_static);
-	result.mesh        = skg_mesh_create(&result.vert_buffer, &result.ind_buffer);
+	result.ind_buffer  = skg_buffer_create(inds,  ind_count,  ind_stride,         skg_buffer_type_index,  skg_use_static);
+	result.mesh        = skg_mesh_create(&result.vert_buffer, &result.ind_buffer, ind_format);
 	result.ind_count   = ind_count;
 	return result;
 }

@@ -415,6 +415,7 @@ static void gl_load_extensions( ) {
 int32_t     gl_active_width        = 0;
 int32_t     gl_active_height       = 0;
 skg_tex_t  *gl_active_rendertarget = nullptr;
+uint32_t    gl_active_index_fmt    = GL_UNSIGNED_INT;
 uint32_t    gl_current_framebuffer = 0;
 const char *gl_adapter_name        = nullptr;
 
@@ -869,9 +870,9 @@ bool skg_capability(skg_cap_ capability) {
 
 void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count) {
 #ifdef _SKG_GL_WEB
-	glDrawElementsInstanced(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count);
+	glDrawElementsInstanced(GL_TRIANGLES, index_count, gl_active_index_fmt, (void*)(index_start*sizeof(uint32_t)), instance_count);
 #else
-	glDrawElementsInstancedBaseVertex(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count, index_base);
+	glDrawElementsInstancedBaseVertex(GL_TRIANGLES, index_count, gl_active_index_fmt, (void*)(index_start*sizeof(uint32_t)), instance_count, index_base);
 #endif
 }
 
@@ -978,10 +979,10 @@ void skg_buffer_destroy(skg_buffer_t *buffer) {
 
 ///////////////////////////////////////////
 
-skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
+skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
 	skg_mesh_t result = {};
 	skg_mesh_set_verts(&result, vert_buffer);
-	skg_mesh_set_inds (&result, ind_buffer);
+	skg_mesh_set_inds (&result, ind_buffer, ind_format);
 
 	return result;
 }
@@ -1030,8 +1031,14 @@ void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 
 ///////////////////////////////////////////
 
-void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
+void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
 	mesh->_ind_buffer = ind_buffer ? ind_buffer->_buffer : 0;
+	switch(ind_format) {
+		case skg_ind_fmt_u32: mesh->_ind_format = GL_UNSIGNED_INT;   break;
+		case skg_ind_fmt_u16: mesh->_ind_format = GL_UNSIGNED_SHORT; break;
+		case skg_ind_fmt_u8:  mesh->_ind_format = GL_UNSIGNED_BYTE;  break;
+		default: break;
+	}
 }
 
 ///////////////////////////////////////////
@@ -1040,6 +1047,7 @@ void skg_mesh_bind(const skg_mesh_t *mesh) {
 	glBindVertexArray(mesh->_layout);
 	glBindBuffer(GL_ARRAY_BUFFER,         mesh->_vert_buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer );
+	gl_active_index_fmt = mesh->_ind_format;
 }
 
 ///////////////////////////////////////////

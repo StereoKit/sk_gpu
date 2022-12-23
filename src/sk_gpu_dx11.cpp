@@ -29,7 +29,8 @@ char                    *d3d_adapter_name = nullptr;
 
 ///////////////////////////////////////////
 
-bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
+bool        skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
+DXGI_FORMAT skg_ind_to_dxgi  (skg_ind_fmt_ format);
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -482,10 +483,11 @@ void skg_buffer_destroy(skg_buffer_t *buffer) {
 
 ///////////////////////////////////////////
 
-skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
+skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
 	skg_mesh_t result = {};
 	result._ind_buffer  = ind_buffer  ? ind_buffer ->_buffer : nullptr;
 	result._vert_buffer = vert_buffer ? vert_buffer->_buffer : nullptr;
+	result._ind_format  = skg_ind_to_dxgi(ind_format);
 	if (result._ind_buffer ) result._ind_buffer ->AddRef();
 	if (result._vert_buffer) result._vert_buffer->AddRef();
 
@@ -509,17 +511,18 @@ void skg_mesh_name(skg_mesh_t* mesh, const char* name) {
 ///////////////////////////////////////////
 
 void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
-	if (mesh->_vert_buffer) mesh->_vert_buffer->Release();
+	if (vert_buffer && vert_buffer->_buffer) vert_buffer->_buffer->AddRef();
+	if (mesh->_vert_buffer)                  mesh->_vert_buffer->Release();
 	mesh->_vert_buffer = vert_buffer->_buffer;
-	if (mesh->_vert_buffer) mesh->_vert_buffer->AddRef();
 }
 
 ///////////////////////////////////////////
 
-void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
-	if (mesh->_ind_buffer) mesh->_ind_buffer->Release();
+void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
+	if (ind_buffer && ind_buffer->_buffer) ind_buffer->_buffer->AddRef();
+	if (mesh->_ind_buffer)                 mesh->_ind_buffer->Release();
 	mesh->_ind_buffer = ind_buffer->_buffer;
-	if (mesh->_ind_buffer) mesh->_ind_buffer->AddRef();
+	mesh->_ind_format = skg_ind_to_dxgi(ind_format);
 }
 
 ///////////////////////////////////////////
@@ -528,7 +531,7 @@ void skg_mesh_bind(const skg_mesh_t *mesh) {
 	UINT strides[] = { sizeof(skg_vert_t) };
 	UINT offsets[] = { 0 };
 	d3d_context->IASetVertexBuffers(0, 1, &mesh->_vert_buffer, strides, offsets);
-	d3d_context->IASetIndexBuffer  (mesh->_ind_buffer, DXGI_FORMAT_R32_UINT, 0);
+	d3d_context->IASetIndexBuffer  (mesh->_ind_buffer, mesh->_ind_format, 0);
 }
 
 ///////////////////////////////////////////
@@ -1823,6 +1826,17 @@ const char *skg_semantic_to_d3d(skg_el_semantic_ semantic) {
 	case skg_el_semantic_color:        return "COLOR";
 	case skg_el_semantic_target_index: return "SV_RenderTargetArrayIndex";
 	default: return "";
+	}
+}
+
+///////////////////////////////////////////
+
+DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
+	switch (format) {
+	case skg_ind_fmt_u32: return DXGI_FORMAT_R32_UINT;
+	case skg_ind_fmt_u16: return DXGI_FORMAT_R16_UINT;
+	case skg_ind_fmt_u8:  return DXGI_FORMAT_R8_UINT;
+	default: abort(); break;
 	}
 }
 

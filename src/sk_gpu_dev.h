@@ -156,6 +156,12 @@ typedef enum skg_fmt_ {
 	skg_fmt_ui8_n_1,  skg_fmt_ui8_n_2,                    skg_fmt_ui8_n_4,
 } skg_fmt_;
 
+typedef enum skg_ind_fmt_ {
+	skg_ind_fmt_u32,
+	skg_ind_fmt_u16,
+	skg_ind_fmt_u8,
+} skg_ind_fmt_;
+
 typedef enum skg_el_semantic_ {
 	skg_el_semantic_none,
 	skg_el_semantic_position,
@@ -323,10 +329,10 @@ SKG_API void                skg_buffer_bind              (const skg_buffer_t *bu
 SKG_API void                skg_buffer_clear             (skg_bind_t bind);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 
-SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer);
+SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format);
 SKG_API void                skg_mesh_name                (      skg_mesh_t *mesh, const char* name);
 SKG_API void                skg_mesh_set_verts           (      skg_mesh_t *mesh, const skg_buffer_t *vert_buffer);
-SKG_API void                skg_mesh_set_inds            (      skg_mesh_t *mesh, const skg_buffer_t *ind_buffer);
+SKG_API void                skg_mesh_set_inds            (      skg_mesh_t *mesh, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format);
 SKG_API void                skg_mesh_bind                (const skg_mesh_t *mesh);
 SKG_API void                skg_mesh_destroy             (      skg_mesh_t *mesh);
 

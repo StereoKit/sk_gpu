@@ -43,7 +43,7 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 		free(im_ib_data);
 		im_ib_data = (uint32_t*)malloc(im_ib_size * sizeof(uint32_t));
 
-		skg_mesh_set_inds(&im_mesh, &im_ib);
+		skg_mesh_set_inds(&im_mesh, &im_ib, skg_ind_fmt_u32);
 	}
 
 	// Upload vertex/index data into a single contiguous GPU buffer
@@ -126,7 +126,7 @@ bool ImGui_ImplSkg_Init() {
 	im_shader      = skg_shader_create_memory(sks_imgui_shader_hlsl, sizeof(sks_imgui_shader_hlsl));
 	im_pipeline    = skg_pipeline_create(&im_shader);
 	im_shader_vars = skg_buffer_create(nullptr, 1, sizeof(float[4][4]), skg_buffer_type_constant, skg_use_dynamic);
-	im_mesh        = skg_mesh_create(nullptr, nullptr);
+	im_mesh        = skg_mesh_create(nullptr, nullptr, skg_ind_fmt_u32);
 
 	skg_pipeline_set_cull        (&im_pipeline, skg_cull_none);
 	skg_pipeline_set_transparency(&im_pipeline, skg_transparency_blend);

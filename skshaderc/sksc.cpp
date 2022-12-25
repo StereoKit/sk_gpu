@@ -93,6 +93,16 @@ enum compile_result_ {
 
 ///////////////////////////////////////////
 
+int strcmp_nocase(char const *a, char const *b) {
+    for (;; a++, b++) {
+        int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
+        if (d != 0 || !*a)
+            return d;
+    }
+}
+
+///////////////////////////////////////////
+
 void sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
 bool sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta);
 
@@ -720,7 +730,7 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 #if defined(SKSC_D3D11)
 
 DWORD sksc_d3d11_build_flags   (const sksc_settings_t *settings);
-bool  sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage);
+bool  sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *ref_meta);
 
 ///////////////////////////////////////////
 
@@ -789,7 +799,7 @@ public:
 
 ///////////////////////////////////////////
 
-bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
+bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *ref_meta) {
 	DWORD flags = sksc_d3d11_build_flags(settings);
 
 	const char *entrypoint = nullptr;
@@ -824,6 +834,76 @@ bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc
 	out_stage->code_size = (uint32_t)compiled->GetBufferSize();
 	out_stage->code       = malloc(out_stage->code_size);
 	memcpy(out_stage->code, compiled->GetBufferPointer(), out_stage->code_size);
+
+	// Get some info about the shader!
+	ID3D11ShaderReflection* reflector = nullptr; 
+	const GUID IID_ID3D11ShaderReflection = { 0x8d536ca1, 0x0cca, 0x4956, { 0xa8, 0x37, 0x78, 0x69, 0x63, 0x75, 0x55, 0x84 } };
+	if (FAILED(D3DReflect( out_stage->code, out_stage->code_size, IID_ID3D11ShaderReflection, (void**)&reflector))) {
+		sksc_log(log_level_err_pre, "Shader reflection failed!");
+		return false;
+	}
+
+	D3D11_SHADER_DESC shader_desc = {};
+	reflector->GetDesc(&shader_desc);
+
+	// Snag some perf related to data
+	skg_shader_perf_t *perf = nullptr;
+	if (type == skg_stage_vertex) perf = &ref_meta->perf_vertex;
+	if (type == skg_stage_pixel)  perf = &ref_meta->perf_pixel;
+	if (perf) {
+		perf->instructions_total        = shader_desc.InstructionCount;
+		perf->instructions_tex_read     = shader_desc.TextureLoadInstructions + shader_desc.TextureNormalInstructions;
+		perf->instructions_dynamic_flow = shader_desc.DynamicFlowControlCount;
+	}
+
+	// Get information about the vertex input data
+	if (type == skg_stage_vertex) {
+		ref_meta->vertex_input_count = shader_desc.InputParameters;
+		ref_meta->vertex_inputs = (skg_vert_component_t*)malloc(sizeof(skg_vert_component_t) * ref_meta->vertex_input_count);
+
+		for (uint32_t i = 0; i < shader_desc.InputParameters; i++) {
+			D3D11_SIGNATURE_PARAMETER_DESC param_desc = {};
+			reflector->GetInputParameterDesc(i, &param_desc);
+			
+			ref_meta->vertex_inputs[i].semantic_slot = param_desc.SemanticIndex;
+			if      (strcmp_nocase(param_desc.SemanticName, "binormal")     == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_binormal;
+			else if (strcmp_nocase(param_desc.SemanticName, "blendindices") == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_blendindices;
+			else if (strcmp_nocase(param_desc.SemanticName, "blendweight")  == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_blendweight;
+			else if (strcmp_nocase(param_desc.SemanticName, "color")        == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_color;
+			else if (strcmp_nocase(param_desc.SemanticName, "normal")       == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_normal;
+			else if (strcmp_nocase(param_desc.SemanticName, "sv_position")  == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_position;
+			else if (strcmp_nocase(param_desc.SemanticName, "position")     == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_position;
+			else if (strcmp_nocase(param_desc.SemanticName, "psize")        == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_psize;
+			else if (strcmp_nocase(param_desc.SemanticName, "tangent")      == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_tangent;
+			else if (strcmp_nocase(param_desc.SemanticName, "texcoord")     == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_texcoord;
+			switch(param_desc.ComponentType) {
+				case D3D_REGISTER_COMPONENT_FLOAT32: ref_meta->vertex_inputs[i].format = skg_fmt_f32;  break;
+				case D3D_REGISTER_COMPONENT_SINT32:  ref_meta->vertex_inputs[i].format = skg_fmt_i32;  break;
+				case D3D_REGISTER_COMPONENT_UINT32:  ref_meta->vertex_inputs[i].format = skg_fmt_ui32; break;
+				default: ref_meta->vertex_inputs[i].format = skg_fmt_none; break;
+			}
+		}
+	}
+	
+	/*char text[256];
+	for (uint32_t i = 0; i < shader_desc.ConstantBuffers; i++) {
+		ID3D11ShaderReflectionConstantBuffer *buff = reflector->GetConstantBufferByIndex(i);
+		D3D11_SHADER_BUFFER_DESC buff_desc = {};
+		buff->GetDesc(&buff_desc);
+
+		snprintf(text, sizeof(text), "Buffer: %s", buff_desc.Name);
+		sksc_log(log_level_info, text);
+		for (uint32_t v = 0; v < buff_desc.Variables; v++) {
+			ID3D11ShaderReflectionVariable *var = buff->GetVariableByIndex(v);
+			D3D11_SHADER_VARIABLE_DESC var_desc = {};
+			var->GetDesc(&var_desc);
+
+			snprintf(text, sizeof(text), "  %s", var_desc.Name);
+			sksc_log(log_level_info, text);
+		}
+	}*/
+	
+	reflector->Release();
 
 	compiled->Release();
 	return true;
@@ -912,7 +992,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		
 		if (settings->target_langs[skg_shader_lang_hlsl]) {
 			stages.add({});
-			if (!sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
+			if (!sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last(), out_file->meta)) {
 				sksc_log(log_level_err, "HLSL shader compile failed");
 				return false;
 			}
@@ -967,6 +1047,25 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 	if (!settings->silent_info) {
 		sksc_log(log_level_info, " ________________");
 		// Write out our reflection information
+
+		// A quick summary of performance
+		sksc_log(log_level_info, "|--Performance--");
+		if (out_file->meta->perf_vertex.instructions_total > 0 || out_file->meta->perf_pixel.instructions_total > 0)
+		sksc_log(log_level_info, "| Instructions |  all | tex | flow |");
+		if (out_file->meta->perf_vertex.instructions_total > 0) {
+			sksc_log(log_level_info, "|       Vertex | %4d | %3d | %4d |", 
+				out_file->meta->perf_vertex.instructions_total, 
+				out_file->meta->perf_vertex.instructions_tex_read, 
+				out_file->meta->perf_vertex.instructions_dynamic_flow);
+		} 
+		if (out_file->meta->perf_pixel.instructions_total > 0) {
+			sksc_log(log_level_info, "|        Pixel | %4d | %3d | %4d |", 
+				out_file->meta->perf_pixel.instructions_total, 
+				out_file->meta->perf_pixel.instructions_tex_read, 
+				out_file->meta->perf_pixel.instructions_dynamic_flow);
+		}
+
+		// List of all the buffers
 		sksc_log(log_level_info, "|--Buffer Info--");
 		for (size_t i = 0; i < out_file->meta->buffer_count; i++) {
 			skg_shader_buffer_t *buff = &out_file->meta->buffers[i];
@@ -984,6 +1083,32 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 				sksc_log(log_level_info, "|    %-15s: +%-4u [%5u] - %s%u", var->name, var->offset, var->size, type_name, var->type_count);
 			}
 		}
+
+		// Show the vertex shader's input format
+		if (out_file->meta->vertex_input_count > 0) {
+			sksc_log(log_level_info, "|--Mesh Input--");
+			for (int32_t i=0; i<out_file->meta->vertex_input_count; i++) {
+				const char *format   = "NA";
+				const char *semantic = "NA";
+				switch (out_file->meta->vertex_inputs[i].format) {
+					case skg_fmt_f32:  format = "float"; break;
+					case skg_fmt_i32:  format = "int  "; break;
+					case skg_fmt_ui32: format = "uint "; break;
+				}
+				switch (out_file->meta->vertex_inputs[i].semantic) {
+					case skg_semantic_binormal:     semantic = "BiNormal";     break;
+					case skg_semantic_blendindices: semantic = "BlendIndices"; break;
+					case skg_semantic_blendweight:  semantic = "BlendWeight";  break;
+					case skg_semantic_color:        semantic = "Color";        break;
+					case skg_semantic_normal:       semantic = "Normal";       break;
+					case skg_semantic_position:     semantic = "Position";     break;
+					case skg_semantic_psize:        semantic = "PSize";        break;
+					case skg_semantic_tangent:      semantic = "Tangent";      break;
+					case skg_semantic_texcoord:     semantic = "TexCoord";     break;
+				}
+				sksc_log(log_level_info, "|  %s : %s%d", format, semantic, out_file->meta->vertex_inputs[i].semantic_slot);
+			}
+		} 
 
 		for (size_t s = 0; s < sizeof(compile_stages)/sizeof(compile_stages[0]); s++) {
 			// check if the stage is used, and skip if it's not

@@ -231,6 +231,7 @@ typedef struct skg_vert_t {
 } skg_vert_t;
 
 typedef enum skg_fmt_ {
+	skg_fmt_none,
 	skg_fmt_f64,
 	skg_fmt_f32,
 	skg_fmt_f16,
@@ -249,6 +250,7 @@ typedef enum skg_fmt_ {
 } skg_fmt_;
 
 typedef enum skg_semantic_ {
+	skg_semantic_none,
 	skg_semantic_position,
 	skg_semantic_texcoord,
 	skg_semantic_normal,
@@ -300,6 +302,12 @@ typedef struct skg_shader_resource_t {
 	skg_bind_t bind;
 } skg_shader_resource_t;
 
+typedef struct skg_shader_perf_t {
+	int32_t instructions_total;
+	int32_t instructions_tex_read;
+	int32_t instructions_dynamic_flow;
+} skg_shader_perf_t;
+
 typedef struct skg_shader_meta_t {
 	char                   name[256];
 	uint32_t               buffer_count;
@@ -308,6 +316,10 @@ typedef struct skg_shader_meta_t {
 	skg_shader_resource_t *resources;
 	int32_t                references;
 	int32_t                global_buffer_id;
+	skg_vert_component_t  *vertex_inputs;
+	int32_t                vertex_input_count;
+	skg_shader_perf_t      perf_vertex;
+	skg_shader_perf_t      perf_pixel;
 } skg_shader_meta_t;
 
 ///////////////////////////////////////////

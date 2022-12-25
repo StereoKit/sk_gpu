@@ -3,6 +3,7 @@
 #include "../sk_gpu.h"
 
 #include <math.h>
+#include <malloc.h>
 
 static inline float vec3_magnitude_sq(const float *a) { return a[0] * a[0] + a[1] * a[1] + a[2] * a[2]; }
 static inline float vec3_magnitude   (const float *a) { return sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]); }
@@ -27,8 +28,8 @@ void gen_cube(skg_mesh_t *mesh, skg_buffer_t *v_buffer, skg_buffer_t *i_buffer, 
 		int u   = ((i+1) / 2)   % 2; // U: 0,1,1,0
 		int v   = (i / 2)       % 2; // V: 0,0,1,1
 
-		verts[i].uv[0] = u;
-		verts[i].uv[1] = v;
+		verts[i].uv[0] = (float)u;
+		verts[i].uv[1] = (float)v;
 		verts[i].norm[0] = nx * neg;
 		verts[i].norm[1] = ny * neg;
 		verts[i].norm[2] = nz * neg;
@@ -40,7 +41,7 @@ void gen_cube(skg_mesh_t *mesh, skg_buffer_t *v_buffer, skg_buffer_t *i_buffer, 
 		verts[i].col.b = 255;
 		verts[i].col.a = 255;
 	}
-	for (size_t i = 0; i < 6; i++) {
+	for (uint32_t i = 0; i < 6; i++) {
 		inds[i*6+0] = i*4;
 		inds[i*6+1] = i*4+1;
 		inds[i*6+2] = i*4+2;
@@ -78,7 +79,7 @@ void mesh_gen_cube_vert(int i, float* size, float* pos, float* norm, float* uv) 
 void gen_sphere(float diameter, int32_t subdivisions, skg_mesh_t *mesh, skg_buffer_t *v_buffer, skg_buffer_t *i_buffer, int32_t *faces) {
 	uint32_t subd   = (uint32_t)subdivisions;
 
-	subd = max(0,(int32_t)subd) + 2;
+	subd = (subd<0?0:subd) + 2;
 
 	int vert_count = 6*subd*subd;
 	int ind_count  = 6*(subd-1)*(subd-1)*6;

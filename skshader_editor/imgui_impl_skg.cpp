@@ -68,8 +68,8 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 		vtx_dst += cmd_list->VtxBuffer.Size;
 		idx_dst += cmd_list->IdxBuffer.Size;
 	}
-	skg_buffer_set_contents(&im_vb, im_vb_data, (vtx_dst - im_vb_data) * sizeof(skg_vert_t));
-	skg_buffer_set_contents(&im_ib, im_ib_data, (idx_dst - im_ib_data) * sizeof(uint32_t  ));
+	skg_buffer_set_contents(&im_vb, im_vb_data, (int32_t)((vtx_dst - im_vb_data) * sizeof(skg_vert_t)));
+	skg_buffer_set_contents(&im_ib, im_ib_data, (int32_t)((idx_dst - im_ib_data) * sizeof(uint32_t  )));
 
 	// Setup orthographic projection matrix into our constant buffer
 	// Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
@@ -107,10 +107,10 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 			} else {
 				// Apply scissor/clipping rectangle
 				int32_t rect[4] = {
-					pcmd->ClipRect.x - clip_off.x,
-					pcmd->ClipRect.y - clip_off.y,
-					pcmd->ClipRect.z - pcmd->ClipRect.x,
-					pcmd->ClipRect.w - pcmd->ClipRect.y};
+					(int32_t)(pcmd->ClipRect.x - clip_off.x),
+					(int32_t)(pcmd->ClipRect.y - clip_off.y),
+					(int32_t)(pcmd->ClipRect.z - pcmd->ClipRect.x),
+					(int32_t)(pcmd->ClipRect.w - pcmd->ClipRect.y)};
 				skg_scissor(rect);
 				
 				skg_tex_bind((skg_tex_t*)pcmd->TextureId, skg_bind_t{ 0, skg_stage_pixel });

@@ -60,8 +60,6 @@ void app_shader_update_hlsl(const char *text) {
 	sksc_settings_t settings = {};
 	settings.debug         = true;
 	settings.optimize      = 3;
-	settings.replace_ext   = true;
-	settings.output_header = false;
 	settings.row_major     = false;
 	settings.silent_err    = false;
 	settings.silent_info   = false;
@@ -117,7 +115,7 @@ skg_pipeline_t *app_shader_get_pipeline() {
 
 void app_shader_show_log() {
 	ImGui::Begin("Log");
-	for (size_t i = 0; i < sksc_log_count(); i++) {
+	for (int32_t i = 0; i < sksc_log_count(); i++) {
 		sksc_log_item_t item = sksc_log_get(i);
 		if (item.level > 0)
 			ImGui::Text(item.text);
@@ -172,7 +170,7 @@ void app_shader_show_meta() {
 
 void app_shader_set_engine_val(engine_val_ type, void *value) {
 	int32_t size = app_shader_engine_val_size(type);
-	int     id   = engine_vals.index_where(&engine_val_t::type, type);
+	int64_t id   = engine_vals.index_where(&engine_val_t::type, type);
 	if (id != -1) {
 		memcpy(engine_vals[id].value, value, size);
 	}
@@ -189,10 +187,10 @@ bool app_shader_is_engine_val(const char *name) {
 }
 
 void app_shader_set_named_val(const char *name, void *value) {
-	int id = -1;
+	int32_t id = -1;
 	for (size_t i = 0; i < engine_vals.count; i++) {
 		if (strcmp(engine_vals[i].name, name) == 0) {
-			id = i;
+			id = (int32_t)i;
 			break;
 		}
 	}
@@ -214,7 +212,7 @@ void app_shader_set_named_val(const char *name, void *value) {
 			val.name      = (char*)malloc(strlen(name) + 1);
 			val.buffer_id = -1;
 			snprintf((char*)val.name, strlen(name) + 1, "%s", name);
-			id = engine_vals.add(val);
+			id = (int32_t)engine_vals.add(val);
 
 			app_shader_remap();
 		}
@@ -224,10 +222,10 @@ void app_shader_set_named_val(const char *name, void *value) {
 }
 
 void *app_shader_get_named_val(const char *name) {
-	int id = -1;
+	int32_t id = -1;
 	for (size_t i = 0; i < engine_vals.count; i++) {
 		if (strcmp(engine_vals[i].name, name) == 0) {
-			id = i;
+			id = (int32_t)i;
 			break;
 		}
 	}
@@ -256,7 +254,7 @@ void *app_shader_get_named_val(const char *name) {
 			} else {
 				memset(val.value, 0, var->size);
 			}
-			id = engine_vals.add(val);
+			id = (int32_t)engine_vals.add(val);
 
 			app_shader_remap();
 		}
@@ -302,9 +300,9 @@ void app_shader_remap() {
 					if (engine_vals[i].val_size != buff->vars[v].size) {
 						printf("Size mismatch on shader var mapping for '%s'!\n", engine_vals[i].name);
 					} else {
-						engine_vals[i].buffer_id = b;
-						engine_vals[i].offset    = buff->vars[v].offset;
-						engine_vals[i].val_size  = buff->vars[v].size;
+						engine_vals[i].buffer_id = (int32_t)b;
+						engine_vals[i].offset    = (int32_t)buff->vars[v].offset;
+						engine_vals[i].val_size  = (int32_t)buff->vars[v].size;
 					}
 				}
 			}

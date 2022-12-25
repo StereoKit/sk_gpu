@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.7)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 
 project(sk_gpu_header VERSION 0.1
                       DESCRIPTION "Single header cross-platform graphics api."

@@ -13,18 +13,13 @@
 ///////////////////////////////////////////
 
 typedef struct sksc_settings_t {
-	bool replace_ext;
 	bool debug;
 	bool row_major;
-	bool output_header;
-	bool output_zipped;
 	bool silent_info;
 	bool silent_err;
 	bool silent_warn;
-	bool only_if_changed;
 	int  optimize;
 	char folder[512];
-	char *out_folder;
 	char vs_entrypoint[64];
 	bool vs_entry_require;
 	char ps_entrypoint[64];

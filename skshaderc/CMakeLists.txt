@@ -26,6 +26,7 @@
 # file.
 
 cmake_minimum_required(VERSION 3.9.2)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 
 project(skshaderc VERSION 1.0
                   DESCRIPTION "Shader compiler for sk_gpu.h"

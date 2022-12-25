@@ -922,7 +922,7 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 
 void skg_buffer_name(skg_buffer_t *buffer, const char* name) {
 	if (buffer->_buffer != 0)
-		glObjectLabel(GL_BUFFER, buffer->_buffer, strlen(name), name);
+		glObjectLabel(GL_BUFFER, buffer->_buffer, (uint32_t)strlen(name), name);
 }
 
 ///////////////////////////////////////////
@@ -993,11 +993,11 @@ void skg_mesh_name(skg_mesh_t *mesh, const char* name) {
 	char postfix_name[256];
 	if (mesh->_vert_buffer != 0) {
 		snprintf(postfix_name, sizeof(postfix_name), "%s_verts", name);
-		glObjectLabel(GL_BUFFER, mesh->_vert_buffer,  strlen(postfix_name), postfix_name);
+		glObjectLabel(GL_BUFFER, mesh->_vert_buffer,  (uint32_t)strlen(postfix_name), postfix_name);
 	}
 	if (mesh->_ind_buffer != 0) {
 		snprintf(postfix_name, sizeof(postfix_name), "%s_inds", name);
-		glObjectLabel(GL_BUFFER, mesh->_ind_buffer,  strlen(postfix_name), postfix_name);
+		glObjectLabel(GL_BUFFER, mesh->_ind_buffer,  (uint32_t)strlen(postfix_name), postfix_name);
 	}
 }
 
@@ -1110,13 +1110,11 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 	} catch (...) {
 		// Some GL drivers have a habit of crashing during shader compile.
 		const char *stage_name = "";
-		char        text[64];
 		switch (type) {
 			case skg_stage_pixel:   stage_name = "Pixel";   break;
 			case skg_stage_vertex:  stage_name = "Vertex";  break;
 			case skg_stage_compute: stage_name = "Compute"; break; }
-		snprintf(text, sizeof(text), "%s shader compile exception", stage_name);
-		skg_log(skg_log_warning, text);
+		skg_logf(skg_log_warning, "%s shader compile exception", stage_name);
 		glDeleteShader(result._shader);
 		result._shader = 0;
 		if (needs_free)
@@ -1134,8 +1132,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 		log = (char*)malloc(length);
 		glGetShaderInfoLog(result._shader, length, &err, log);
 
-		skg_log(skg_log_warning, "Unable to compile shader:\n");
-		skg_log(skg_log_warning, log);
+		skg_logf(skg_log_warning, "Unable to compile shader: ", log);
 		free(log);
 
 		glDeleteShader(result._shader);
@@ -1158,9 +1155,7 @@ void skg_shader_stage_destroy(skg_shader_stage_t *shader) {
 
 skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_t v_shader, skg_shader_stage_t p_shader, skg_shader_stage_t c_shader) {
 	if (v_shader._shader == 0 && p_shader._shader == 0 && c_shader._shader == 0) {
-		char text[290];
-		snprintf(text, sizeof(text), "Shader '%s' has no valid stages!", meta->name);
-		skg_log(skg_log_warning, text);
+		skg_logf(skg_log_warning, "Shader '%s' has no valid stages!", meta->name);
 		return {};
 	}
 
@@ -1179,9 +1174,7 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 		glLinkProgram(result._program);
 	} catch (...) {
 		// Some GL drivers have a habit of crashing during shader compile.
-		char text[286];
-		snprintf(text, sizeof(text), "Shader link exception in %s:", meta->name);
-		skg_log(skg_log_warning, text);
+		skg_logf(skg_log_warning, "Shader link exception in %s:", meta->name);
 		glDeleteProgram(result._program);
 		result._program = 0;
 		return result;
@@ -1197,9 +1190,7 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 		log = (char*)malloc(length);
 		glGetProgramInfoLog(result._program, length, &err, log);
 
-		char text[272];
-		snprintf(text, sizeof(text), "Unable to link %s:", meta->name);
-		skg_log(skg_log_warning, text);
+		skg_logf(skg_log_warning, "Unable to link %s:", meta->name);
 		skg_log(skg_log_warning, log);
 		free(log);
 
@@ -1223,8 +1214,7 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 			glUniformBlockBinding(result._program, slot, meta->buffers[i].bind.slot);
 
 			if (slot == GL_INVALID_INDEX) {
-				skg_log(skg_log_warning, "Couldn't find uniform block index for:");
-				skg_log(skg_log_warning, meta->buffers[i].name);
+				skg_logf(skg_log_warning, "Couldn't find uniform block index for: %s", meta->buffers[i].name);
 			}
 		}
 		glUseProgram(result._program);
@@ -1244,19 +1234,19 @@ void skg_shader_name(skg_shader_t *shader, const char* name) {
 	char postfix_name[256];
 	if (shader->_program != 0) {
 		snprintf(postfix_name, sizeof(postfix_name), "%s_program", name);
-		glObjectLabel(GL_PROGRAM, shader->_program, strlen(postfix_name), postfix_name);
+		glObjectLabel(GL_PROGRAM, shader->_program, (uint32_t)strlen(postfix_name), postfix_name);
 	}
 	if (shader->_compute != 0) {
 		snprintf(postfix_name, sizeof(postfix_name), "%s_cs", name);
-		glObjectLabel(GL_SHADER, shader->_compute, strlen(postfix_name), postfix_name);
+		glObjectLabel(GL_SHADER, shader->_compute, (uint32_t)strlen(postfix_name), postfix_name);
 	}
 	if (shader->_pixel != 0) {
 		snprintf(postfix_name, sizeof(postfix_name), "%s_ps", name);
-		glObjectLabel(GL_SHADER, shader->_pixel, strlen(postfix_name), postfix_name);
+		glObjectLabel(GL_SHADER, shader->_pixel, (uint32_t)strlen(postfix_name), postfix_name);
 	}
 	if (shader->_vertex != 0) {
 		snprintf(postfix_name, sizeof(postfix_name), "%s_vs", name);
-		glObjectLabel(GL_SHADER, shader->_vertex, strlen(postfix_name), postfix_name);
+		glObjectLabel(GL_SHADER, shader->_vertex, (uint32_t)strlen(postfix_name), postfix_name);
 	}
 }
 
@@ -1756,7 +1746,7 @@ void skg_tex_name(skg_tex_t *tex, const char* name) {
 		// If the framebuffer hasn't been created, labeling it can error out,
 		// binding it can force creation and fix that!
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
-		glObjectLabel    (GL_FRAMEBUFFER, tex->_framebuffer, strlen(postfix_name), postfix_name);
+		glObjectLabel    (GL_FRAMEBUFFER, tex->_framebuffer, (uint32_t)strlen(postfix_name), postfix_name);
 	}
 }
 
@@ -1914,7 +1904,7 @@ bool skg_tex_get_mip_contents(skg_tex_t *tex, int32_t mip_level, void *ref_data,
 
 bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size) {
 	// Double check on mips first
-	uint32_t mip_levels = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+	int32_t mip_levels = tex->mips == skg_mip_generate ? (int32_t)skg_mip_count(tex->width, tex->height) : 1;
 	if (mip_level != 0) {
 		if (tex->mips != skg_mip_generate) {
 			skg_log(skg_log_critical, "Can't get mip data from a texture with no mips!");
@@ -1987,7 +1977,7 @@ void* skg_tex_get_native(const skg_tex_t* tex) {
 void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 	if (bind.stage_bits & skg_stage_compute) {
 #if !defined(_SKG_GL_WEB)
-		glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, skg_tex_fmt_to_native( texture->format ));
+		glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, (uint32_t)skg_tex_fmt_to_native( texture->format ));
 #endif
 	} else {
 		glActiveTexture(GL_TEXTURE0 + bind.slot);

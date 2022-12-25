@@ -28,33 +28,48 @@
 
 ///////////////////////////////////////////
 
+typedef struct compiler_settings_t {
+	bool replace_ext;
+	bool output_header;
+	bool output_zipped;
+	bool output_raw_shaders;
+	bool only_if_changed;
+	char *out_folder;
+
+	sksc_settings_t shaderc;
+} compiler_settings_t;
+
+///////////////////////////////////////////
+
 uint64_t exe_file_time = 0;
 const int32_t path_size = 2048;
 
 ///////////////////////////////////////////
 
-bool            read_file     (const char *filename, char **out_text, size_t *out_size);
-bool            write_file    (const char *filename, void *file_data, size_t file_size);
-bool            write_header  (const char *filename, void *file_data, size_t file_size, bool zipped);
-void            compile_file  (const char *filename,   sksc_settings_t *settings);
-void            iterate_dir   (const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file));
-sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
-void            show_usage    ();
-uint64_t        file_time     (const char *file);
-void            file_name     (const char *file, char *out_name, size_t name_size);
-void            file_name_ext (const char *file, char *out_name, size_t name_size);
-void            file_dir      (const char *file, char *out_path, size_t path_size);
-bool            file_exists   (const char *path);
-bool            path_is_file  (const char *path);
-bool            path_is_wild  (const char *path);
-char           *path_absolute (const char *relative_dir);
-bool            recurse_mkdir (const char *dirname);
+bool                read_file     (const char *filename, char **out_text, size_t *out_size);
+bool                write_file    (const char *filename, void *file_data, size_t file_size);
+bool                write_file_txt(const char *filename, void *file_data, size_t file_size);
+bool                write_header  (const char *filename, void *file_data, size_t file_size, bool zipped);
+void                write_stages  (const skg_shader_file_t *file, const char *folder, bool trailing_slash, const char *name_ext);
+void                compile_file  (const char *filename, compiler_settings_t *settings);
+void                iterate_dir   (const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file));
+compiler_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
+void                show_usage    ();
+uint64_t            file_time     (const char *file);
+void                file_name     (const char *file, char *out_name, size_t name_size);
+void                file_name_ext (const char *file, char *out_name, size_t name_size);
+void                file_dir      (const char *file, char *out_path, size_t path_size);
+bool                file_exists   (const char *path);
+bool                path_is_file  (const char *path);
+bool                path_is_wild  (const char *path);
+char               *path_absolute (const char *relative_dir);
+bool                recurse_mkdir (const char *dirname);
 
 ///////////////////////////////////////////
 
 int main(int argc, char **argv) {
-	bool            exit     = false;
-	sksc_settings_t settings = check_settings(argc, argv, &exit);
+	bool                exit     = false;
+	compiler_settings_t settings = check_settings(argc, argv, &exit);
 	if (exit) return 0;
 
 	exe_file_time = file_time(argv[0]);
@@ -68,7 +83,7 @@ int main(int argc, char **argv) {
 	} else {
 		iterate_dir(path, &settings, [](void *callback_data, const char *src_filename, bool file) {
 			if (!file) return;
-			compile_file(src_filename, (sksc_settings_t *)callback_data);
+			compile_file(src_filename, (compiler_settings_t*)callback_data);
 		});
 	}
 #else
@@ -86,61 +101,62 @@ int main(int argc, char **argv) {
 
 ///////////////////////////////////////////
 
-sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
+compiler_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	if (argc <= 1) {
 		*exit = true;
 		show_usage();
 		return {};
 	}
 
-	sksc_settings_t result = {};
-	result.debug         = false;
-	result.optimize      = 3;
-	result.replace_ext   = false;
-	result.output_header = false;
-	result.row_major     = false;
-	result.silent_err    = false;
-	result.silent_info   = false;
-	result.silent_warn   = false;
+	compiler_settings_t result = {};
+	result.replace_ext     = false;
+	result.output_header   = false;
 	result.only_if_changed = true;
+	result.shaderc.debug         = false;
+	result.shaderc.optimize      = 3;
+	result.shaderc.row_major     = false;
+	result.shaderc.silent_err    = false;
+	result.shaderc.silent_info   = false;
+	result.shaderc.silent_warn   = false;
 
 	// Get the inlcude folder
-	file_dir(argv[argc-1], result.folder, sizeof(result.folder));
+	file_dir(argv[argc-1], result.shaderc.folder, sizeof(result.shaderc.folder));
 
 	bool set_targets = false;
 	for (int32_t i=1; i<argc-1; i++) {
-		if      (strcmp(argv[i], "-h" ) == 0) result.output_header = true;
-		else if (strcmp(argv[i], "-z" ) == 0) result.output_zipped = true;
-		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext   = false;
-		else if (strcmp(argv[i], "-r" ) == 0) result.row_major     = true;
-		else if (strcmp(argv[i], "-d" ) == 0) result.debug         = true;
-		else if (strcmp(argv[i], "-f" ) == 0) result.only_if_changed=false;
-		else if (strcmp(argv[i], "-si") == 0) result.silent_info   = true;
-		else if (strcmp(argv[i], "-sw") == 0) { result.silent_info = true; result.silent_warn = true; }
-		else if (strcmp(argv[i], "-s" ) == 0) { result.silent_err = true; result.silent_info = true; result.silent_warn = true;}
+		if      (strcmp(argv[i], "-h" ) == 0) result.output_header         = true;
+		else if (strcmp(argv[i], "-z" ) == 0) result.output_zipped         = true;
+		else if (strcmp(argv[i], "-raw")== 0) result.output_raw_shaders    = true;
+		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext           = false;
+		else if (strcmp(argv[i], "-f" ) == 0) result.only_if_changed       = false;
+		else if (strcmp(argv[i], "-r" ) == 0) result.shaderc.row_major     = true;
+		else if (strcmp(argv[i], "-d" ) == 0) result.shaderc.debug         = true;
+		else if (strcmp(argv[i], "-si") == 0) result.shaderc.silent_info   = true;
+		else if (strcmp(argv[i], "-sw") == 0) { result.shaderc.silent_info = true; result.shaderc.silent_warn = true; }
+		else if (strcmp(argv[i], "-s" ) == 0) { result.shaderc.silent_err  = true; result.shaderc.silent_info = true; result.shaderc.silent_warn = true;}
 		else if (strcmp(argv[i], "-o0") == 0 ||
-		         strcmp(argv[i], "-O0") == 0) result.optimize = 0;
+		         strcmp(argv[i], "-O0") == 0) result.shaderc.optimize = 0;
 		else if (strcmp(argv[i], "-o1") == 0 ||
-		         strcmp(argv[i], "-O1") == 0) result.optimize = 1;
+		         strcmp(argv[i], "-O1") == 0) result.shaderc.optimize = 1;
 		else if (strcmp(argv[i], "-o2") == 0 ||
-		         strcmp(argv[i], "-O2") == 0) result.optimize = 2;
+		         strcmp(argv[i], "-O2") == 0) result.shaderc.optimize = 2;
 		else if (strcmp(argv[i], "-o3") == 0 ||
-		         strcmp(argv[i], "-O3") == 0) result.optimize = 3;
+		         strcmp(argv[i], "-O3") == 0) result.shaderc.optimize = 3;
 		else if (strcmp(argv[i], "-help" ) == 0 ||
 		         strcmp(argv[i], "-?" ) == 0 ||
 		         strcmp(argv[i], "--help" ) == 0 ||
 		         strcmp(argv[i], "/?" ) == 0 ) *exit = true;
-		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { result.cs_entry_require = true; strncpy(result.cs_entrypoint, argv[i+1], sizeof(result.cs_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { result.vs_entry_require = true; strncpy(result.vs_entrypoint, argv[i+1], sizeof(result.vs_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { result.ps_entry_require = true; strncpy(result.ps_entrypoint, argv[i+1], sizeof(result.ps_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-gl") == 0 && i<argc-1) { result.gl_version = atoi(argv[i+1]); i++; }
-		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shader_model,  argv[i+1], sizeof(result.shader_model )); i++; }
+		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { result.shaderc.cs_entry_require = true; strncpy(result.shaderc.cs_entrypoint, argv[i+1], sizeof(result.shaderc.cs_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { result.shaderc.vs_entry_require = true; strncpy(result.shaderc.vs_entrypoint, argv[i+1], sizeof(result.shaderc.vs_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { result.shaderc.ps_entry_require = true; strncpy(result.shaderc.ps_entrypoint, argv[i+1], sizeof(result.shaderc.ps_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-gl") == 0 && i<argc-1) { result.shaderc.gl_version = atoi(argv[i+1]); i++; }
+		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shaderc.shader_model,  argv[i+1], sizeof(result.shaderc.shader_model )); i++; }
 		else if (strcmp(argv[i], "-i" ) == 0 && i<argc-1) {
 			size_t len = strlen(argv[i + 1]) + 1;
-			result.include_folder_ct += 1;
-			result.include_folders    = (char**)realloc(result.include_folders, sizeof(result.include_folder_ct * sizeof(char *)));
-			result.include_folders[result.include_folder_ct-1] = (char*)malloc(len);
-			strncpy(result.include_folders[result.include_folder_ct-1], argv[i+1], len); 
+			result.shaderc.include_folder_ct += 1;
+			result.shaderc.include_folders    = (char**)realloc(result.shaderc.include_folders, sizeof(result.shaderc.include_folder_ct * sizeof(char *)));
+			result.shaderc.include_folders[result.shaderc.include_folder_ct-1] = (char*)malloc(len);
+			strncpy(result.shaderc.include_folders[result.shaderc.include_folder_ct-1], argv[i+1], len); 
 			i++; }
 		else if (strcmp(argv[i], "-o" ) == 0) { 
 			size_t len = strlen(argv[i + 1]) + 1;
@@ -152,11 +168,11 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 			const char *targets = argv[i + 1];
 			size_t      len     = strlen(targets);
 			for (size_t i = 0; i < len; i++) {
-				if      (targets[i] == 'x') result.target_langs[skg_shader_lang_hlsl]     = true;
-				else if (targets[i] == 's') result.target_langs[skg_shader_lang_spirv]    = true;
-				else if (targets[i] == 'g') result.target_langs[skg_shader_lang_glsl]     = true;
-				else if (targets[i] == 'e') result.target_langs[skg_shader_lang_glsl_es]  = true;
-				else if (targets[i] == 'w') result.target_langs[skg_shader_lang_glsl_web] = true;
+				if      (targets[i] == 'x') result.shaderc.target_langs[skg_shader_lang_hlsl]     = true;
+				else if (targets[i] == 's') result.shaderc.target_langs[skg_shader_lang_spirv]    = true;
+				else if (targets[i] == 'g') result.shaderc.target_langs[skg_shader_lang_glsl]     = true;
+				else if (targets[i] == 'e') result.shaderc.target_langs[skg_shader_lang_glsl_es]  = true;
+				else if (targets[i] == 'w') result.shaderc.target_langs[skg_shader_lang_glsl_web] = true;
 				else { printf("Unrecognized shader language target '%c'\n", targets[i]); *exit = true; }
 			}
 			i++;
@@ -167,24 +183,24 @@ sksc_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 
 	// Default language targets, all of them
 	if (!set_targets) {
-		for (size_t i = 0; i < sizeof(result.target_langs)/sizeof(result.target_langs[0]); i++) {
-			result.target_langs[i] = true;
+		for (size_t i = 0; i < sizeof(result.shaderc.target_langs)/sizeof(result.shaderc.target_langs[0]); i++) {
+			result.shaderc.target_langs[i] = true;
 		}
 	}
 
 	// Default shader model
-	if (result.shader_model[0] == 0)
-		strncpy(result.shader_model, "5_0", sizeof(result.shader_model));
+	if (result.shaderc.shader_model[0] == 0)
+		strncpy(result.shaderc.shader_model, "5_0", sizeof(result.shaderc.shader_model));
 
 	// default desktop glsl version
-	if (result.gl_version == 0)
-		result.gl_version = 430;
+	if (result.shaderc.gl_version == 0)
+		result.shaderc.gl_version = 430;
 
 	// If no entrypoints were provided, then these are the defaults!
-	if (result.ps_entrypoint[0] == 0 && result.vs_entrypoint[0] == 0 && result.cs_entrypoint[0] == 0) {
-		strncpy(result.ps_entrypoint, "ps", sizeof(result.ps_entrypoint));
-		strncpy(result.vs_entrypoint, "vs", sizeof(result.vs_entrypoint));
-		strncpy(result.cs_entrypoint, "cs", sizeof(result.cs_entrypoint));
+	if (result.shaderc.ps_entrypoint[0] == 0 && result.shaderc.vs_entrypoint[0] == 0 && result.shaderc.cs_entrypoint[0] == 0) {
+		strncpy(result.shaderc.ps_entrypoint, "ps", sizeof(result.shaderc.ps_entrypoint));
+		strncpy(result.shaderc.vs_entrypoint, "vs", sizeof(result.shaderc.vs_entrypoint));
+		strncpy(result.shaderc.cs_entrypoint, "cs", sizeof(result.shaderc.cs_entrypoint));
 	}
 
 	if (*exit) {
@@ -203,6 +219,8 @@ Options:
 	-r		Specify row-major matrices, column-major is default.
 	-h		Output a C header file with a byte array instead of a binary file.
 	-z		Zips and compresses output data with miniz
+	-raw		Outputs the raw shader stage data as additional files in the same
+			directory. Useful for debugging shader transpilation.
 	-e		Appends the sks extension to the resulting file instead of 
 			replacing the extension with sks. Default will replace the 
 			extension.
@@ -251,7 +269,7 @@ Options:
 
 ///////////////////////////////////////////
 
-void compile_file(const char *src_filename, sksc_settings_t *settings) {
+void compile_file(const char *src_filename, compiler_settings_t *settings) {
 	char dir     [path_size];
 	char name    [path_size];
 	char name_ext[path_size];
@@ -273,7 +291,7 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 	uint64_t src_file_time      = file_time(src_filename);
 	uint64_t compiled_file_time = file_time(new_filename);
 	if (settings->only_if_changed && src_file_time < compiled_file_time && exe_file_time < compiled_file_time) {
-		if (!settings->silent_info) {
+		if (!settings->shaderc.silent_info) {
 			printf("File '%s' is already up-to-date, skipping...\n", src_filename);
 		}
 		return;
@@ -284,7 +302,7 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 	if (read_file(src_filename, &file_text, &file_size)) {
 		skg_shader_file_t file;
 		sksc_log(log_level_info, "Compiling %s..", src_filename);
-		if (sksc_compile(src_filename, file_text, settings, &file)) {
+		if (sksc_compile(src_filename, file_text, &settings->shaderc, &file)) {
 			
 			// Turn the shader data into a binary file
 			void  *sks_data;
@@ -294,10 +312,10 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 			// Zip data
 			bool err = false;
 			if (settings->output_zipped) {
-				mz_ulong sks_size_z = mz_compressBound(sks_size);
+				mz_ulong sks_size_z = mz_compressBound((mz_ulong)sks_size);
 				void*    sks_data_z = malloc(sks_size_z);
 				
-				int status = mz_compress2((unsigned char*)sks_data_z, &sks_size_z, (unsigned char*)sks_data, sks_size, MZ_BEST_COMPRESSION);
+				int status = mz_compress2((unsigned char*)sks_data_z, &sks_size_z, (unsigned char*)sks_data, (mz_ulong)sks_size, MZ_BEST_COMPRESSION);
 				if (status != MZ_OK) {
 					sksc_log(log_level_err, "Failed to compress data! %d\n", status);
 					err = true;
@@ -320,6 +338,10 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 					? write_header(abs_file, sks_data, sks_size, settings->output_zipped)
 					: write_file  (abs_file, sks_data, sks_size);
 
+				if (settings->output_raw_shaders) {
+					write_stages(&file, dest_folder, trailing_slash, name_ext);
+				}
+
 				if (written) sksc_log(log_level_info, "Compiled successfully to %s", abs_file);
 				else         sksc_log(log_level_err,  "Failed to write file! %s", abs_file);
 			}
@@ -329,11 +351,42 @@ void compile_file(const char *src_filename, sksc_settings_t *settings) {
 		}
 		
 		char* abs_src_file = path_absolute(src_filename);
-		sksc_log_print(abs_src_file, settings);
+		sksc_log_print(abs_src_file, &settings->shaderc);
 		sksc_log_clear();
 		free(file_text);
 	} else {
 		printf("Couldn't read file '%s'!\n", src_filename);
+	}
+}
+
+///////////////////////////////////////////
+
+void write_stages(const skg_shader_file_t *file, const char *folder, bool trailing_slash, const char *name_ext) {
+	for (uint32_t i = 0; i < file->stage_count; i++) {
+		skg_shader_file_stage_t *stage = &file->stages[i];
+
+		char        sub_filename[path_size];
+		const char *stage_name = "";
+		const char *lang       = "";
+		bool        text       = false;
+		switch (stage->language) {
+			case skg_shader_lang_glsl:     lang = "glsl";      text = true; break;
+			case skg_shader_lang_glsl_es:  lang = "glsl.es";   text = true; break;
+			case skg_shader_lang_glsl_web: lang = "glsl.web";  text = true; break;
+			case skg_shader_lang_hlsl:     lang = "hlsl.bin";               break;
+			case skg_shader_lang_spirv:    lang = "spirv.bin";              break;
+		}
+		switch(stage->stage){
+			case skg_stage_compute: stage_name = "compute"; break;
+			case skg_stage_pixel:   stage_name = "pixel";   break;
+			case skg_stage_vertex:  stage_name = "vertex";  break;
+		}
+		snprintf(sub_filename, sizeof(sub_filename), "%s%s%s.%s.%s", folder, trailing_slash ? "":"/", name_ext, stage_name, lang);
+		if (text) {
+			write_file_txt(sub_filename, stage->code, stage->code_size-1);
+		} else {
+			write_file    (sub_filename, stage->code, stage->code_size);
+		}
 	}
 }
 
@@ -456,7 +509,7 @@ bool recurse_mkdir(const char *dirname) {
 		char old = *curr;
 		*curr = '\0';
 #ifdef _WIN32
-		if (CreateDirectory(full, NULL) == FALSE) {
+		if (CreateDirectoryA(full, NULL) == FALSE) {
 			if (GetLastError() != ERROR_ALREADY_EXISTS) {
 				return false;
 			}
@@ -473,9 +526,26 @@ bool recurse_mkdir(const char *dirname) {
 	return true;
 }
 
+///////////////////////////////////////////
+
 bool write_file(const char *filename, void *file_data, size_t file_size) {
 	// Open and write
 	FILE *fp = fopen(filename, "wb");
+	if (fp == nullptr) {
+		return false;
+	}
+	fwrite(file_data, file_size, 1, fp);
+	fflush(fp);
+	fclose(fp);
+	return true;
+}
+
+
+///////////////////////////////////////////
+
+bool write_file_txt(const char *filename, void *file_data, size_t file_size) {
+	// Open and write
+	FILE *fp = fopen(filename, "w");
 	if (fp == nullptr) {
 		return false;
 	}
@@ -631,7 +701,7 @@ void iterate_dir(const char *directory_path, void *callback_data, void (*on_item
 #if defined(_WIN32)
 	if (strcmp(directory_path, "") == 0) {
 		char drive_names[path_size];
-		GetLogicalDriveStrings(sizeof(drive_names), drive_names);
+		GetLogicalDriveStringsA(sizeof(drive_names), drive_names);
 		char *curr = drive_names;
 		while (*curr != '\0') {
 			on_item(callback_data, curr, false);
@@ -640,8 +710,8 @@ void iterate_dir(const char *directory_path, void *callback_data, void (*on_item
 		return;
 	}
 
-	WIN32_FIND_DATA info;
-	HANDLE          handle = nullptr;
+	WIN32_FIND_DATAA info;
+	HANDLE           handle = nullptr;
 
 	char directory[path_size];
 	file_dir(directory_path, directory, sizeof(directory));
@@ -656,7 +726,7 @@ void iterate_dir(const char *directory_path, void *callback_data, void (*on_item
 		snprintf(filter, sizeof(filter), "%s/*.*", directory_path);
 	}
 
-	handle = FindFirstFile(filter, &info);
+	handle = FindFirstFileA(filter, &info);
 	if (handle == INVALID_HANDLE_VALUE) return;
 
 	while (handle) {
@@ -670,7 +740,7 @@ void iterate_dir(const char *directory_path, void *callback_data, void (*on_item
 				on_item(callback_data, file, true);
 		}
 
-		if (!FindNextFile(handle, &info)) {
+		if (!FindNextFileA(handle, &info)) {
 			FindClose(handle);
 			handle = nullptr;
 		}

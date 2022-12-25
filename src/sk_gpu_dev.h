@@ -142,20 +142,6 @@ typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_depth16,
 } skg_tex_fmt_;
 
-typedef enum skg_fmt_ {
-	skg_fmt_none,
-	skg_fmt_f32_1,    skg_fmt_f32_2,    skg_fmt_f32_3,    skg_fmt_f32_4,
-	skg_fmt_f16_1,    skg_fmt_f16_2,                      skg_fmt_f16_4,
-	skg_fmt_i32_1,    skg_fmt_i32_2,    skg_fmt_i32_3,    skg_fmt_i32_4,
-	skg_fmt_i16_1,    skg_fmt_i16_2,                      skg_fmt_i16_4,
-	skg_fmt_i8_1,     skg_fmt_i8_2,                       skg_fmt_i8_4,
-	skg_fmt_ui32_1,   skg_fmt_ui32_2,   skg_fmt_ui32_3,   skg_fmt_ui32_4,
-	skg_fmt_ui16_1,   skg_fmt_ui16_2,                     skg_fmt_ui16_4,
-	skg_fmt_ui8_1,    skg_fmt_ui8_2,                      skg_fmt_ui8_4,
-	skg_fmt_ui16_n_1, skg_fmt_ui16_n_2,                   skg_fmt_ui16_n_4,
-	skg_fmt_ui8_n_1,  skg_fmt_ui8_n_2,                    skg_fmt_ui8_n_4,
-} skg_fmt_;
-
 typedef enum skg_ind_fmt_ {
 	skg_ind_fmt_u32,
 	skg_ind_fmt_u16,
@@ -243,6 +229,43 @@ typedef struct skg_vert_t {
 	float         uv  [2];
 	skg_color32_t col;
 } skg_vert_t;
+
+typedef enum skg_fmt_ {
+	skg_fmt_f64,
+	skg_fmt_f32,
+	skg_fmt_f16,
+	skg_fmt_i32,
+	skg_fmt_i16,
+	skg_fmt_i8,
+	skg_fmt_i32_normalized,
+	skg_fmt_i16_normalized,
+	skg_fmt_i8_normalized,
+	skg_fmt_ui32,
+	skg_fmt_ui16,
+	skg_fmt_ui8,
+	skg_fmt_ui32_normalized,
+	skg_fmt_ui16_normalized,
+	skg_fmt_ui8_normalized,
+} skg_fmt_;
+
+typedef enum skg_semantic_ {
+	skg_semantic_position,
+	skg_semantic_texcoord,
+	skg_semantic_normal,
+	skg_semantic_binormal,
+	skg_semantic_tangent,
+	skg_semantic_color,
+	skg_semantic_psize,
+	skg_semantic_blendweight,
+	skg_semantic_blendindices,
+} skg_semantic_;
+
+typedef struct skg_vert_component_t {
+	skg_fmt_      format;
+	uint8_t       count;
+	skg_semantic_ semantic;
+	uint8_t       semantic_slot;
+} skg_vert_component_t;
 
 typedef struct skg_bind_t {
 	uint16_t slot;

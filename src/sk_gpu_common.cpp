@@ -798,3 +798,26 @@ uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
 	default: return 0;
 	}
 }
+
+///////////////////////////////////////////
+
+int32_t skg_fmt_size(skg_fmt_ format) {
+	switch (format) {
+		case skg_fmt_f64: return 8;
+		case skg_fmt_i32:
+		case skg_fmt_ui32:
+		case skg_fmt_i32_normalized:
+		case skg_fmt_ui32_normalized:
+		case skg_fmt_f32: return 4;
+		case skg_fmt_i16:
+		case skg_fmt_ui16:
+		case skg_fmt_i16_normalized:
+		case skg_fmt_ui16_normalized:
+		case skg_fmt_f16: return 2;
+		case skg_fmt_i8:
+		case skg_fmt_ui8:
+		case skg_fmt_i8_normalized:
+		case skg_fmt_ui8_normalized: return 1;
+		default: return 0;
+	}
+}

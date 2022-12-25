@@ -71,9 +71,9 @@ struct file_data_t {
 
 	void write_fixed_str(const char *item, int32_t _Size) {
 		size_t len = strlen(item);
-		data.add_range((uint8_t*)item, sizeof(char) * len);
+		data.add_range((uint8_t*)item, (int32_t)(sizeof(char) * len));
 
-		int32_t count = _Size - len;
+		int32_t count = (int32_t)(_Size - len);
 		if (_Size - len > 0) {
 			while (data.count + count > data.capacity) { data.resize(data.capacity * 2 < 4 ? 4 : data.capacity * 2); }
 		}

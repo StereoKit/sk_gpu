@@ -130,7 +130,7 @@ app_mesh_t app_mesh_create(const skg_vert_t *verts, int32_t vert_count, bool ver
 void       app_mesh_destroy(app_mesh_t *mesh);
 bool       ply_read_skg(const char *filename, skg_vert_t **out_verts, int32_t *out_vert_count, uint32_t **out_indices, int32_t *out_ind_count);
 void       tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataBGRA, uint8_t dataChannels = 4, uint8_t fileChannels = 3);
-void       bmp_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA);
+void       bmp_write(const char *filename, int32_t  width, int32_t  height, uint8_t *dataRGBA);
 
 void app_test_compute_init();
 void app_test_compute_destroy();
@@ -208,7 +208,7 @@ bool app_init() {
 	free(colors);
 
 	// Test reading specific mip levels
-	for (int32_t m = 0; m < skg_mip_count(app_tex.width, app_tex.height); m++) {
+	for (int32_t m = 0; m < (int32_t)skg_mip_count(app_tex.width, app_tex.height); m++) {
 		int32_t  checker_w, checker_h;
 		skg_mip_dimensions(app_tex.width, app_tex.height, m, &checker_w, &checker_h);
 		size_t   checker_size       = skg_tex_fmt_size(skg_tex_fmt_rgba32) * checker_w * checker_h;
@@ -425,7 +425,7 @@ void app_test_compute_init() {
 	float *data = (float*)malloc(sizeof(float)*2 * c_size*c_size);
 	for (size_t y = 0; y < c_size; y+=1) {
 	for (size_t x = 0; x < c_size; x+=1) {
-		float r = hash_f(1, (x/16)*13+(y/16)*127);
+		float r = hash_f(1, (uint32_t)((x/16)*13+(y/16)*127));
 		data[(x+y*c_size)*2    ] = r;
 		data[(x+y*c_size)*2 + 1] = 1.0f-r;
 	}}
@@ -808,7 +808,7 @@ void tga_write(const char *filename, uint32_t width, uint32_t height, uint8_t *d
 #endif
 }
 
-void bmp_write(const char *filename, uint32_t width, uint32_t height, uint8_t *dataRGBA) {
+void bmp_write(const char *filename, int32_t width, int32_t height, uint8_t *dataRGBA) {
 #ifndef __EMSCRIPTEN__
 	FILE *fp = NULL;
 	fp = fopen(filename, "wb");
@@ -832,9 +832,9 @@ void bmp_write(const char *filename, uint32_t width, uint32_t height, uint8_t *d
 	uint32_t biClrUsed = 0;                           fwrite(&biClrUsed, sizeof(uint32_t), 1, fp);
 	uint32_t biClrImportant = 0;                      fwrite(&biClrImportant, sizeof(uint32_t), 1, fp);
 
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			int i = (x + ((height - 1) - y) * width) * 4;
+	for (int32_t y = 0; y < height; y++) {
+		for (int32_t x = 0; x < width; x++) {
+			int32_t i = (x + ((height - 1) - y) * width) * 4;
 			fwrite(&dataRGBA[i+2], sizeof(uint8_t), 1, fp);
 			fwrite(&dataRGBA[i+1], sizeof(uint8_t), 1, fp);
 			fwrite(&dataRGBA[i  ], sizeof(uint8_t), 1, fp);

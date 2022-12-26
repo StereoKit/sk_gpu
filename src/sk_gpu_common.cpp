@@ -529,12 +529,12 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 	memset(out_file->meta->resources,     0, sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
 	memset(out_file->meta->vertex_inputs, 0, sizeof(skg_vert_component_t ) * out_file->meta->vertex_input_count);
 
-	memcpy(&out_file->meta->perf_vertex.instructions_total,        &bytes[at], sizeof(out_file->meta->perf_vertex.instructions_total));        at += sizeof(out_file->meta->perf_vertex.instructions_total);
-	memcpy(&out_file->meta->perf_vertex.instructions_tex_read,     &bytes[at], sizeof(out_file->meta->perf_vertex.instructions_tex_read));     at += sizeof(out_file->meta->perf_vertex.instructions_tex_read);
-	memcpy(&out_file->meta->perf_vertex.instructions_dynamic_flow, &bytes[at], sizeof(out_file->meta->perf_vertex.instructions_dynamic_flow)); at += sizeof(out_file->meta->perf_vertex.instructions_dynamic_flow);
-	memcpy(&out_file->meta->perf_pixel.instructions_total,         &bytes[at], sizeof(out_file->meta->perf_pixel.instructions_total));         at += sizeof(out_file->meta->perf_pixel.instructions_total);
-	memcpy(&out_file->meta->perf_pixel.instructions_tex_read,      &bytes[at], sizeof(out_file->meta->perf_pixel.instructions_tex_read));      at += sizeof(out_file->meta->perf_pixel.instructions_tex_read);
-	memcpy(&out_file->meta->perf_pixel.instructions_dynamic_flow,  &bytes[at], sizeof(out_file->meta->perf_pixel.instructions_dynamic_flow));  at += sizeof(out_file->meta->perf_pixel.instructions_dynamic_flow);
+	memcpy(&out_file->meta->ops_vertex.total,        &bytes[at], sizeof(out_file->meta->ops_vertex.total));        at += sizeof(out_file->meta->ops_vertex.total);
+	memcpy(&out_file->meta->ops_vertex.tex_read,     &bytes[at], sizeof(out_file->meta->ops_vertex.tex_read));     at += sizeof(out_file->meta->ops_vertex.tex_read);
+	memcpy(&out_file->meta->ops_vertex.dynamic_flow, &bytes[at], sizeof(out_file->meta->ops_vertex.dynamic_flow)); at += sizeof(out_file->meta->ops_vertex.dynamic_flow);
+	memcpy(&out_file->meta->ops_pixel.total,         &bytes[at], sizeof(out_file->meta->ops_pixel.total));         at += sizeof(out_file->meta->ops_pixel.total);
+	memcpy(&out_file->meta->ops_pixel.tex_read,      &bytes[at], sizeof(out_file->meta->ops_pixel.tex_read));      at += sizeof(out_file->meta->ops_pixel.tex_read);
+	memcpy(&out_file->meta->ops_pixel.dynamic_flow,  &bytes[at], sizeof(out_file->meta->ops_pixel.dynamic_flow));  at += sizeof(out_file->meta->ops_pixel.dynamic_flow);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buffer = &out_file->meta->buffers[i];

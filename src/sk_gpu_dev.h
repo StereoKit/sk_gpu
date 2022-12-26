@@ -302,11 +302,11 @@ typedef struct skg_shader_resource_t {
 	skg_bind_t bind;
 } skg_shader_resource_t;
 
-typedef struct skg_shader_perf_t {
-	int32_t instructions_total;
-	int32_t instructions_tex_read;
-	int32_t instructions_dynamic_flow;
-} skg_shader_perf_t;
+typedef struct skg_shader_ops_t {
+	int32_t total;
+	int32_t tex_read;
+	int32_t dynamic_flow;
+} skg_shader_ops_t;
 
 typedef struct skg_shader_meta_t {
 	char                   name[256];
@@ -318,8 +318,8 @@ typedef struct skg_shader_meta_t {
 	int32_t                global_buffer_id;
 	skg_vert_component_t  *vertex_inputs;
 	int32_t                vertex_input_count;
-	skg_shader_perf_t      perf_vertex;
-	skg_shader_perf_t      perf_pixel;
+	skg_shader_ops_t       ops_vertex;
+	skg_shader_ops_t       ops_pixel;
 } skg_shader_meta_t;
 
 ///////////////////////////////////////////

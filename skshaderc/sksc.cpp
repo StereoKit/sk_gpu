@@ -847,13 +847,13 @@ bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc
 	reflector->GetDesc(&shader_desc);
 
 	// Snag some perf related to data
-	skg_shader_perf_t *perf = nullptr;
-	if (type == skg_stage_vertex) perf = &ref_meta->perf_vertex;
-	if (type == skg_stage_pixel)  perf = &ref_meta->perf_pixel;
-	if (perf) {
-		perf->instructions_total        = shader_desc.InstructionCount;
-		perf->instructions_tex_read     = shader_desc.TextureLoadInstructions + shader_desc.TextureNormalInstructions;
-		perf->instructions_dynamic_flow = shader_desc.DynamicFlowControlCount;
+	skg_shader_ops_t *ops = nullptr;
+	if (type == skg_stage_vertex) ops = &ref_meta->ops_vertex;
+	if (type == skg_stage_pixel)  ops = &ref_meta->ops_pixel;
+	if (ops) {
+		ops->total        = shader_desc.InstructionCount;
+		ops->tex_read     = shader_desc.TextureLoadInstructions + shader_desc.TextureNormalInstructions;
+		ops->dynamic_flow = shader_desc.DynamicFlowControlCount;
 	}
 
 	// Get information about the vertex input data
@@ -1064,19 +1064,19 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		// A quick summary of performance
 		sksc_log(log_level_info, "|--Performance--");
-		if (out_file->meta->perf_vertex.instructions_total > 0 || out_file->meta->perf_pixel.instructions_total > 0)
+		if (out_file->meta->ops_vertex.total > 0 || out_file->meta->ops_pixel.total > 0)
 		sksc_log(log_level_info, "| Instructions |  all | tex | flow |");
-		if (out_file->meta->perf_vertex.instructions_total > 0) {
+		if (out_file->meta->ops_vertex.total > 0) {
 			sksc_log(log_level_info, "|       Vertex | %4d | %3d | %4d |", 
-				out_file->meta->perf_vertex.instructions_total, 
-				out_file->meta->perf_vertex.instructions_tex_read, 
-				out_file->meta->perf_vertex.instructions_dynamic_flow);
+				out_file->meta->ops_vertex.total, 
+				out_file->meta->ops_vertex.tex_read, 
+				out_file->meta->ops_vertex.dynamic_flow);
 		} 
-		if (out_file->meta->perf_pixel.instructions_total > 0) {
+		if (out_file->meta->ops_pixel.total > 0) {
 			sksc_log(log_level_info, "|        Pixel | %4d | %3d | %4d |", 
-				out_file->meta->perf_pixel.instructions_total, 
-				out_file->meta->perf_pixel.instructions_tex_read, 
-				out_file->meta->perf_pixel.instructions_dynamic_flow);
+				out_file->meta->ops_pixel.total, 
+				out_file->meta->ops_pixel.tex_read, 
+				out_file->meta->ops_pixel.dynamic_flow);
 		}
 
 		// List of all the buffers
@@ -1192,12 +1192,12 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 	data.write(file->meta->resource_count);
 	data.write(file->meta->vertex_input_count);
 
-	data.write(file->meta->perf_vertex.instructions_total);
-	data.write(file->meta->perf_vertex.instructions_tex_read);
-	data.write(file->meta->perf_vertex.instructions_dynamic_flow);
-	data.write(file->meta->perf_pixel.instructions_total);
-	data.write(file->meta->perf_pixel.instructions_tex_read);
-	data.write(file->meta->perf_pixel.instructions_dynamic_flow);
+	data.write(file->meta->ops_vertex.total);
+	data.write(file->meta->ops_vertex.tex_read);
+	data.write(file->meta->ops_vertex.dynamic_flow);
+	data.write(file->meta->ops_pixel.total);
+	data.write(file->meta->ops_pixel.tex_read);
+	data.write(file->meta->ops_pixel.dynamic_flow);
 
 	for (size_t i = 0; i < file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buff = &file->meta->buffers[i];

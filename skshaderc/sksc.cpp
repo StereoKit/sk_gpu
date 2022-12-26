@@ -861,28 +861,41 @@ bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc
 		ref_meta->vertex_input_count = shader_desc.InputParameters;
 		ref_meta->vertex_inputs = (skg_vert_component_t*)malloc(sizeof(skg_vert_component_t) * ref_meta->vertex_input_count);
 
-		for (uint32_t i = 0; i < shader_desc.InputParameters; i++) {
+		int32_t curr = 0;
+		for (int32_t i = 0; i < (int32_t)shader_desc.InputParameters; i++) {
 			D3D11_SIGNATURE_PARAMETER_DESC param_desc = {};
 			reflector->GetInputParameterDesc(i, &param_desc);
-			
-			ref_meta->vertex_inputs[i].count         = 0;
-			ref_meta->vertex_inputs[i].semantic_slot = param_desc.SemanticIndex;
-			if      (strcmp_nocase(param_desc.SemanticName, "binormal")     == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_binormal;
-			else if (strcmp_nocase(param_desc.SemanticName, "blendindices") == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_blendindices;
-			else if (strcmp_nocase(param_desc.SemanticName, "blendweight")  == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_blendweight;
-			else if (strcmp_nocase(param_desc.SemanticName, "color")        == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_color;
-			else if (strcmp_nocase(param_desc.SemanticName, "normal")       == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_normal;
-			else if (strcmp_nocase(param_desc.SemanticName, "sv_position")  == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_position;
-			else if (strcmp_nocase(param_desc.SemanticName, "position")     == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_position;
-			else if (strcmp_nocase(param_desc.SemanticName, "psize")        == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_psize;
-			else if (strcmp_nocase(param_desc.SemanticName, "tangent")      == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_tangent;
-			else if (strcmp_nocase(param_desc.SemanticName, "texcoord")     == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_texcoord;
-			switch(param_desc.ComponentType) {
-				case D3D_REGISTER_COMPONENT_FLOAT32: ref_meta->vertex_inputs[i].format = skg_fmt_f32;  break;
-				case D3D_REGISTER_COMPONENT_SINT32:  ref_meta->vertex_inputs[i].format = skg_fmt_i32;  break;
-				case D3D_REGISTER_COMPONENT_UINT32:  ref_meta->vertex_inputs[i].format = skg_fmt_ui32; break;
-				default: ref_meta->vertex_inputs[i].format = skg_fmt_none; break;
+
+			// Ignore SV_ inputs, unless they're SV_Position
+			if (strlen(param_desc.SemanticName)>3 &&
+				tolower(param_desc.SemanticName[0]) == 's' &&
+				tolower(param_desc.SemanticName[1]) == 'v' &&
+				tolower(param_desc.SemanticName[2]) == '_' &&
+				strcmp_nocase(param_desc.SemanticName, "sv_position") != 0)
+			{
+				ref_meta->vertex_input_count--;
+				continue;
 			}
+			
+			ref_meta->vertex_inputs[curr].count         = 0;
+			ref_meta->vertex_inputs[curr].semantic_slot = param_desc.SemanticIndex;
+			if      (strcmp_nocase(param_desc.SemanticName, "binormal")     == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_binormal;
+			else if (strcmp_nocase(param_desc.SemanticName, "blendindices") == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_blendindices;
+			else if (strcmp_nocase(param_desc.SemanticName, "blendweight")  == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_blendweight;
+			else if (strcmp_nocase(param_desc.SemanticName, "color")        == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_color;
+			else if (strcmp_nocase(param_desc.SemanticName, "normal")       == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_normal;
+			else if (strcmp_nocase(param_desc.SemanticName, "sv_position")  == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_position;
+			else if (strcmp_nocase(param_desc.SemanticName, "position")     == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_position;
+			else if (strcmp_nocase(param_desc.SemanticName, "psize")        == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_psize;
+			else if (strcmp_nocase(param_desc.SemanticName, "tangent")      == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_tangent;
+			else if (strcmp_nocase(param_desc.SemanticName, "texcoord")     == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_texcoord;
+			switch(param_desc.ComponentType) {
+				case D3D_REGISTER_COMPONENT_FLOAT32: ref_meta->vertex_inputs[curr].format = skg_fmt_f32;  break;
+				case D3D_REGISTER_COMPONENT_SINT32:  ref_meta->vertex_inputs[curr].format = skg_fmt_i32;  break;
+				case D3D_REGISTER_COMPONENT_UINT32:  ref_meta->vertex_inputs[curr].format = skg_fmt_ui32; break;
+				default: ref_meta->vertex_inputs[curr].format = skg_fmt_none; break;
+			}
+			curr += 1;
 		}
 	}
 	

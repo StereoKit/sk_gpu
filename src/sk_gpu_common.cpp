@@ -712,6 +712,7 @@ void skg_shader_meta_release(skg_shader_meta_t *meta) {
 		}
 		free(meta->buffers);
 		free(meta->resources);
+		free(meta->vertex_inputs);
 		*meta = {};
 	}
 }

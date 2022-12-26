@@ -865,6 +865,7 @@ bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc
 			D3D11_SIGNATURE_PARAMETER_DESC param_desc = {};
 			reflector->GetInputParameterDesc(i, &param_desc);
 			
+			ref_meta->vertex_inputs[i].count         = 0;
 			ref_meta->vertex_inputs[i].semantic_slot = param_desc.SemanticIndex;
 			if      (strcmp_nocase(param_desc.SemanticName, "binormal")     == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_binormal;
 			else if (strcmp_nocase(param_desc.SemanticName, "blendindices") == 0) ref_meta->vertex_inputs[i].semantic = skg_semantic_blendindices;
@@ -1168,7 +1169,7 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 	file_data_t data = {};
 
 	const char tag[8] = {'S','K','S','H','A','D','E','R'};
-	uint16_t version = 2;
+	uint16_t version = 3;
 	data.write(tag);
 	data.write(version);
 
@@ -1176,6 +1177,14 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 	data.write_fixed_str(file->meta->name, sizeof(file->meta->name));
 	data.write(file->meta->buffer_count);
 	data.write(file->meta->resource_count);
+	data.write(file->meta->vertex_input_count);
+
+	data.write(file->meta->perf_vertex.instructions_total);
+	data.write(file->meta->perf_vertex.instructions_tex_read);
+	data.write(file->meta->perf_vertex.instructions_dynamic_flow);
+	data.write(file->meta->perf_pixel.instructions_total);
+	data.write(file->meta->perf_pixel.instructions_tex_read);
+	data.write(file->meta->perf_pixel.instructions_dynamic_flow);
 
 	for (size_t i = 0; i < file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buff = &file->meta->buffers[i];
@@ -1200,6 +1209,13 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 			data.write(var->type);
 			data.write(var->type_count);
 		}
+	}
+
+	for (int32_t i = 0; i < file->meta->vertex_input_count; i++) {
+		skg_vert_component_t *com = &file->meta->vertex_inputs[i];
+		data.write(com->format);
+		data.write(com->semantic);
+		data.write(com->semantic_slot);
 	}
 
 	for (uint32_t i = 0; i < file->meta->resource_count; i++) {

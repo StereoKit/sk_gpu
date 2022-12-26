@@ -502,7 +502,7 @@ bool skg_shader_file_verify(const void *data, size_t size, uint16_t *out_version
 
 bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_t *out_file) {
 	uint16_t file_version = 0;
-	if (!skg_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 2) {
+	if (!skg_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 3) {
 		return false;
 	}
 	
@@ -517,14 +517,24 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skg_shader_meta_reference(out_file->meta);
-	memcpy( out_file->meta->name,            &bytes[at], sizeof(out_file->meta->name          )); at += sizeof(out_file->meta->name);
-	memcpy(&out_file->meta->buffer_count,    &bytes[at], sizeof(out_file->meta->buffer_count  )); at += sizeof(out_file->meta->buffer_count);
-	memcpy(&out_file->meta->resource_count,  &bytes[at], sizeof(out_file->meta->resource_count)); at += sizeof(out_file->meta->resource_count);
-	out_file->meta->buffers   = (skg_shader_buffer_t  *)malloc(sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count  );
-	out_file->meta->resources = (skg_shader_resource_t*)malloc(sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
-	if (out_file->meta->buffers == nullptr || out_file->meta->resources == nullptr) { skg_log(skg_log_critical, "Out of memory"); return false; }
-	memset(out_file->meta->buffers,   0, sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count);
-	memset(out_file->meta->resources, 0, sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
+	memcpy( out_file->meta->name,               &bytes[at], sizeof(out_file->meta->name              )); at += sizeof(out_file->meta->name);
+	memcpy(&out_file->meta->buffer_count,       &bytes[at], sizeof(out_file->meta->buffer_count      )); at += sizeof(out_file->meta->buffer_count);
+	memcpy(&out_file->meta->resource_count,     &bytes[at], sizeof(out_file->meta->resource_count    )); at += sizeof(out_file->meta->resource_count);
+	memcpy(&out_file->meta->vertex_input_count, &bytes[at], sizeof(out_file->meta->vertex_input_count)); at += sizeof(out_file->meta->vertex_input_count);
+	out_file->meta->buffers       = (skg_shader_buffer_t  *)malloc(sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count);
+	out_file->meta->resources     = (skg_shader_resource_t*)malloc(sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
+	out_file->meta->vertex_inputs = (skg_vert_component_t *)malloc(sizeof(skg_vert_component_t ) * out_file->meta->vertex_input_count);
+	if (out_file->meta->buffers == nullptr || out_file->meta->resources == nullptr || out_file->meta->vertex_inputs == nullptr) { skg_log(skg_log_critical, "Out of memory"); return false; }
+	memset(out_file->meta->buffers,       0, sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count);
+	memset(out_file->meta->resources,     0, sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
+	memset(out_file->meta->vertex_inputs, 0, sizeof(skg_vert_component_t ) * out_file->meta->vertex_input_count);
+
+	memcpy(&out_file->meta->perf_vertex.instructions_total,        &bytes[at], sizeof(out_file->meta->perf_vertex.instructions_total));        at += sizeof(out_file->meta->perf_vertex.instructions_total);
+	memcpy(&out_file->meta->perf_vertex.instructions_tex_read,     &bytes[at], sizeof(out_file->meta->perf_vertex.instructions_tex_read));     at += sizeof(out_file->meta->perf_vertex.instructions_tex_read);
+	memcpy(&out_file->meta->perf_vertex.instructions_dynamic_flow, &bytes[at], sizeof(out_file->meta->perf_vertex.instructions_dynamic_flow)); at += sizeof(out_file->meta->perf_vertex.instructions_dynamic_flow);
+	memcpy(&out_file->meta->perf_pixel.instructions_total,         &bytes[at], sizeof(out_file->meta->perf_pixel.instructions_total));         at += sizeof(out_file->meta->perf_pixel.instructions_total);
+	memcpy(&out_file->meta->perf_pixel.instructions_tex_read,      &bytes[at], sizeof(out_file->meta->perf_pixel.instructions_tex_read));      at += sizeof(out_file->meta->perf_pixel.instructions_tex_read);
+	memcpy(&out_file->meta->perf_pixel.instructions_dynamic_flow,  &bytes[at], sizeof(out_file->meta->perf_pixel.instructions_dynamic_flow));  at += sizeof(out_file->meta->perf_pixel.instructions_dynamic_flow);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buffer = &out_file->meta->buffers[i];
@@ -558,6 +568,13 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 
 		if (strcmp(buffer->name, "$Global") == 0)
 			out_file->meta->global_buffer_id = i;
+	}
+
+	for (int32_t i = 0; i < out_file->meta->vertex_input_count; i++) {
+		skg_vert_component_t *com = &out_file->meta->vertex_inputs[i];
+		memcpy(&com->format,        &bytes[at], sizeof(com->format       )); at += sizeof(com->format);
+		memcpy(&com->semantic,      &bytes[at], sizeof(com->semantic     )); at += sizeof(com->semantic);
+		memcpy(&com->semantic_slot, &bytes[at], sizeof(com->semantic_slot)); at += sizeof(com->semantic_slot);
 	}
 
 	for (uint32_t i = 0; i < out_file->meta->resource_count; i++) {

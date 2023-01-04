@@ -144,7 +144,7 @@ float4 ps(psIn input) : SV_TARGET {
 			app_shader_update_hlsl(editor.GetText().c_str());
 
 			TextEditor::ErrorMarkers markers;
-			for (size_t i = 0; i < sksc_log_count(); i++) {
+			for (int32_t i = 0; i < sksc_log_count(); i++) {
 				sksc_log_item_t item = sksc_log_get(i);
 				if (item.level > 0 && item.line >= 0) {
 					markers.emplace(item.line, item.text);

@@ -543,6 +543,32 @@ void skg_mesh_destroy(skg_mesh_t *mesh) {
 }
 
 ///////////////////////////////////////////
+// skg_vert_fmt_t                        //
+///////////////////////////////////////////
+
+skg_vert_format_t skg_vert_format_create(skg_vert_component_t *components, int32_t component_count) {
+	skg_vert_format_t result = {};
+
+	size_t size = sizeof(skg_vert_component_t) * component_count;
+	result.components      = (skg_vert_component_t*)malloc(size);
+	result.component_count = component_count;
+	memcpy(result.components, components, size);
+
+	for (int32_t i = 0; i < component_count; i++) {
+		result.size += skg_fmt_size(components[i].format) * components[i].count;
+	}
+	
+	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_vert_format_destroy(skg_vert_format_t *format) {
+	free(format->components);
+	*format = {};
+}
+
+///////////////////////////////////////////
 
 skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_size, skg_stage_ type) {
 	skg_shader_stage_t result = {};

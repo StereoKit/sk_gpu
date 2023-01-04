@@ -30,10 +30,18 @@ typedef struct skg_mesh_t {
 	DXGI_FORMAT        _ind_format;
 } skg_mesh_t;
 
+typedef struct skg_vert_format_t {
+	int32_t               size;
+	skg_vert_component_t *components;
+	int32_t               component_count;
+} skg_vert_format_t;
+
 typedef struct skg_shader_stage_t {
 	skg_stage_         type;
 	void*              _shader;
 	ID3D11InputLayout* _layout;
+	void*              _vs_bytes;
+	size_t             _vs_bytes_size;
 } skg_shader_stage_t;
 
 typedef struct skg_shader_t {

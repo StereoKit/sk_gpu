@@ -125,8 +125,8 @@ void window_preview() {
 
 	ImVec2 min  = ImGui::GetWindowContentRegionMin();
 	ImVec2 max  = ImGui::GetWindowContentRegionMax();
-	ImVec2 size = {max.x - min.x, max.y-min.y};
-	window_preview_resize(size.x, size.y);
+	ImVec2 size = {max.x-min.x, max.y-min.y};
+	window_preview_resize((int32_t)size.x, (int32_t)size.y);
 	window_preview_render();
 	ImGui::SetCursorPos(min);
 	ImGui::Image((ImTextureID)&surface, size);

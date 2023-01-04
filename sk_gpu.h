@@ -738,6 +738,10 @@ ID3D11DepthStencilState *d3d_depthstate  = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
 char                    *d3d_adapter_name = nullptr;
 
+ID3D11DeviceContext     *d3d_deferred    = nullptr;
+HANDLE                   d3d_deferred_mtx= nullptr;
+DWORD                    d3d_main_thread = 0;
+
 ///////////////////////////////////////////
 
 bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
@@ -818,6 +822,14 @@ int32_t skg_init(const char *, void *adapter_id) {
 		return 0;
 	}
 
+	// Create a deferred context for making some multithreaded context calls.
+	hr = d3d_device->CreateDeferredContext(0, &d3d_deferred);
+	if (FAILED(hr)) {
+		skg_logf(skg_log_critical, "Failed to create a deferred context: 0x%08X", hr);
+	}
+	d3d_deferred_mtx = CreateMutex(nullptr, false, nullptr);
+	d3d_main_thread  = GetCurrentThreadId();
+
 	// Notify what device and API we're using
 	if (final_adapter != nullptr) {
 		DXGI_ADAPTER_DESC1 final_adapter_info;
@@ -896,9 +908,11 @@ const char* skg_adapter_name() {
 
 void skg_shutdown() {
 	free(d3d_adapter_name);
+	CloseHandle(d3d_deferred_mtx);
 	if (d3d_rasterstate) { d3d_rasterstate->Release(); d3d_rasterstate = nullptr; }
 	if (d3d_depthstate ) { d3d_depthstate ->Release(); d3d_depthstate  = nullptr; }
 	if (d3d_info       ) { d3d_info       ->Release(); d3d_info        = nullptr; }
+	if (d3d_deferred   ) { d3d_deferred   ->Release(); d3d_deferred    = nullptr; }
 	if (d3d_context    ) { d3d_context    ->Release(); d3d_context     = nullptr; }
 	if (d3d_device     ) { d3d_device     ->Release(); d3d_device      = nullptr; }
 }
@@ -906,6 +920,13 @@ void skg_shutdown() {
 ///////////////////////////////////////////
 
 void skg_draw_begin() {
+	ID3D11CommandList* command_list = nullptr;
+	WaitForSingleObject(d3d_deferred_mtx, INFINITE);
+	d3d_deferred->FinishCommandList(false, &command_list);
+	ReleaseMutex(d3d_deferred_mtx);
+	d3d_context->ExecuteCommandList(command_list, false);
+	command_list->Release();
+
 	d3d_context->RSSetState            (d3d_rasterstate);
 	d3d_context->OMSetDepthStencilState(d3d_depthstate, 1);
 	d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -2180,7 +2201,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || data_frames != nullptr || data_frames[0] != nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags  = D3D11_RESOURCE_MISC_TEXTURECUBE;
+		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
 		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
@@ -2217,7 +2238,18 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	} else {
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
-		hr = d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
+		
+		// Map the memory so we can access it on CPU! In a multi-threaded
+		// context this can be tricky, here we're using a deferred context to
+		// push this operation over to the main thread. The deferred context is
+		// then executed in skg_draw_begin.
+		bool on_main = GetCurrentThreadId() == d3d_main_thread;
+		if (on_main) {
+			hr = d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
+		} else {
+			WaitForSingleObject(d3d_deferred_mtx, INFINITE);
+			hr = d3d_deferred->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
+		}
 		if (FAILED(hr)) {
 			skg_logf(skg_log_critical, "Failed mapping a texture: 0x%08X", hr);
 			return;
@@ -2230,7 +2262,13 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 			dest_line += tex_mem.RowPitch;
 			src_line  += px_size * (uint64_t)width;
 		}
-		d3d_context->Unmap(tex->_texture, 0);
+		
+		if (on_main) {
+			d3d_context->Unmap(tex->_texture, 0);
+		} else {
+			d3d_deferred->Unmap(tex->_texture, 0);
+			ReleaseMutex(d3d_deferred_mtx);
+		}
 	}
 
 	// If the sampler has not been set up yet, we'll make a default one real quick.

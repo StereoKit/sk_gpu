@@ -693,7 +693,8 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	const char* name     = glGetString(GL_RENDERER);
 	size_t      name_len = strlen(name);
 	gl_adapter_name = (char*)malloc(name_len+1);
-	memcpy(gl_adapter_name, name, name_len+1);
+	memcpy(gl_adapter_name, name, name_len);
+	gl_adapter_name[name_len] = '\0';
 
 	skg_logf(skg_log_info, "Using OpenGL: %s", glGetString(GL_VERSION));
 	skg_logf(skg_log_info, "Device: %s", gl_adapter_name);

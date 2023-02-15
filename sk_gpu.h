@@ -738,6 +738,10 @@ ID3D11DepthStencilState *d3d_depthstate  = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
 char                    *d3d_adapter_name = nullptr;
 
+ID3D11DeviceContext     *d3d_deferred    = nullptr;
+HANDLE                   d3d_deferred_mtx= nullptr;
+DWORD                    d3d_main_thread = 0;
+
 ///////////////////////////////////////////
 
 bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
@@ -745,7 +749,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
 template <typename T>
-void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
+void skg_downsample_4(T *data, T data_max, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
 
 ///////////////////////////////////////////
 
@@ -817,6 +821,14 @@ int32_t skg_init(const char *, void *adapter_id) {
 
 		return 0;
 	}
+
+	// Create a deferred context for making some multithreaded context calls.
+	hr = d3d_device->CreateDeferredContext(0, &d3d_deferred);
+	if (FAILED(hr)) {
+		skg_logf(skg_log_critical, "Failed to create a deferred context: 0x%08X", hr);
+	}
+	d3d_deferred_mtx = CreateMutex(nullptr, false, nullptr);
+	d3d_main_thread  = GetCurrentThreadId();
 
 	// Notify what device and API we're using
 	if (final_adapter != nullptr) {
@@ -896,9 +908,11 @@ const char* skg_adapter_name() {
 
 void skg_shutdown() {
 	free(d3d_adapter_name);
+	CloseHandle(d3d_deferred_mtx);
 	if (d3d_rasterstate) { d3d_rasterstate->Release(); d3d_rasterstate = nullptr; }
 	if (d3d_depthstate ) { d3d_depthstate ->Release(); d3d_depthstate  = nullptr; }
 	if (d3d_info       ) { d3d_info       ->Release(); d3d_info        = nullptr; }
+	if (d3d_deferred   ) { d3d_deferred   ->Release(); d3d_deferred    = nullptr; }
 	if (d3d_context    ) { d3d_context    ->Release(); d3d_context     = nullptr; }
 	if (d3d_device     ) { d3d_device     ->Release(); d3d_device      = nullptr; }
 }
@@ -906,6 +920,13 @@ void skg_shutdown() {
 ///////////////////////////////////////////
 
 void skg_draw_begin() {
+	ID3D11CommandList* command_list = nullptr;
+	WaitForSingleObject(d3d_deferred_mtx, INFINITE);
+	d3d_deferred->FinishCommandList(false, &command_list);
+	ReleaseMutex(d3d_deferred_mtx);
+	d3d_context->ExecuteCommandList(command_list, false);
+	command_list->Release();
+
 	d3d_context->RSSetState            (d3d_rasterstate);
 	d3d_context->OMSetDepthStencilState(d3d_depthstate, 1);
 	d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1966,23 +1987,24 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 	const void *mip_data = curr_data;
 	int32_t     mip_w    = width;
 	int32_t     mip_h    = height;
+
 	for (uint32_t m = 1; m < mip_levels; m++) {
 		tex_mem[m] = {};
 		switch (format) { // When adding a new format here, also add it to skg_can_make_mips
 		case skg_tex_fmt_bgra32:
 		case skg_tex_fmt_bgra32_linear:
 		case skg_tex_fmt_rgba32:
-		case skg_tex_fmt_rgba32_linear: 
-			skg_downsample_4((uint8_t  *)mip_data, mip_w, mip_h, (uint8_t  **)&tex_mem[m].pSysMem, &mip_w, &mip_h); 
+		case skg_tex_fmt_rgba32_linear:
+			skg_downsample_4<uint8_t >((uint8_t  *)mip_data, 255,   mip_w, mip_h, (uint8_t  **)&tex_mem[m].pSysMem, &mip_w, &mip_h);
 			break;
 		case skg_tex_fmt_rgba64u:
-			skg_downsample_4((uint16_t *)mip_data, mip_w, mip_h, (uint16_t **)&tex_mem[m].pSysMem, &mip_w, &mip_h);
+			skg_downsample_4<uint16_t>((uint16_t *)mip_data, 65535, mip_w, mip_h, (uint16_t **)&tex_mem[m].pSysMem, &mip_w, &mip_h);
 			break;
 		case skg_tex_fmt_rgba64s:
-			skg_downsample_4((int16_t  *)mip_data, mip_w, mip_h, (int16_t  **)&tex_mem[m].pSysMem, &mip_w, &mip_h);
+			skg_downsample_4<int16_t >((int16_t  *)mip_data, 32762, mip_w, mip_h, (int16_t  **)&tex_mem[m].pSysMem, &mip_w, &mip_h);
 			break;
 		case skg_tex_fmt_rgba128:
-			skg_downsample_4((float    *)mip_data, mip_w, mip_h, (float    **)&tex_mem[m].pSysMem, &mip_w, &mip_h);
+			skg_downsample_4<float   >((float    *)mip_data, 1.0f,  mip_w, mip_h, (float    **)&tex_mem[m].pSysMem, &mip_w, &mip_h);
 			break;
 		case skg_tex_fmt_depth32:
 		case skg_tex_fmt_r32:
@@ -2160,9 +2182,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	tex->multisample = multisample;
 	bool mips = 
 		   tex->mips == skg_mip_generate
-		&& skg_can_make_mips(tex->format)
-		&& (width  & (width  - 1)) == 0
-		&& (height & (height - 1)) == 0;
+		&& skg_can_make_mips(tex->format);
 
 	uint32_t mip_levels = (mips ? skg_mip_count(width, height) : 1);
 	uint32_t px_size    = skg_tex_fmt_size(tex->format);
@@ -2180,7 +2200,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || data_frames != nullptr || data_frames[0] != nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags  = D3D11_RESOURCE_MISC_TEXTURECUBE;
+		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
 		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
@@ -2217,7 +2237,18 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	} else {
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
-		hr = d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
+		
+		// Map the memory so we can access it on CPU! In a multi-threaded
+		// context this can be tricky, here we're using a deferred context to
+		// push this operation over to the main thread. The deferred context is
+		// then executed in skg_draw_begin.
+		bool on_main = GetCurrentThreadId() == d3d_main_thread;
+		if (on_main) {
+			hr = d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
+		} else {
+			WaitForSingleObject(d3d_deferred_mtx, INFINITE);
+			hr = d3d_deferred->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
+		}
 		if (FAILED(hr)) {
 			skg_logf(skg_log_critical, "Failed mapping a texture: 0x%08X", hr);
 			return;
@@ -2230,7 +2261,13 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 			dest_line += tex_mem.RowPitch;
 			src_line  += px_size * (uint64_t)width;
 		}
-		d3d_context->Unmap(tex->_texture, 0);
+		
+		if (on_main) {
+			d3d_context->Unmap(tex->_texture, 0);
+		} else {
+			d3d_deferred->Unmap(tex->_texture, 0);
+			ReleaseMutex(d3d_deferred_mtx);
+		}
 	}
 
 	// If the sampler has not been set up yet, we'll make a default one real quick.
@@ -2421,17 +2458,14 @@ void skg_tex_destroy(skg_tex_t *tex) {
 ///////////////////////////////////////////
 
 template <typename T>
-void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
-	int w = (int32_t)log2f((float)width);
-	int h = (int32_t)log2f((float)height);
-	*out_width  = w = max(1, (1 << w) >> 1);
-	*out_height = h = max(1, (1 << h) >> 1);
-
-	*out_data = (T*)malloc((int64_t)w * h * sizeof(T) * 4);
+void skg_downsample_4(T *data, T data_max, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
+	*out_width  = width  / 2;
+	*out_height = height / 2;
+	*out_data   = (T*)malloc((int64_t)(*out_width) * (*out_height) * sizeof(T) * 4);
 	if (*out_data == nullptr) { skg_log(skg_log_critical, "Out of memory"); return; }
-	memset(*out_data, 0, (int64_t)w * h * sizeof(T) * 4);
 	T *result = *out_data;
 
+	const float data_maxf = (float)data_max;
 	for (int32_t y = 0; y < (*out_height); y++) {
 		int32_t src_row_start  = y * 2 * width;
 		int32_t dest_row_start = y * (*out_width);
@@ -2441,10 +2475,15 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 			int src_n = src + width*4;
 			T *cD = &result[dest];
 
-			cD[0] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
-			cD[1] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
-			cD[2] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
-			cD[3] = (data[src] + data[src+4] + data[src_n] + data[src_n+4])/4; src++; src_n++;
+			float a = data[src  +3] / data_maxf;
+			float b = data[src  +7] / data_maxf;
+			float c = data[src_n+3] / data_maxf;
+			float d = data[src_n+7] / data_maxf;
+			float total = a + b + c + d;
+			cD[0] = (T)((data[src+0]*a + data[src+4]*b + data[src_n+0]*c + data[src_n+4]*d)/total);
+			cD[1] = (T)((data[src+1]*a + data[src+5]*b + data[src_n+1]*c + data[src_n+5]*d)/total);
+			cD[2] = (T)((data[src+2]*a + data[src+6]*b + data[src_n+2]*c + data[src_n+6]*d)/total);
+			cD[3] =     (data[src+3]   + data[src+7]   + data[src_n+3]   + data[src_n+7])/4;
 		}
 	}
 }
@@ -2453,14 +2492,10 @@ void skg_downsample_4(T *data, int32_t width, int32_t height, T **out_data, int3
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
-	int w = (int32_t)log2f((float)width);
-	int h = (int32_t)log2f((float)height);
-	*out_width  = w = (1 << w) >> 1;
-	*out_height = h = (1 << h) >> 1;
-
-	*out_data = (T*)malloc((int64_t)w * h * sizeof(T));
+	*out_width  = width  / 2;
+	*out_height = height / 2;
+	*out_data   = (T*)malloc((int64_t)(*out_width) * (*out_height) * sizeof(T));
 	if (*out_data == nullptr) { skg_log(skg_log_critical, "Out of memory"); return; }
-	memset(*out_data, 0, (int64_t)w * h * sizeof(T));
 	T *result = *out_data;
 
 	for (int32_t y = 0; y < (*out_height); y++) {
@@ -2630,16 +2665,16 @@ const char *skg_semantic_to_d3d(skg_el_semantic_ semantic) {
 	typedef void         (*glXSwapBuffers_proc)            (Display* dpy, GLXDrawable);
 	typedef __GLXextproc (*glXGetProcAddress_proc)         (const char* procName);
 
-	glXCreateContext_proc           glXCreateContext;
-	glXCreateContextAttribsARB_proc glXCreateContextAttribsARB;
-	glXDestroyContext_proc          glXDestroyContext;
-	glXMakeCurrent_proc             glXMakeCurrent;
-	glXSwapBuffers_proc             glXSwapBuffers;
-	glXGetProcAddress_proc          glXGetProcAddress;
+	static glXCreateContext_proc           glXCreateContext;
+	static glXCreateContextAttribsARB_proc glXCreateContextAttribsARB;
+	static glXDestroyContext_proc          glXDestroyContext;
+	static glXMakeCurrent_proc             glXMakeCurrent;
+	static glXSwapBuffers_proc             glXSwapBuffers;
+	static glXGetProcAddress_proc          glXGetProcAddress;
 
-	GLXFBConfig  glxFBConfig;
-	GLXDrawable  glxDrawable;
-	GLXContext   glxContext;
+	static GLXFBConfig  glxFBConfig;
+	static GLXDrawable  glxDrawable;
+	static GLXContext   glxContext;
 #endif
 
 #ifdef _SKG_GL_MAKE_FUNCTIONS
@@ -2956,7 +2991,7 @@ int32_t     gl_active_width        = 0;
 int32_t     gl_active_height       = 0;
 skg_tex_t  *gl_active_rendertarget = nullptr;
 uint32_t    gl_current_framebuffer = 0;
-const char *gl_adapter_name        = nullptr;
+char*       gl_adapter_name        = nullptr;
 
 ///////////////////////////////////////////
 
@@ -3230,7 +3265,12 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	gl_load_extensions();
 #endif
 
-	gl_adapter_name = glGetString(GL_RENDERER);
+	const char* name     = glGetString(GL_RENDERER);
+	size_t      name_len = strlen(name);
+	gl_adapter_name = (char*)malloc(name_len+1);
+	memcpy(gl_adapter_name, name, name_len);
+	gl_adapter_name[name_len] = '\0';
+
 	skg_logf(skg_log_info, "Using OpenGL: %s", glGetString(GL_VERSION));
 	skg_logf(skg_log_info, "Device: %s", gl_adapter_name);
 
@@ -3289,7 +3329,15 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 
 ///////////////////////////////////////////
 
+const char* skg_adapter_name() {
+	return gl_adapter_name;
+}
+
+///////////////////////////////////////////
+
 void skg_shutdown() {
+	free(gl_adapter_name); gl_adapter_name = nullptr;
+
 #if defined(_SKG_GL_LOAD_WGL)
 	wglMakeCurrent(NULL, NULL);
 	ReleaseDC(gl_hwnd, gl_hdc);
@@ -4694,15 +4742,17 @@ void skg_log(skg_log_ level, const char *text) {
 	if (_skg_log) _skg_log(level, text);
 }
 void skg_logf (skg_log_ level, const char *text, ...) {
-	va_list args;
+	va_list args, copy;
 	va_start(args, text);
+	va_copy (copy, args);
 	size_t length = vsnprintf(nullptr, 0, text, args);
 	char*  buffer = (char*)malloc(sizeof(char) * (length + 2));
-	vsnprintf(buffer, length + 2, text, args);
+	vsnprintf(buffer, length + 2, text, copy);
 
 	skg_log(level, buffer);
 	free(buffer);
 	va_end(args);
+	va_end(copy);
 }
 
 ///////////////////////////////////////////

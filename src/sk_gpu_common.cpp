@@ -797,6 +797,7 @@ uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r8:            return sizeof(uint8_t );
 	case skg_tex_fmt_r16:           return sizeof(uint16_t);
 	case skg_tex_fmt_r32:           return sizeof(uint32_t);
+	case skg_tex_fmt_r8g8:          return sizeof(uint16_t);
 	default: return 0;
 	}
 }

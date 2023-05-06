@@ -2037,6 +2037,7 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r8:            return GL_R8;
 	case skg_tex_fmt_r16:           return GL_R16F;
 	case skg_tex_fmt_r32:           return GL_R32F;
+	case skg_tex_fmt_r8g8:          return GL_RG8;
 	default: return 0;
 	}
 }
@@ -2059,6 +2060,7 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case GL_R8:                 return skg_tex_fmt_r8;
 	case GL_R16UI:              return skg_tex_fmt_r16;
 	case GL_R32F:               return skg_tex_fmt_r32;
+	case GL_RG8:                return skg_tex_fmt_r8g8;
 	default: return skg_tex_fmt_none;
 	}
 }
@@ -2088,6 +2090,7 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r8:
 	case skg_tex_fmt_r16:
 	case skg_tex_fmt_r32:           return GL_RED;
+	case skg_tex_fmt_r8g8:          return GL_RG;
 	default: return 0;
 	}
 }
@@ -2112,6 +2115,7 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r8:            return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_r16:           return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_r32:           return GL_FLOAT;
+	case skg_tex_fmt_r8g8:          return GL_UNSIGNED_SHORT;
 	default: return 0;
 	}
 }

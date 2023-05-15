@@ -20,6 +20,11 @@ sk_gpu.h
 //#define SKG_FORCE_DIRECT3D11
 //#define SKG_FORCE_OPENGL
 
+// You can disable use of D3DCompile to make building this easier sometimes,
+// since D3DCompile is primarily used to catch .sks shader files built from
+// Linux to run on Windows, and this may not be critical in all cases.
+//#define SKG_NO_D3DCOMPILER
+
 #if   defined( SKG_FORCE_NULL )
 #define SKG_NULL
 #elif defined( SKG_FORCE_DIRECT3D11 )
@@ -717,12 +722,15 @@ SKG_API void                    skg_shader_meta_release        (skg_shader_meta_
 
 #pragma comment(lib,"D3D11.lib")
 #pragma comment(lib,"Dxgi.lib")
-#pragma comment(lib,"d3dcompiler.lib")
 #include <d3d11.h>
 #include <dxgi1_6.h>
-#include <d3dcompiler.h>
-#include <math.h>
 
+#if !defined(SKG_NO_D3DCOMPILER)
+#pragma comment(lib,"d3dcompiler.lib")
+#include <d3dcompiler.h>
+#endif
+
+#include <math.h>
 #include <stdio.h>
 
 // Manually defining this lets us skip d3dcommon.h and dxguid.lib
@@ -967,7 +975,10 @@ void skg_tex_target_bind(skg_tex_t *render_target) {
 	if (render_target->type != skg_tex_type_rendertarget)
 		return;
 
-	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(0.f, 0.f, (float)render_target->width, (float)render_target->height);
+	D3D11_VIEWPORT viewport = {};
+	viewport.Width    = (float)render_target->width;
+	viewport.Height   = (float)render_target->height;
+	viewport.MaxDepth = 1.0f;
 	d3d_context->RSSetViewports(1, &viewport);
 	d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
 }
@@ -1005,7 +1016,12 @@ void skg_compute(uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thre
 ///////////////////////////////////////////
 
 void skg_viewport(const int32_t *xywh) {
-	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT((float)xywh[0], (float)xywh[1], (float)xywh[2], (float)xywh[3]);
+	D3D11_VIEWPORT viewport = {};
+	viewport.TopLeftX = (float)xywh[0];
+	viewport.TopLeftY = (float)xywh[1];
+	viewport.Width    = (float)xywh[2];
+	viewport.Height   = (float)xywh[3];
+	viewport.MaxDepth = 1.0f;
 	d3d_context->RSSetViewports(1, &viewport);
 }
 
@@ -1285,6 +1301,7 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 		buffer      = file_data;
 		buffer_size = shader_size;
 	} else {
+#if !defined(SKG_NO_D3DCOMPILER)
 		DWORD flags = D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
 #if !defined(NDEBUG)
 		flags |= D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG;
@@ -1313,6 +1330,10 @@ skg_shader_stage_t skg_shader_stage_create(const void *file_data, size_t shader_
 
 		buffer      = compiled->GetBufferPointer();
 		buffer_size = compiled->GetBufferSize();
+#else
+		skg_log(skg_log_warning, "Raw HLSL not supported in this configuration! (SKG_NO_D3DCOMPILER)");
+		return {};
+#endif
 	}
 
 	// Create a shader from HLSL bytecode

@@ -433,6 +433,9 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 	}
 	if (FAILED(hr)) {
 		skg_logf(skg_log_critical, "Failed to set contents of buffer, may not be using a writeable buffer type: 0x%08X", hr);
+		if (!on_main) {
+			ReleaseMutex(d3d_deferred_mtx);
+		}
 		return;
 	}
 
@@ -1563,6 +1566,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		}
 		if (FAILED(hr)) {
 			skg_logf(skg_log_critical, "Failed mapping a texture: 0x%08X", hr);
+			if (!on_main) {
+				ReleaseMutex(d3d_deferred_mtx);
+			}
 			return;
 		}
 

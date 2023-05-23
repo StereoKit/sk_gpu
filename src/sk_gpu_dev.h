@@ -145,6 +145,7 @@ typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_depthstencil,
 	skg_tex_fmt_depth32,
 	skg_tex_fmt_depth16,
+	skg_tex_fmt_r8g8,
 } skg_tex_fmt_;
 
 typedef enum skg_fmt_ {

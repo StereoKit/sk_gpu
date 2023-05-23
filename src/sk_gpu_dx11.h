@@ -87,4 +87,7 @@ typedef struct skg_swapchain_t {
 
 typedef struct skg_platform_data_t {
 	void *_d3d11_device;
+	void *_d3d11_deferred_context;
+	void *_d3d_deferred_mtx;
+	uint32_t _d3d_main_thread_id;
 } skg_platform_data_t;

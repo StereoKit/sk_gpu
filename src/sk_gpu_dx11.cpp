@@ -229,7 +229,9 @@ void skg_draw_begin() {
 skg_platform_data_t skg_get_platform_data() {
 	skg_platform_data_t result = {};
 	result._d3d11_device = d3d_device;
-
+	result._d3d11_deferred_context = d3d_deferred;
+	result._d3d_deferred_mtx = d3d_deferred_mtx;
+	result._d3d_main_thread_id = d3d_main_thread;
 	return result;
 }
 
@@ -426,13 +428,35 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 		return;
 	}
 
-	D3D11_MAPPED_SUBRESOURCE resource;
-	HRESULT hr = d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	if (SUCCEEDED(hr)) {
-		memcpy(resource.pData, data, size_bytes);
+	HRESULT hr = E_FAIL;
+	D3D11_MAPPED_SUBRESOURCE resource = {};
+
+	// Map the memory so we can access it on CPU! In a multi-threaded
+	// context this can be tricky, here we're using a deferred context to
+	// push this operation over to the main thread. The deferred context is
+	// then executed in skg_draw_begin.
+	bool on_main = GetCurrentThreadId() == d3d_main_thread;
+	if (on_main) {
+		hr = d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+	} else {
+		WaitForSingleObject(d3d_deferred_mtx, INFINITE);
+		hr = d3d_deferred->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+	}
+	if (FAILED(hr)) {
+		skg_logf(skg_log_critical, "Failed to set contents of buffer, may not be using a writeable buffer type: 0x%08X", hr);
+		if (!on_main) {
+			ReleaseMutex(d3d_deferred_mtx);
+		}
+		return;
+	}
+
+	memcpy(resource.pData, data, size_bytes);
+		
+	if (on_main) {
 		d3d_context->Unmap(buffer->_buffer, 0);
 	} else {
-		skg_logf(skg_log_critical, "Failed to set contents of buffer, may not be using a writeable buffer type: 0x%08X", hr);
+		d3d_deferred->Unmap(buffer->_buffer, 0);
+		ReleaseMutex(d3d_deferred_mtx);
 	}
 }
 
@@ -1281,6 +1305,7 @@ bool skg_can_make_mips(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r32:
 	case skg_tex_fmt_depth16:
 	case skg_tex_fmt_r16:
+	case skg_tex_fmt_r8g8:
 	case skg_tex_fmt_r8: return true;
 	default: return false;
 	}
@@ -1317,6 +1342,7 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 			break;
 		case skg_tex_fmt_depth16:
 		case skg_tex_fmt_r16:
+		case skg_tex_fmt_r8g8:
 			skg_downsample_1((uint16_t *)mip_data, mip_w, mip_h, (uint16_t **)&tex_mem[m].pSysMem, &mip_w, &mip_h); 
 			break;
 		case skg_tex_fmt_r8:
@@ -1556,6 +1582,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		}
 		if (FAILED(hr)) {
 			skg_logf(skg_log_critical, "Failed mapping a texture: 0x%08X", hr);
+			if (!on_main) {
+				ReleaseMutex(d3d_deferred_mtx);
+			}
 			return;
 		}
 
@@ -1835,6 +1864,7 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	case skg_tex_fmt_r8:            return DXGI_FORMAT_R8_UNORM;
 	case skg_tex_fmt_r16:           return DXGI_FORMAT_R16_UNORM;
 	case skg_tex_fmt_r32:           return DXGI_FORMAT_R32_FLOAT;
+	case skg_tex_fmt_r8g8:          return DXGI_FORMAT_R8G8_UNORM;
 	default: return DXGI_FORMAT_UNKNOWN;
 	}
 }
@@ -1859,6 +1889,7 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case DXGI_FORMAT_R8_UNORM:            return skg_tex_fmt_r8;
 	case DXGI_FORMAT_R16_UNORM:           return skg_tex_fmt_r16;
 	case DXGI_FORMAT_R32_FLOAT:           return skg_tex_fmt_r32;
+	case DXGI_FORMAT_R8G8_UNORM:          return skg_tex_fmt_r8g8;
 	default: return skg_tex_fmt_none;
 	}
 }

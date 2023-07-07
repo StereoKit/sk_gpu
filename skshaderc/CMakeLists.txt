@@ -32,6 +32,12 @@ project(skshaderc VERSION 1.0
                   DESCRIPTION "Shader compiler for sk_gpu.h"
                   LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+    add_compile_options(-fcolor-diagnostics)
+endif()
+
 # See: https://github.com/cpm-cmake/CPM.cmake
 include(../cmake/CPM.cmake)
 

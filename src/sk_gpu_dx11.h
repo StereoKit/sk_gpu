@@ -1,10 +1,23 @@
 #pragma once
 #include "sk_gpu_dev.h"
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <d3d11.h>
-#include <dxgi1_6.h>
+
+// Forward declare our D3D structs, so we don't have to pay the cost for
+// including the d3d11 header in every file that includes this one.
+struct ID3D11Buffer;
+struct ID3D11ShaderResourceView;
+struct ID3D11UnorderedAccessView;
+struct ID3D11InputLayout;
+struct ID3D11VertexShader;
+struct ID3D11PixelShader;
+struct ID3D11ComputeShader;
+struct ID3D11BlendState;
+struct ID3D11RasterizerState;
+struct ID3D11DepthStencilState;
+struct ID3D11SamplerState;
+struct ID3D11RenderTargetView;
+struct ID3D11DepthStencilView;
+struct IDXGISwapChain1;
+struct ID3D11Texture2D;
 
 ///////////////////////////////////////////
 

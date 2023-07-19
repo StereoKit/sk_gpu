@@ -575,7 +575,7 @@ bool write_header(const char *filename, void *file_data, size_t file_size, bool 
 	int32_t ct = fprintf(fp, "const unsigned char sks_%s%s[%zu] = {\n", name, zipped ? "_zip" : "", file_size);
 	for (size_t i = 0; i < file_size; i++) {
 		unsigned char byte = ((unsigned char *)file_data)[i];  
-		ct += fprintf(fp, "%d,\n", byte);
+		ct += fprintf(fp, "%d,", byte);
 		if (ct > 80) { 
 			fprintf(fp, "\n"); 
 			ct = 0; 

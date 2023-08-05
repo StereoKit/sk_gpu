@@ -312,6 +312,9 @@ SKG_API void                skg_callback_file_read       (bool (*callback)(const
 SKG_API skg_platform_data_t skg_get_platform_data        ();
 SKG_API bool                skg_capability               (skg_cap_ capability);
 
+SKG_API void                skg_event_begin              (const char *name);
+SKG_API void                skg_event_end                ();
+
 SKG_API void                skg_draw_begin               ();
 SKG_API void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
 SKG_API void                skg_compute                  (uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z);

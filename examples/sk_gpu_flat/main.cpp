@@ -255,7 +255,9 @@ void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 		hmm_mat4 view, proj;
 		memcpy(&view, views[i].viewMatrix,       sizeof(hmm_mat4));
 		memcpy(&proj, views[i].projectionMatrix, sizeof(hmm_mat4));
+		skg_event_begin("app_render");
 		app_render((float)frame, view, proj);
+		skg_event_end();
 	}
 
 	skg_viewport(old_viewport);

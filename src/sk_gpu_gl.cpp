@@ -295,6 +295,7 @@
 #define GL_DEBUG_SEVERITY_HIGH         0x9146
 #define GL_DEBUG_SEVERITY_MEDIUM       0x9147
 #define GL_DEBUG_SEVERITY_LOW          0x9148
+#define GL_DEBUG_SOURCE_APPLICATION    0x824A
 
 // Reference from here:
 // https://github.com/ApoorvaJ/Papaya/blob/3808e39b0f45d4ca4972621c847586e4060c042a/src/libs/gl_lite.h
@@ -382,6 +383,8 @@ GLE(void,     glBlendFuncSeparate,       uint32_t srcRGB, uint32_t dstRGB, uint3
 GLE(void,     glBlendEquationSeparate,   uint32_t modeRGB, uint32_t modeAlpha) \
 GLE(void,     glDispatchCompute,         uint32_t num_groups_x, uint32_t num_groups_y, uint32_t num_groups_z) \
 GLE(void,     glObjectLabel,             uint32_t identifier, uint32_t name, uint32_t length, const char* label) \
+GLE(void,     glPushDebugGroupKHR,       uint32_t source, uint32_t id, uint32_t length, const char* message) \
+GLE(void,     glPopDebugGroupKHR,        void) \
 GLE(const char *, glGetString,           uint32_t name) \
 GLE(const char *, glGetStringi,          uint32_t name, uint32_t index)
 
@@ -910,6 +913,24 @@ bool skg_capability(skg_cap_ capability) {
 #endif
 	default: return false;
 	}
+}
+
+///////////////////////////////////////////
+
+void skg_event_begin (const char *name) {
+#if defined(_DEBUG) && !defined(_SKG_GL_WEB)
+	if (glPushDebugGroupKHR)
+		glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name);
+#endif
+}
+
+///////////////////////////////////////////
+
+void skg_event_end () {
+#if defined(_DEBUG) && !defined(_SKG_GL_WEB)
+	if (glPopDebugGroupKHR)
+		glPopDebugGroupKHR();
+#endif
 }
 
 ///////////////////////////////////////////

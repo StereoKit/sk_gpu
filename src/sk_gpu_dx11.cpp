@@ -39,6 +39,11 @@ ID3D11DeviceContext     *d3d_deferred    = nullptr;
 HANDLE                   d3d_deferred_mtx= nullptr;
 DWORD                    d3d_main_thread = 0;
 
+#if defined(_DEBUG)
+#include <d3d11_1.h>
+ID3DUserDefinedAnnotation *d3d_annotate = nullptr;
+#endif
+
 ///////////////////////////////////////////
 
 bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
@@ -164,6 +169,10 @@ int32_t skg_init(const char *, void *adapter_id) {
 		d3d_debug->Release();
 	}
 
+#if defined(_DEBUG)
+	immediateContext->QueryInterface(__uuidof(ID3DUserDefinedAnnotation), (void **)&annot);
+#endif
+
 	D3D11_RASTERIZER_DESC desc_rasterizer = {};
 	desc_rasterizer.FillMode = D3D11_FILL_SOLID;
 	desc_rasterizer.CullMode = D3D11_CULL_BACK;
@@ -252,6 +261,24 @@ bool skg_capability(skg_cap_ capability) {
 	case skg_cap_wireframe: return true;
 	default: return false;
 	}
+}
+
+///////////////////////////////////////////
+
+void skg_event_begin (const char *name) {
+#if defined(_DEBUG)
+	wchar_t name_w[64];
+	MultiByteToWideChar(CP_UTF8, 0, name, -1, name_w, _countof(name_w));
+	d3d_annotate->BeginEvent(name_w);
+#endif
+}
+
+///////////////////////////////////////////
+
+void skg_event_end () {
+#if defined(_DEBUG)
+	d3d_annotate->EndEvent();
+#endif
 }
 
 ///////////////////////////////////////////

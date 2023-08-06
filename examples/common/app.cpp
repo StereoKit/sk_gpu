@@ -202,9 +202,9 @@ bool app_init() {
 		colors[i] = { c8,c8,c8,c8 };
 	} }
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
-	skg_tex_name        (&app_tex, "checker_tex");
 	skg_tex_settings    (&app_tex, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_tex, colors, w, h);
+	skg_tex_name        (&app_tex, "checker_tex");
 	free(colors);
 
 	// Test reading specific mip levels
@@ -237,9 +237,9 @@ bool app_init() {
 		colors[i] = { c8,c8,c8,c8 };
 	} }
 	app_particle = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
-	skg_tex_name        (&app_particle, "particle_tex");
 	skg_tex_settings    (&app_particle, skg_tex_address_clamp, skg_tex_sample_linear, 0);
 	skg_tex_set_contents(&app_particle, colors, w, h);
+	skg_tex_name        (&app_particle, "particle_tex");
 	free(colors);
 
 	// Make a plain white texture
@@ -248,8 +248,8 @@ bool app_init() {
 		colors_wht[i] = {255,255,255,255};
 	}
 	app_tex_white = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
-	skg_tex_name        (&app_tex_white, "white_tex");
 	skg_tex_set_contents(&app_tex_white, colors_wht, 2, 2);
+	skg_tex_name        (&app_tex_white, "white_tex");
 
 	// Make srgb and linear gradients
 	const int32_t gw = 64, gh = 16;
@@ -304,14 +304,13 @@ bool app_init() {
 
 	app_target       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	app_target_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depth16,       skg_mip_none);
-	skg_tex_name        (&app_target,       "main_rtex");
-	skg_tex_name        (&app_target_depth, "depth_rtex");
 	skg_tex_set_contents(&app_target,       nullptr, 512, 512);
 	skg_tex_set_contents(&app_target_depth, nullptr, 512, 512);
 	skg_tex_attach_depth(&app_target, &app_target_depth);
+	skg_tex_name        (&app_target,       "main_rtex");
+	skg_tex_name        (&app_target_depth, "depth_rtex");
 
 	app_cubemap = skg_tex_create(skg_tex_type_cubemap, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
-	skg_tex_name(&app_cubemap, "cubemap_tex");
 	skg_color32_t *cube_cols[6];
 	const int32_t  cube_face_size = 64;
 	for (size_t f = 0; f < 6; f++) {
@@ -327,6 +326,7 @@ bool app_init() {
 		}
 	}
 	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, cube_face_size, cube_face_size, 1);
+	skg_tex_name(&app_cubemap, "cubemap_tex");
 
 	// Check array texture read
 	{
@@ -431,8 +431,8 @@ void app_test_compute_init() {
 	}}
 
 	compute_tex = skg_tex_create(skg_tex_type_image, skg_use_compute_write, skg_tex_fmt_rgba32_linear, skg_mip_none);
-	skg_tex_name        (&compute_tex, "compute_result_tex");
 	skg_tex_set_contents(&compute_tex, nullptr, c_size, c_size);
+	skg_tex_name        (&compute_tex, "compute_result_tex");
 
 	compute_buff_args = skg_buffer_create(&compute_args, 1, sizeof(reaction_diffusion_args_t), skg_buffer_type_constant, skg_use_static);
 	compute_buff_a    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);

@@ -56,6 +56,9 @@ typedef struct skg_tex_t {
 	uint32_t      _target;
 	uint32_t      _access;
 	uint32_t      _format;
+	skg_tex_address_ _address;
+	skg_tex_sample_  _sample;
+	int32_t          _anisotropy;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {

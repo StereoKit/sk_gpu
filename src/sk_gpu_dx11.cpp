@@ -170,7 +170,7 @@ int32_t skg_init(const char *, void *adapter_id) {
 	}
 
 #if defined(_DEBUG)
-	immediateContext->QueryInterface(__uuidof(ID3DUserDefinedAnnotation), (void **)&annot);
+	d3d_context->QueryInterface(__uuidof(ID3DUserDefinedAnnotation), (void **)&d3d_annotate);
 #endif
 
 	D3D11_RASTERIZER_DESC desc_rasterizer = {};

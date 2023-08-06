@@ -465,8 +465,8 @@ int32_t gl_init_wgl() {
 	format_desc.cColorBits   = 32;
 	format_desc.cAlphaBits   = 8;
 	format_desc.iLayerType   = PFD_MAIN_PLANE;
-	format_desc.cDepthBits   = 24;
-	format_desc.cStencilBits = 8;
+	format_desc.cDepthBits   = 0;
+	format_desc.cStencilBits = 0;
 
 	int pixel_format = ChoosePixelFormat(dummy_dc, &format_desc);
 	if (!pixel_format) {
@@ -525,10 +525,10 @@ int32_t gl_init_wgl() {
 		WGL_ACCELERATION_ARB,   WGL_FULL_ACCELERATION_ARB,
 		WGL_PIXEL_TYPE_ARB,     WGL_TYPE_RGBA_ARB,
 		WGL_COLOR_BITS_ARB,     32,
-		WGL_DEPTH_BITS_ARB,     24,
-		WGL_STENCIL_BITS_ARB,   8,
-		WGL_SAMPLE_BUFFERS_ARB, 1,
-		WGL_SAMPLES_ARB,        4,
+		WGL_DEPTH_BITS_ARB,     0,
+		WGL_STENCIL_BITS_ARB,   0,
+		WGL_SAMPLE_BUFFERS_ARB, 0,
+		WGL_SAMPLES_ARB,        0,
 		0 };
 
 	pixel_format = 0;
@@ -597,7 +597,7 @@ int32_t gl_init_egl() {
 		EGL_GREEN_SIZE, 8,
 		EGL_RED_SIZE,   8,
 		EGL_ALPHA_SIZE, 8,
-		EGL_DEPTH_SIZE, 16,
+		EGL_DEPTH_SIZE, 0,
 		EGL_NONE
 	};
 	EGLint context_attribs[] = { 
@@ -1522,10 +1522,10 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 		WGL_ACCELERATION_ARB,   WGL_FULL_ACCELERATION_ARB,
 		WGL_PIXEL_TYPE_ARB,     WGL_TYPE_RGBA_ARB,
 		WGL_COLOR_BITS_ARB,     32,
-		WGL_DEPTH_BITS_ARB,     24,
-		WGL_STENCIL_BITS_ARB,   8,
-		WGL_SAMPLE_BUFFERS_ARB, 1,
-		WGL_SAMPLES_ARB,        4,
+		WGL_DEPTH_BITS_ARB,     0,
+		WGL_STENCIL_BITS_ARB,   0,
+		WGL_SAMPLE_BUFFERS_ARB, 0,
+		WGL_SAMPLES_ARB,        0,
 		0 };
 
 	int  pixel_format = 0;

@@ -35,7 +35,9 @@ Display *x_dpy;
 ///////////////////////////////////////////
 
 void           *app_hwnd      = nullptr;
-skg_swapchain_t app_swapchain = {};
+skg_swapchain_t app_swapchain     = {};
+skg_tex_t       app_surface       = {};
+skg_tex_t       app_surface_depth = {};
 bool            app_resize    = false;
 int             app_width     = 0;
 int             app_height    = 0;
@@ -89,6 +91,14 @@ void resize_swapchain(int width, int height) {
 	app_height = height;
 
 	skg_swapchain_resize(&app_swapchain, app_width, app_height);
+
+	skg_tex_destroy(&app_surface);
+	skg_tex_destroy(&app_surface_depth);
+	app_surface       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32,        skg_mip_none);
+	app_surface_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depthstencil,  skg_mip_none);
+	skg_tex_set_contents_arr(&app_surface,       nullptr, 1, width, height, 8);
+	skg_tex_set_contents_arr(&app_surface_depth, nullptr, 1, width, height, 8);
+	skg_tex_attach_depth(&app_surface, &app_surface_depth);
 }
 
 ///////////////////////////////////////////
@@ -144,7 +154,7 @@ bool main_init() {
 		GLX_GREEN_SIZE,    8,
 		GLX_BLUE_SIZE,     8,
 		GLX_ALPHA_SIZE,    8,
-		GLX_DEPTH_SIZE,    16,
+		GLX_DEPTH_SIZE,    0,
 		GLX_RENDER_TYPE,   GLX_RGBA_BIT,
 		GLX_DRAWABLE_TYPE, GLX_PBUFFER_BIT,
 		GLX_X_RENDERABLE,  true,
@@ -224,7 +234,7 @@ int main_step(double t, void *) {
 
 	skg_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skg_swapchain_bind(&app_swapchain);
+	skg_tex_target_bind(&app_surface);
 	skg_target_clear(true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(
@@ -235,6 +245,7 @@ int main_step(double t, void *) {
 
 	app_render((float)t, view, proj);
 
+	skg_tex_copy_to_swapchain(&app_surface, &app_swapchain);
 	skg_swapchain_present(&app_swapchain);
 	return 1;
 }

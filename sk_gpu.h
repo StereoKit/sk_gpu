@@ -2686,7 +2686,7 @@ const char *skg_semantic_to_d3d(skg_el_semantic_ semantic) {
 // OpenGL Implementation                 //
 ///////////////////////////////////////////
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -4920,7 +4920,7 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 // Common Code                           //
 ///////////////////////////////////////////
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>

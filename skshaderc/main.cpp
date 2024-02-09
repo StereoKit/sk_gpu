@@ -599,11 +599,13 @@ uint64_t file_time(const char *file) {
 		return 0;
 	CloseHandle(handle);
 	return (static_cast<uint64_t>(write_time.dwHighDateTime) << 32) | write_time.dwLowDateTime;
-#elif defined(__linux__)
+#elif defined(__linux__) || __APPLE__
 	struct stat result;
 	if(stat(file, &result)==0)
 		return result.st_mtime;
 	return 0;
+#else
+	#error "Platform unsupported"
 #endif
 }
 

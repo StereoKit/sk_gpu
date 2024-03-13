@@ -1336,7 +1336,8 @@ bool skg_can_make_mips(skg_tex_fmt_ format) {
 	case skg_tex_fmt_depth32:
 	case skg_tex_fmt_r32:
 	case skg_tex_fmt_depth16:
-	case skg_tex_fmt_r16:
+	case skg_tex_fmt_r16u:
+	case skg_tex_fmt_r16s:
 	case skg_tex_fmt_r8g8:
 	case skg_tex_fmt_r8: return true;
 	default: return false;
@@ -1373,7 +1374,8 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 			skg_downsample_1((float    *)mip_data, mip_w, mip_h, (float    **)&tex_mem[m].pSysMem, &mip_w, &mip_h); 
 			break;
 		case skg_tex_fmt_depth16:
-		case skg_tex_fmt_r16:
+		case skg_tex_fmt_r16u:
+		case skg_tex_fmt_r16s:
 		case skg_tex_fmt_r8g8:
 			skg_downsample_1((uint16_t *)mip_data, mip_w, mip_h, (uint16_t **)&tex_mem[m].pSysMem, &mip_w, &mip_h); 
 			break;
@@ -1894,7 +1896,9 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	case skg_tex_fmt_depth32:       return DXGI_FORMAT_D32_FLOAT;
 	case skg_tex_fmt_depthstencil:  return DXGI_FORMAT_D24_UNORM_S8_UINT;
 	case skg_tex_fmt_r8:            return DXGI_FORMAT_R8_UNORM;
-	case skg_tex_fmt_r16:           return DXGI_FORMAT_R16_UNORM;
+	case skg_tex_fmt_r16u:          return DXGI_FORMAT_R16_UNORM;
+	case skg_tex_fmt_r16s:          return DXGI_FORMAT_R16_SNORM;
+	case skg_tex_fmt_r16f:          return DXGI_FORMAT_R16_FLOAT;
 	case skg_tex_fmt_r32:           return DXGI_FORMAT_R32_FLOAT;
 	case skg_tex_fmt_r8g8:          return DXGI_FORMAT_R8G8_UNORM;
 	default: return DXGI_FORMAT_UNKNOWN;
@@ -1919,7 +1923,9 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case DXGI_FORMAT_D32_FLOAT:           return skg_tex_fmt_depth32;
 	case DXGI_FORMAT_D24_UNORM_S8_UINT:   return skg_tex_fmt_depthstencil;
 	case DXGI_FORMAT_R8_UNORM:            return skg_tex_fmt_r8;
-	case DXGI_FORMAT_R16_UNORM:           return skg_tex_fmt_r16;
+	case DXGI_FORMAT_R16_UNORM:           return skg_tex_fmt_r16u;
+	case DXGI_FORMAT_R16_SNORM:           return skg_tex_fmt_r16s;
+	case DXGI_FORMAT_R16_FLOAT:           return skg_tex_fmt_r16f;
 	case DXGI_FORMAT_R32_FLOAT:           return skg_tex_fmt_r32;
 	case DXGI_FORMAT_R8G8_UNORM:          return skg_tex_fmt_r8g8;
 	default: return skg_tex_fmt_none;

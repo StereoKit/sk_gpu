@@ -785,7 +785,7 @@ uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba32_linear:
 	case skg_tex_fmt_bgra32:
 	case skg_tex_fmt_bgra32_linear:
-	case skg_tex_fmt_rg11b10: 
+	case skg_tex_fmt_rg11b10:
 	case skg_tex_fmt_rgb10a2:       return sizeof(uint8_t )*4;
 	case skg_tex_fmt_rgba64u:
 	case skg_tex_fmt_rgba64s:
@@ -795,7 +795,9 @@ uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
 	case skg_tex_fmt_depth32:       return sizeof(uint32_t);
 	case skg_tex_fmt_depthstencil:  return sizeof(uint32_t);
 	case skg_tex_fmt_r8:            return sizeof(uint8_t );
-	case skg_tex_fmt_r16:           return sizeof(uint16_t);
+	case skg_tex_fmt_r16u:
+	case skg_tex_fmt_r16s:
+	case skg_tex_fmt_r16f:          return sizeof(uint16_t);
 	case skg_tex_fmt_r32:           return sizeof(uint32_t);
 	case skg_tex_fmt_r8g8:          return sizeof(uint16_t);
 	default: return 0;

@@ -26,6 +26,7 @@
 	EGLDisplay egl_display = EGL_NO_DISPLAY;
 	EGLContext egl_context;
 	EGLConfig  egl_config;
+	EGLSurface egl_temp_surface;
 #elif defined(_SKG_GL_LOAD_GLX)
 	#include <X11/Xutil.h>
 	#include <X11/Xlib.h>
@@ -203,6 +204,7 @@
 #define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
 #define GL_READ_FRAMEBUFFER 0x8CA8
 #define GL_DRAW_FRAMEBUFFER 0x8CA9
+#define GL_FRAMEBUFFER_COMPLETE 0x8CD5
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
@@ -231,6 +233,7 @@
 #define GL_R8 0x8229
 #define GL_RG8 0x822B
 #define GL_RG16 0x822C
+#define GL_R16 0x822A
 #define GL_R16F 0x822D
 #define GL_R32F 0x822E
 #define GL_RG16F 0x822F
@@ -278,9 +281,13 @@
 #define GL_UNSIGNED_INT 0x1405
 #define GL_UNSIGNED_INT_24_8 0x84FA;
 #define GL_FLOAT 0x1406
+#define GL_HALF_FLOAT 0x140B
 #define GL_DOUBLE 0x140A
 #define GL_UNSIGNED_INT_8_8_8_8 0x8035
 #define GL_UNSIGNED_INT_8_8_8_8_REV 0x8367
+#define GL_MAX_SAMPLES 0x8D57
+#define GL_PACK_ALIGNMENT 0x0D05
+#define GL_UNPACK_ALIGNMENT 0x0CF5
 
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_VERTEX_SHADER 0x8B31
@@ -349,6 +356,7 @@ GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) 
 GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
+GLE(uint32_t, glCheckFramebufferStatus,  uint32_t target) \
 GLE(void,     glBlitFramebuffer,         int32_t srcX0, int32_t srcY0, int32_t srcX1, int32_t srcY1, int32_t dstX0, int32_t dstY0, int32_t dstX1, int32_t dstY1, uint32_t mask, uint32_t filter) \
 GLE(void,     glDeleteTextures,          int32_t n, const uint32_t *textures) \
 GLE(void,     glBindTexture,             uint32_t target, uint32_t texture) \
@@ -363,6 +371,7 @@ GLE(void,     glTexStorage3DMultisample, uint32_t target, uint32_t samples, int3
 GLE(void,     glCopyTexSubImage2D,       uint32_t target, int32_t level, int32_t xoffset, int32_t yoffset, int32_t x, int32_t y, uint32_t width, uint32_t height) \
 GLE(void,     glGetTexImage,             uint32_t target, int32_t level, uint32_t format, uint32_t type, void *img) \
 GLE(void,     glReadPixels,              int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t format, uint32_t type, void *data) \
+GLE(void,     glPixelStorei,             uint32_t pname, int32_t param) \
 GLE(void,     glActiveTexture,           uint32_t texture) \
 GLE(void,     glGenerateMipmap,          uint32_t target) \
 GLE(void,     glBindAttribLocation,      uint32_t program, uint32_t index, const char *name) \
@@ -591,7 +600,7 @@ int32_t gl_init_emscripten() {
 int32_t gl_init_egl() {
 #ifdef _SKG_GL_LOAD_EGL
 	const EGLint attribs[] = {
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+		EGL_SURFACE_TYPE, EGL_DONT_CARE,
 		EGL_CONFORMANT,   EGL_OPENGL_ES3_BIT_KHR,
 		EGL_BLUE_SIZE,  8,
 		EGL_GREEN_SIZE, 8,
@@ -653,7 +662,23 @@ int32_t gl_init_egl() {
 	egl_context = eglCreateContext      (egl_display, egl_config, nullptr, context_attribs);
 	if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglCreateContext"  ); return 0; }
 
-	if (eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, egl_context) == EGL_FALSE) {
+	const char* egl_extensions       = eglQueryString(egl_display, EGL_EXTENSIONS);
+	bool        supports_surfaceless = egl_extensions != nullptr && strstr(egl_extensions, "EGL_KHR_surfaceless_context") != nullptr;
+
+	egl_temp_surface = nullptr;
+	if (supports_surfaceless == false) {
+		EGLint temp_buffer_attr[] = {
+			EGL_WIDTH,  1,
+			EGL_HEIGHT, 1,
+			EGL_NONE };
+		egl_temp_surface = eglCreatePbufferSurface(egl_display, egl_config, temp_buffer_attr);
+		if (egl_temp_surface == EGL_NO_SURFACE) {
+			skg_log(skg_log_critical, "Unable to create temporary EGL surface");
+			return -1;
+		}
+	}
+
+	if (eglMakeCurrent(egl_display, egl_temp_surface, egl_temp_surface, egl_context) == EGL_FALSE) {
 		skg_log(skg_log_critical, "Unable to eglMakeCurrent");
 		return -1;
 	}
@@ -731,7 +756,7 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	gl_load_extensions();
 #endif
 
-	const char* name     = glGetString(GL_RENDERER);
+	const char* name     = (const char *)glGetString(GL_RENDERER);
 	size_t      name_len = strlen(name);
 	gl_adapter_name = (char*)malloc(name_len+1);
 	memcpy(gl_adapter_name, name, name_len);
@@ -809,6 +834,12 @@ void skg_shutdown() {
 	ReleaseDC(gl_hwnd, gl_hdc);
 	wglDeleteContext(gl_hrc);
 #elif defined(_SKG_GL_LOAD_EGL)
+
+	if (egl_temp_surface) {
+		eglDestroySurface(egl_display, egl_temp_surface);
+		egl_temp_surface = nullptr;
+	}
+
 	if (egl_display != EGL_NO_DISPLAY) {
 		eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 		if (egl_context != EGL_NO_CONTEXT) eglDestroyContext(egl_display, egl_context);
@@ -1560,6 +1591,9 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 		EGL_NONE };
 	result._egl_surface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)hwnd, attribs);
 	if (eglGetError() != EGL_SUCCESS) skg_log(skg_log_critical, "Err eglCreateWindowSurface");
+	
+	if (eglMakeCurrent(egl_display, result._egl_surface, result._egl_surface, egl_context) == EGL_FALSE)
+		skg_log(skg_log_critical, "Unable to eglMakeCurrent for swapchain");
 
 	eglQuerySurface(egl_display, result._egl_surface, EGL_WIDTH,  &result.width );
 	eglQuerySurface(egl_display, result._egl_surface, EGL_HEIGHT, &result.height);
@@ -1835,9 +1869,23 @@ void skg_tex_copy_to(const skg_tex_t *tex, skg_tex_t *destination) {
 		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
 	}
 
-	glBindFramebuffer  (GL_FRAMEBUFFER, tex->_framebuffer);
-	glBindTexture      (destination->_target, destination->_texture);
-	glCopyTexSubImage2D(destination->_target, 0, 0,0,0,0,tex->width,tex->height);
+	if (tex->multisample > 1) {
+		uint32_t temp_framebuffer;
+		glGenFramebuffers     (1, &temp_framebuffer);
+		glBindFramebuffer     (GL_FRAMEBUFFER, temp_framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, destination->_target, destination->_texture, 0);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, tex->_framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, temp_framebuffer);
+
+		glBlitFramebuffer  (0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+		glDeleteFramebuffers(1, &temp_framebuffer);
+	} else {
+		glBindFramebuffer  (GL_FRAMEBUFFER, tex->_framebuffer);
+		glBindTexture      (destination->_target, destination->_texture);
+		glCopyTexSubImage2D(destination->_target, 0, 0,0,0,0,tex->width,tex->height);
+	}
 }
 
 ///////////////////////////////////////////
@@ -1926,6 +1974,16 @@ void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32
 ///////////////////////////////////////////
 
 void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample) {
+	if (multisample > 1) {
+		int32_t max_samples = 0;
+		glGetIntegerv(GL_MAX_SAMPLES, &max_samples);
+		if (multisample > max_samples)
+			multisample = max_samples;
+	}
+#ifdef _SKG_GL_WEB
+	multisample = 1;
+#endif
+
 	tex->width       = width;
 	tex->height      = height;
 	tex->multisample = multisample;
@@ -1942,6 +2000,11 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 
 	glBindTexture(tex->_target, tex->_texture);
 
+	if (tex->format == skg_tex_fmt_r8)
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	else if (tex->format == skg_tex_fmt_r16u || tex->format == skg_tex_fmt_r16s || tex->format == skg_tex_fmt_r16f || tex->format == skg_tex_fmt_r8g8 || tex->format == skg_tex_fmt_depth16)
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+
 	tex->_format    = (uint32_t)skg_tex_fmt_to_native   (tex->format);
 	uint32_t layout =           skg_tex_fmt_to_gl_layout(tex->format);
 	uint32_t type   =           skg_tex_fmt_to_gl_type  (tex->format);
@@ -1953,10 +2016,17 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		for (int32_t f = 0; f < 6; f++)
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, tex->_format, width, height, 0, layout, type, data_frames[f]);
 	} else {
+
+		#ifndef _SKG_GL_WEB
 		if      (tex->_target == GL_TEXTURE_2D_MULTISAMPLE)       { glTexStorage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE,       multisample, tex->_format, width, height, true); }
 		else if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) { glTexStorage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, multisample, tex->_format, width, height, data_frame_count, true); }
 		else                                                      { glTexImage2D             (GL_TEXTURE_2D, 0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]); }
+		#else
+		glTexImage2D(GL_TEXTURE_2D, 0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
+		#endif
 	}
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
 	if (tex->mips == skg_mip_generate)
 		glGenerateMipmap(tex->_target);
@@ -1972,6 +2042,12 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		} else {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_target, tex->_texture, 0);
 		}
+
+		uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE) {
+			skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
+		}
+
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
 
@@ -1998,8 +2074,9 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 		char text[128];
 		snprintf(text, 128, "skg_tex_get_mip_contents_arr: eating a gl error from somewhere else: %d", result);
 		skg_log(skg_log_warning, text);
+		result = glGetError();
 	}
-
+	
 	// Double check on mips first
 	int32_t mip_levels = tex->mips == skg_mip_generate ? (int32_t)skg_mip_count(tex->width, tex->height) : 1;
 	if (mip_level != 0) {
@@ -2119,15 +2196,17 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	case skg_tex_fmt_bgra32_linear: return GL_RGBA8;
 	case skg_tex_fmt_rg11b10:       return GL_R11F_G11F_B10F;
 	case skg_tex_fmt_rgb10a2:       return GL_RGB10_A2;
-	case skg_tex_fmt_rgba64u:       return GL_RGBA16F;
-	case skg_tex_fmt_rgba64s:       return GL_RGBA16F;
+	case skg_tex_fmt_rgba64u:       return GL_RGBA16;
+	case skg_tex_fmt_rgba64s:       return GL_RGBA16_SNORM;
 	case skg_tex_fmt_rgba64f:       return GL_RGBA16F;
 	case skg_tex_fmt_rgba128:       return GL_RGBA32F;
 	case skg_tex_fmt_depth16:       return GL_DEPTH_COMPONENT16;
 	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT32F;
 	case skg_tex_fmt_depthstencil:  return GL_DEPTH24_STENCIL8;
 	case skg_tex_fmt_r8:            return GL_R8;
-	case skg_tex_fmt_r16:           return GL_R16F;
+	case skg_tex_fmt_r16u:          return GL_R16;
+	case skg_tex_fmt_r16s:          return GL_R16_SNORM;
+	case skg_tex_fmt_r16f:          return GL_R16F;
 	case skg_tex_fmt_r32:           return GL_R32F;
 	case skg_tex_fmt_r8g8:          return GL_RG8;
 	default: return 0;
@@ -2142,15 +2221,17 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case GL_RGBA8:              return skg_tex_fmt_rgba32_linear;
 	case GL_R11F_G11F_B10F:     return skg_tex_fmt_rg11b10;
 	case GL_RGB10_A2:           return skg_tex_fmt_rgb10a2;
-	case GL_RGBA16UI:           return skg_tex_fmt_rgba64u;
-	case GL_RGBA16I:            return skg_tex_fmt_rgba64s;
+	case GL_RGBA16:             return skg_tex_fmt_rgba64u;
+	case GL_RGBA16_SNORM:       return skg_tex_fmt_rgba64s;
 	case GL_RGBA16F:            return skg_tex_fmt_rgba64f;
 	case GL_RGBA32F:            return skg_tex_fmt_rgba128;
 	case GL_DEPTH_COMPONENT16:  return skg_tex_fmt_depth16;
 	case GL_DEPTH_COMPONENT32F: return skg_tex_fmt_depth32;
 	case GL_DEPTH24_STENCIL8:   return skg_tex_fmt_depthstencil;
 	case GL_R8:                 return skg_tex_fmt_r8;
-	case GL_R16UI:              return skg_tex_fmt_r16;
+	case GL_R16:                return skg_tex_fmt_r16u;
+	case GL_R16F:               return skg_tex_fmt_r16f;
+	case GL_R16_SNORM:          return skg_tex_fmt_r16s;
 	case GL_R32F:               return skg_tex_fmt_r32;
 	case GL_RG8:                return skg_tex_fmt_r8g8;
 	default: return skg_tex_fmt_none;
@@ -2180,7 +2261,9 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_depth32:       return GL_DEPTH_COMPONENT;
 	case skg_tex_fmt_depthstencil:  return GL_DEPTH_STENCIL;
 	case skg_tex_fmt_r8:
-	case skg_tex_fmt_r16:
+	case skg_tex_fmt_r16u:
+	case skg_tex_fmt_r16s:
+	case skg_tex_fmt_r16f:
 	case skg_tex_fmt_r32:           return GL_RED;
 	case skg_tex_fmt_r8g8:          return GL_RG;
 	default: return 0;
@@ -2199,15 +2282,17 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rg11b10:       return GL_FLOAT;
 	case skg_tex_fmt_rgba64u:       return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_rgba64s:       return GL_SHORT;
-	case skg_tex_fmt_rgba64f:       return GL_FLOAT;
+	case skg_tex_fmt_rgba64f:       return GL_HALF_FLOAT;
 	case skg_tex_fmt_rgba128:       return GL_FLOAT;
 	case skg_tex_fmt_depth16:       return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_depth32:       return GL_FLOAT;
 	case skg_tex_fmt_depthstencil:  return GL_UNSIGNED_INT_24_8;
 	case skg_tex_fmt_r8:            return GL_UNSIGNED_BYTE;
-	case skg_tex_fmt_r16:           return GL_UNSIGNED_SHORT;
+	case skg_tex_fmt_r16u:          return GL_UNSIGNED_SHORT;
+	case skg_tex_fmt_r16s:          return GL_SHORT;
+	case skg_tex_fmt_r16f:          return GL_HALF_FLOAT;
 	case skg_tex_fmt_r32:           return GL_FLOAT;
-	case skg_tex_fmt_r8g8:          return GL_UNSIGNED_SHORT;
+	case skg_tex_fmt_r8g8:          return GL_UNSIGNED_BYTE;
 	default: return 0;
 	}
 }

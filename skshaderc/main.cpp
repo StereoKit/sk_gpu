@@ -10,7 +10,7 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <direct.h>
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #include <sys/types.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -575,10 +575,14 @@ bool write_header(const char *filename, void *file_data, skg_shader_ops_t *vs_sh
 	if (vs_shader_op_info) fprintf(fp, "// --Vertex shader ops--\n// total  : %d\n// texture: %d\n// flow   : %d\n", vs_shader_op_info->total, vs_shader_op_info->tex_read, vs_shader_op_info->dynamic_flow);
 	if (ps_shader_op_info) fprintf(fp, "// --Pixel shader ops-- \n// total  : %d\n// texture: %d\n// flow   : %d\n", ps_shader_op_info->total, ps_shader_op_info->tex_read, ps_shader_op_info->dynamic_flow);
 	if (ps_shader_op_info || vs_shader_op_info) fprintf(fp, "\n");
-	fprintf(fp, "const unsigned char sks_%s%s[%zu] = {\n", name, zipped ? "_zip" : "", file_size);
+	int32_t ct = fprintf(fp, "const unsigned char sks_%s%s[%zu] = {\n", name, zipped ? "_zip" : "", file_size);
 	for (size_t i = 0; i < file_size; i++) {
-		unsigned char byte = ((unsigned char *)file_data)[i];
-		fprintf(fp, "%d,\n", byte);
+		unsigned char byte = ((unsigned char *)file_data)[i];  
+		ct += fprintf(fp, "%d,", byte);
+		if (ct > 80) { 
+			fprintf(fp, "\n"); 
+			ct = 0; 
+		}
 	}
 	fprintf(fp, "};\n");
 	fflush(fp);
@@ -598,11 +602,13 @@ uint64_t file_time(const char *file) {
 		return 0;
 	CloseHandle(handle);
 	return (static_cast<uint64_t>(write_time.dwHighDateTime) << 32) | write_time.dwLowDateTime;
-#elif defined(__linux__)
+#elif defined(__linux__) || __APPLE__
 	struct stat result;
 	if(stat(file, &result)==0)
 		return result.st_mtime;
 	return 0;
+#else
+	#error "Platform unsupported"
 #endif
 }
 

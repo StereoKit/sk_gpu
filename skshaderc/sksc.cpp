@@ -1825,7 +1825,6 @@ void sksc_log_print(const char *file, const sksc_settings_t *settings) {
 			printf("%s\n", sksc_log_list[i].text);
 		}
 	}
-	printf("\n");
 	for (size_t i = 0; i < sksc_log_list.count; i++) {
 		if ((sksc_log_list[i].level == log_level_err_pre && !settings->silent_err)) {
 			printf("%s", sksc_log_list[i].text);
@@ -1846,7 +1845,6 @@ void sksc_log_print(const char *file, const sksc_settings_t *settings) {
 			}
 		}
 	}
-	printf("\n");
 }
 
 ///////////////////////////////////////////

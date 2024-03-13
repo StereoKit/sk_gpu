@@ -20,6 +20,11 @@ sk_gpu.h
 //#define SKG_FORCE_DIRECT3D11
 //#define SKG_FORCE_OPENGL
 
+// You can disable use of D3DCompile to make building this easier sometimes,
+// since D3DCompile is primarily used to catch .sks shader files built from
+// Linux to run on Windows, and this may not be critical in all cases.
+//#define SKG_NO_D3DCOMPILER
+
 #if   defined( SKG_FORCE_NULL )
 #define SKG_NULL
 #elif defined( SKG_FORCE_DIRECT3D11 )
@@ -135,11 +140,14 @@ typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_rgba64f,
 	skg_tex_fmt_rgba128,
 	skg_tex_fmt_r8,
-	skg_tex_fmt_r16,
+	skg_tex_fmt_r16u,
+	skg_tex_fmt_r16s,
+	skg_tex_fmt_r16f,
 	skg_tex_fmt_r32,
 	skg_tex_fmt_depthstencil,
 	skg_tex_fmt_depth32,
 	skg_tex_fmt_depth16,
+	skg_tex_fmt_r8g8,
 } skg_tex_fmt_;
 
 typedef enum skg_ind_fmt_ {
@@ -347,6 +355,9 @@ SKG_API void                skg_callback_log             (void (*callback)(skg_l
 SKG_API void                skg_callback_file_read       (bool (*callback)(const char *filename, void **out_data, size_t *out_size));
 SKG_API skg_platform_data_t skg_get_platform_data        ();
 SKG_API bool                skg_capability               (skg_cap_ capability);
+
+SKG_API void                skg_event_begin              (const char *name);
+SKG_API void                skg_event_end                ();
 
 SKG_API void                skg_draw_begin               ();
 SKG_API void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);

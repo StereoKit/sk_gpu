@@ -571,11 +571,10 @@ void skg_buffer_destroy(skg_buffer_t *buffer) {
 
 ///////////////////////////////////////////
 
-skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
+skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
 	skg_mesh_t result = {};
 	result._ind_buffer  = ind_buffer  ? ind_buffer ->_buffer : nullptr;
 	result._vert_buffer = vert_buffer ? vert_buffer->_buffer : nullptr;
-	result._ind_format  = skg_ind_to_dxgi(ind_format);
 	if (result._ind_buffer ) result._ind_buffer ->AddRef();
 	if (result._vert_buffer) result._vert_buffer->AddRef();
 
@@ -606,11 +605,10 @@ void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 
 ///////////////////////////////////////////
 
-void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
+void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
 	if (ind_buffer && ind_buffer->_buffer) ind_buffer->_buffer->AddRef();
 	if (mesh->_ind_buffer)                 mesh->_ind_buffer->Release();
 	mesh->_ind_buffer = ind_buffer->_buffer;
-	mesh->_ind_format = skg_ind_to_dxgi(ind_format);
 }
 
 ///////////////////////////////////////////
@@ -619,7 +617,7 @@ void skg_mesh_bind(const skg_mesh_t *mesh) {
 	UINT strides[] = { sizeof(skg_vert_t) };
 	UINT offsets[] = { 0 };
 	d3d_context->IASetVertexBuffers(0, 1, &mesh->_vert_buffer, strides, offsets);
-	d3d_context->IASetIndexBuffer  (mesh->_ind_buffer, mesh->_ind_format, 0);
+	d3d_context->IASetIndexBuffer  (mesh->_ind_buffer, DXGI_FORMAT_R32_UINT, 0);
 }
 
 ///////////////////////////////////////////
@@ -628,32 +626,6 @@ void skg_mesh_destroy(skg_mesh_t *mesh) {
 	if (mesh->_ind_buffer ) mesh->_ind_buffer ->Release();
 	if (mesh->_vert_buffer) mesh->_vert_buffer->Release();
 	*mesh = {};
-}
-
-///////////////////////////////////////////
-// skg_vert_fmt_t                        //
-///////////////////////////////////////////
-
-skg_vert_format_t skg_vert_format_create(skg_vert_component_t *components, int32_t component_count) {
-	skg_vert_format_t result = {};
-
-	size_t size = sizeof(skg_vert_component_t) * component_count;
-	result.components      = (skg_vert_component_t*)malloc(size);
-	result.component_count = component_count;
-	memcpy(result.components, components, size);
-
-	for (int32_t i = 0; i < component_count; i++) {
-		result.size += skg_fmt_size(components[i].format) * components[i].count;
-	}
-	
-	return result;
-}
-
-///////////////////////////////////////////
-
-void skg_vert_format_destroy(skg_vert_format_t *format) {
-	free(format->components);
-	*format = {};
 }
 
 ///////////////////////////////////////////

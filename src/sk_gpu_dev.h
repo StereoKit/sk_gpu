@@ -276,7 +276,6 @@ typedef struct skg_vert_t {
 	float         uv  [2];
 	skg_color32_t col;
 } skg_vert_t;
-extern skg_vert_component_t skg_vert_layout[4];
 
 typedef struct skg_bind_t {
 	uint16_t slot;
@@ -376,15 +375,12 @@ SKG_API void                skg_buffer_bind              (const skg_buffer_t *bu
 SKG_API void                skg_buffer_clear             (      skg_bind_t bind);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 
-SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_vert_format_t *vert_format, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format);
+SKG_API skg_mesh_t          skg_mesh_create              (const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer);
 SKG_API void                skg_mesh_name                (      skg_mesh_t *mesh, const char* name);
-SKG_API void                skg_mesh_set_verts           (      skg_mesh_t *mesh, const skg_buffer_t *vert_buffer, const skg_vert_format_t *vert_format);
-SKG_API void                skg_mesh_set_inds            (      skg_mesh_t *mesh, const skg_buffer_t *ind_buffer,  skg_ind_fmt_ ind_format);
+SKG_API void                skg_mesh_set_verts           (      skg_mesh_t *mesh, const skg_buffer_t *vert_buffer);
+SKG_API void                skg_mesh_set_inds            (      skg_mesh_t *mesh, const skg_buffer_t *ind_buffer);
 SKG_API void                skg_mesh_bind                (const skg_mesh_t *mesh);
 SKG_API void                skg_mesh_destroy             (      skg_mesh_t *mesh);
-
-SKG_API skg_vert_format_t   skg_vert_format_create       (const skg_vert_component_t *components, int32_t component_count);
-SKG_API void                skg_vert_format_destroy      (      skg_vert_format_t *format);
 
 SKG_API skg_shader_stage_t  skg_shader_stage_create      (const void *shader_data, size_t shader_size, skg_stage_ type);
 SKG_API void                skg_shader_stage_destroy     (skg_shader_stage_t *stage);

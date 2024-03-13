@@ -38,23 +38,14 @@ typedef struct skg_computebuffer_t {
 } skg_computebuffer_t;
 
 typedef struct skg_mesh_t {
-	ID3D11Buffer*      _ind_buffer;
-	ID3D11Buffer*      _vert_buffer;
-	DXGI_FORMAT        _ind_format;
+	ID3D11Buffer* _ind_buffer;
+	ID3D11Buffer* _vert_buffer;
 } skg_mesh_t;
-
-typedef struct skg_vert_format_t {
-	int32_t               size;
-	skg_vert_component_t *components;
-	int32_t               component_count;
-} skg_vert_format_t;
 
 typedef struct skg_shader_stage_t {
 	skg_stage_         type;
-	void*              _shader;
-	ID3D11InputLayout* _layout;
-	void*              _vs_bytes;
-	size_t             _vs_bytes_size;
+	void              *_shader;
+	ID3D11InputLayout *_layout;
 } skg_shader_stage_t;
 
 typedef struct skg_shader_t {

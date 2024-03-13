@@ -13,16 +13,6 @@
 #include <android/asset_manager.h>
 #endif
 
-///////////////////////////////////////////
-
-skg_vert_component_t skg_vert_layout[4] = {
-	{skg_fmt_f32,            3, skg_semantic_position, 0},
-	{skg_fmt_f32,            3, skg_semantic_normal,   0},
-	{skg_fmt_f32,            2, skg_semantic_texcoord, 0},
-	{skg_fmt_ui8_normalized, 4, skg_semantic_color,    0} };
-
-///////////////////////////////////////////
-
 void (*_skg_log)(skg_log_ level, const char *text);
 void skg_callback_log(void (*callback)(skg_log_ level, const char *text)) {
 	_skg_log = callback;

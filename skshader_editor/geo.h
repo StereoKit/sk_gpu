@@ -19,7 +19,7 @@ static inline void  vec2_lerp        (const float *a, const float *b, float t, f
 
 void gen_cube(skg_mesh_t *mesh, skg_buffer_t *v_buffer, skg_buffer_t *i_buffer, int32_t *faces) {
 	skg_vert_t verts[24];
-	uint8_t    inds [36];
+	uint32_t   inds [36];
 	for (size_t i = 0; i < 24; i++) {
 		float neg = (float)((i / 4) % 2 ? -1 : 1);
 		int nx  = ((i+24) / 16) % 2;
@@ -50,10 +50,10 @@ void gen_cube(skg_mesh_t *mesh, skg_buffer_t *v_buffer, skg_buffer_t *i_buffer, 
 		inds[i*6+4] = i*4+2;
 		inds[i*6+5] = i*4+3;
 	}
-
+	
 	*v_buffer = skg_buffer_create(verts, sizeof(verts)/sizeof(skg_vert_t), sizeof(skg_vert_t), skg_buffer_type_vertex, skg_use_static);
-	*i_buffer = skg_buffer_create(inds,  sizeof(inds )/sizeof(uint8_t   ), sizeof(uint8_t),    skg_buffer_type_index,  skg_use_static);
-	*mesh     = skg_mesh_create  (v_buffer, nullptr, i_buffer, skg_ind_fmt_u8);
+	*i_buffer = skg_buffer_create(inds,  sizeof(inds )/sizeof(uint32_t  ), sizeof(uint32_t),   skg_buffer_type_index,  skg_use_static);
+	*mesh     = skg_mesh_create  (v_buffer, i_buffer);
 	*faces    = 36;
 }
 
@@ -77,14 +77,14 @@ void mesh_gen_cube_vert(int i, float* size, float* pos, float* norm, float* uv) 
 ///////////////////////////////////////////
 
 void gen_sphere(float diameter, int32_t subdivisions, skg_mesh_t *mesh, skg_buffer_t *v_buffer, skg_buffer_t *i_buffer, int32_t *faces) {
-	uint16_t subd   = (uint16_t)subdivisions;
+	uint32_t subd   = (uint32_t)subdivisions;
 
 	subd = (subd<0?0:subd) + 2;
 
 	int vert_count = 6*subd*subd;
 	int ind_count  = 6*(subd-1)*(subd-1)*6;
 	skg_vert_t *verts = (skg_vert_t*)malloc(sizeof(skg_vert_t) * vert_count);
-	uint16_t   *inds  = (uint16_t  *)malloc(sizeof(uint16_t  ) * ind_count);
+	uint32_t   *inds  = (uint32_t  *)malloc(sizeof(uint32_t  ) * ind_count);
 
 	float    size[3] = {1,1,1};
 	float    radius = diameter / 2;
@@ -141,8 +141,8 @@ void gen_sphere(float diameter, int32_t subdivisions, skg_mesh_t *mesh, skg_buff
 	}
 
 	*v_buffer = skg_buffer_create(verts, vert_count, sizeof(skg_vert_t), skg_buffer_type_vertex, skg_use_static);
-	*i_buffer = skg_buffer_create(inds,  ind_count,  sizeof(uint16_t),   skg_buffer_type_index,  skg_use_static);
-	*mesh     = skg_mesh_create  (v_buffer, nullptr, i_buffer, skg_ind_fmt_u16);
+	*i_buffer = skg_buffer_create(inds,  ind_count,  sizeof(uint32_t),   skg_buffer_type_index,  skg_use_static);
+	*mesh     = skg_mesh_create  (v_buffer, i_buffer);
 	*faces    = ind_count;
 
 	free(verts);

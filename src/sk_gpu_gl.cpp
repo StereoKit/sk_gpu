@@ -279,8 +279,7 @@
 #define GL_UNSIGNED_SHORT 0x1403
 #define GL_INT 0x1404
 #define GL_UNSIGNED_INT 0x1405
-#define GL_UNSIGNED_INT_24_8 0x84FA;
-#define GL_HALF_FLOAT 0x140b
+#define GL_UNSIGNED_INT_24_8 0x84FA
 #define GL_FLOAT 0x1406
 #define GL_HALF_FLOAT 0x140B
 #define GL_DOUBLE 0x140A
@@ -437,16 +436,14 @@ static void gl_load_extensions( ) {
 int32_t     gl_active_width        = 0;
 int32_t     gl_active_height       = 0;
 skg_tex_t  *gl_active_rendertarget = nullptr;
-uint32_t    gl_active_index_fmt    = GL_UNSIGNED_INT;
 uint32_t    gl_current_framebuffer = 0;
 char*       gl_adapter_name        = nullptr;
 
 ///////////////////////////////////////////
 
-uint32_t skg_buffer_type_to_gl      (skg_buffer_type_ type);
-uint32_t skg_tex_fmt_to_gl_type     (skg_tex_fmt_ format);
-uint32_t skg_tex_fmt_to_gl_layout   (skg_tex_fmt_ format);
-uint32_t skg_vert_format_make_layout(const skg_vert_format_t *format);
+uint32_t skg_buffer_type_to_gl   (skg_buffer_type_ type);
+uint32_t skg_tex_fmt_to_gl_type  (skg_tex_fmt_ format);
+uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format);
 
 ///////////////////////////////////////////
 
@@ -984,9 +981,9 @@ void skg_event_end () {
 
 void skg_draw(int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count) {
 #ifdef _SKG_GL_WEB
-	glDrawElementsInstanced(GL_TRIANGLES, index_count, gl_active_index_fmt, (void*)(index_start*sizeof(uint32_t)), instance_count);
+	glDrawElementsInstanced(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count);
 #else
-	glDrawElementsInstancedBaseVertex(GL_TRIANGLES, index_count, gl_active_index_fmt, (void*)(index_start*sizeof(uint32_t)), instance_count, index_base);
+	glDrawElementsInstancedBaseVertex(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, (void*)(index_start*sizeof(uint32_t)), instance_count, index_base);
 #endif
 }
 
@@ -1093,10 +1090,10 @@ void skg_buffer_destroy(skg_buffer_t *buffer) {
 
 ///////////////////////////////////////////
 
-skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_vert_format_t *vert_format, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
+skg_mesh_t skg_mesh_create(const skg_buffer_t *vert_buffer, const skg_buffer_t *ind_buffer) {
 	skg_mesh_t result = {};
-	skg_mesh_set_verts(&result, vert_buffer, vert_format);
-	skg_mesh_set_inds (&result, ind_buffer,  ind_format);
+	skg_mesh_set_verts(&result, vert_buffer);
+	skg_mesh_set_inds (&result, ind_buffer);
 
 	return result;
 }
@@ -1117,29 +1114,36 @@ void skg_mesh_name(skg_mesh_t *mesh, const char* name) {
 
 ///////////////////////////////////////////
 
-void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer, const skg_vert_format_t *vert_format) {
+void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 	mesh->_vert_buffer = vert_buffer ? vert_buffer->_buffer : 0;
-
 	if (mesh->_vert_buffer != 0) {
 		if (mesh->_layout != 0) {
 			glDeleteVertexArrays(1, &mesh->_layout);
 			mesh->_layout = 0;
 		}
+
 		glBindBuffer(GL_ARRAY_BUFFER, mesh->_vert_buffer);
-		mesh->_layout = skg_vert_format_make_layout(vert_format);
+
+		// Create a vertex layout
+		glGenVertexArrays(1, &mesh->_layout);
+		glBindVertexArray(mesh->_layout);
+		// enable the vertex data for the shader
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(2);
+		glEnableVertexAttribArray(3);
+		// tell the shader how our vertex data binds to the shader inputs
+		glVertexAttribPointer(0, 3, GL_FLOAT,         0, sizeof(skg_vert_t), nullptr);
+		glVertexAttribPointer(1, 3, GL_FLOAT,         0, sizeof(skg_vert_t), (void*)(sizeof(float) * 3));
+		glVertexAttribPointer(2, 2, GL_FLOAT,         0, sizeof(skg_vert_t), (void*)(sizeof(float) * 6));
+		glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, 1, sizeof(skg_vert_t), (void*)(sizeof(float) * 8));
 	}
 }
 
 ///////////////////////////////////////////
 
-void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer, skg_ind_fmt_ ind_format) {
+void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
 	mesh->_ind_buffer = ind_buffer ? ind_buffer->_buffer : 0;
-	switch(ind_format) {
-		case skg_ind_fmt_u32: mesh->_ind_format = GL_UNSIGNED_INT;   break;
-		case skg_ind_fmt_u16: mesh->_ind_format = GL_UNSIGNED_SHORT; break;
-		case skg_ind_fmt_u8:  mesh->_ind_format = GL_UNSIGNED_BYTE;  break;
-		default: break;
-	}
 }
 
 ///////////////////////////////////////////
@@ -1148,7 +1152,6 @@ void skg_mesh_bind(const skg_mesh_t *mesh) {
 	glBindVertexArray(mesh->_layout);
 	glBindBuffer(GL_ARRAY_BUFFER,         mesh->_vert_buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer );
-	gl_active_index_fmt = mesh->_ind_format;
 }
 
 ///////////////////////////////////////////
@@ -1157,73 +1160,6 @@ void skg_mesh_destroy(skg_mesh_t *mesh) {
 	uint32_t vao_list[] = {mesh->_layout};
 	glDeleteVertexArrays(1, vao_list);
 	*mesh = {};
-}
-
-///////////////////////////////////////////
-// skg_vert_format_t                     //
-///////////////////////////////////////////
-
-skg_vert_format_t skg_vert_format_create(const skg_vert_component_t *components, int32_t component_count) {
-	skg_vert_format_t result = {};
-
-	size_t size = sizeof(skg_vert_component_t) * component_count;
-	result.components      = (skg_vert_component_t*)malloc(size);
-	result.component_count = component_count;
-	memcpy(result.components, components, size);
-
-	for (int32_t i = 0; i < component_count; i++) {
-		result.size += skg_fmt_size(components[i].format) * components[i].count;
-	}
-	
-	return result;
-}
-
-///////////////////////////////////////////
-
-uint32_t skg_vert_format_make_layout(const skg_vert_format_t* format) {//, const skg_buffer_t* vertex_buffer, const skg_shader_t* shader) {
-	uint32_t result = 0;
-
-	// Create a vertex layout
-	glGenVertexArrays(1, &result);
-	glBindVertexArray(result);
-	uint64_t offset = 0;
-	for (int32_t i = 0; i < format->component_count; i++) {
-		uint32_t normalized = 0;
-		uint32_t gl_format  = 0;
-		switch (format->components[i].format) {
-		case skg_fmt_f64:             gl_format = GL_DOUBLE;         normalized = 0; break;
-		case skg_fmt_f32:             gl_format = GL_FLOAT;          normalized = 0; break;
-		case skg_fmt_f16:             gl_format = GL_HALF_FLOAT;     normalized = 0; break;
-		case skg_fmt_i32:             gl_format = GL_INT;            normalized = 0; break;
-		case skg_fmt_ui32:            gl_format = GL_UNSIGNED_INT;   normalized = 0; break;
-		case skg_fmt_i32_normalized:  gl_format = GL_INT;            normalized = 1; break;
-		case skg_fmt_ui32_normalized: gl_format = GL_UNSIGNED_INT;   normalized = 1; break;
-		case skg_fmt_i16:             gl_format = GL_SHORT;          normalized = 0; break;
-		case skg_fmt_ui16:            gl_format = GL_UNSIGNED_SHORT; normalized = 0; break;
-		case skg_fmt_i16_normalized:  gl_format = GL_SHORT;          normalized = 1; break;
-		case skg_fmt_ui16_normalized: gl_format = GL_UNSIGNED_SHORT; normalized = 1; break;
-		case skg_fmt_i8:              gl_format = GL_BYTE;           normalized = 0; break;
-		case skg_fmt_ui8:             gl_format = GL_UNSIGNED_BYTE;  normalized = 0; break;
-		case skg_fmt_i8_normalized:   gl_format = GL_BYTE;           normalized = 1; break;
-		case skg_fmt_ui8_normalized:  gl_format = GL_UNSIGNED_BYTE;  normalized = 1; break;
-		}
-
-		glEnableVertexAttribArray(i);
-		glVertexAttribPointer(i, format->components[i].count, gl_format, normalized, (int32_t)format->size, (void*)offset);
-		//glBindAttribLocation()
-
-		offset += skg_fmt_size(format->components[i].format) * format->components[i].count;
-	}
-	glBindVertexArray(0);
-
-	return result;
-}
-
-///////////////////////////////////////////
-
-void skg_vert_format_destroy(skg_vert_format_t *format) {
-	free(format->components);
-	*format = {};
 }
 
 ///////////////////////////////////////////

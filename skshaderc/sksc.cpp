@@ -92,6 +92,13 @@ enum compile_result_ {
 	compile_result_skip = -1,
 };
 
+struct sksc_meta_item_t {
+	char name [32];
+	char tag  [64];
+	char value[512];
+	int32_t row, col;
+};
+
 ///////////////////////////////////////////
 
 int strcmp_nocase(char const *a, char const *b) {
@@ -104,10 +111,11 @@ int strcmp_nocase(char const *a, char const *b) {
 
 ///////////////////////////////////////////
 
-void sksc_meta_find_defaults    (const char *hlsl_text, skg_shader_meta_t *ref_meta);
-bool sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta);
+array_t<sksc_meta_item_t> sksc_meta_find_defaults    (const char *hlsl_text);
+void                      sksc_meta_assign_defaults  (array_t<sksc_meta_item_t> items, skg_shader_meta_t *ref_meta);
+bool                      sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta);
 
-bool sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta);
+bool sksc_spvc_compile_stage    (const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta, array_t<sksc_meta_item_t> var_meta);
 bool sksc_spvc_read_meta        (const skg_shader_file_stage_t *spirv_stage, skg_shader_meta_t *meta);
 
 void sksc_line_col              (const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
@@ -955,7 +963,8 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 	*out_file->meta = {};
 	 out_file->meta->references = 1;
 
-	array_t<skg_shader_file_stage_t> stages = {};
+	array_t<skg_shader_file_stage_t> stages   = {};
+	array_t<sksc_meta_item_t>        var_meta = sksc_meta_find_defaults(hlsl_text);
 
 	skg_stage_ compile_stages[3] = { skg_stage_vertex, skg_stage_pixel, skg_stage_compute };
 	char      *entrypoints   [3] = { settings->vs_entrypoint,    settings->ps_entrypoint,    settings->cs_entrypoint };
@@ -1002,7 +1011,6 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		}
 		sksc_spvc_read_meta(&spirv_stage, out_file->meta);
 #endif
-		sksc_meta_find_defaults(hlsl_text, out_file->meta);
 
 #if defined(SKSC_D3D11)
 		
@@ -1029,7 +1037,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (settings->target_langs[skg_shader_lang_glsl]) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta)) {
+			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta, var_meta)) {
 				sksc_log(log_level_err, "GLSL shader compile failed");
 				return false;
 			}
@@ -1037,7 +1045,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute && settings->target_langs[skg_shader_lang_glsl_es]) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta)) {
+			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta, var_meta)) {
 				sksc_log(log_level_err, "GLES shader compile failed");
 				return false;
 			}
@@ -1045,7 +1053,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute && settings->target_langs[skg_shader_lang_glsl_web]) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta)) {
+			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta, var_meta)) {
 				sksc_log(log_level_err, "GLSL web shader compile failed");
 				return false;
 			}
@@ -1055,7 +1063,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (!settings->target_langs[skg_shader_lang_spirv])
 			free(spirv_stage.code);
 	}
-
+	sksc_meta_assign_defaults(var_meta, out_file->meta);
 	out_file->stage_count = (uint32_t)stages.count;
 	out_file->stages      = stages.data;
 
@@ -1257,7 +1265,7 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 int64_t mini(int64_t a, int64_t b) {return a<b?a:b;}
 int64_t maxi(int64_t a, int64_t b) {return a>b?a:b;}
 
-void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta) {
+array_t<sksc_meta_item_t> sksc_meta_find_defaults(const char *hlsl_text) {
 	// Searches for metadata in comments that look like this:
 	//--name                 = unlit/test
 	//--time: color          = 1,1,1,1
@@ -1268,6 +1276,8 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 	// |indicator|param name|tag separator|tag string|default separator|comma separated default values
 	//  --        time       :             color      =                 1,1,1,1
 	// Metadata can be in // as well as /**/ comments
+
+	array_t<sksc_meta_item_t> items = {};
 
 	// This function will get each line of comment from the file
 	const char *(*next_comment)(const char *src, const char **ref_end, bool *ref_state) = [](const char *src, const char **ref_end, bool *ref_state) {
@@ -1328,16 +1338,6 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 		return (const char*)nullptr;
 	};
 
-	int32_t(*count_ch)(const char *str, char ch) = [](const char *str, char ch) {
-		const char *c      = str;
-		int32_t     result = 0;
-		while (*c != '\0') {
-			if (*c == ch) result++;
-			c++;
-		}
-		return result;
-	};
-
 	bool        in_comment  = false;
 	const char *comment_end = nullptr;
 	const char *comment     = next_comment(hlsl_text, &comment_end, &in_comment);
@@ -1375,93 +1375,104 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 				value[ct] = '\0';
 			}
 
-			skg_shader_buffer_t *buff  = ref_meta->global_buffer_id == -1 ? nullptr : &ref_meta->buffers[ref_meta->global_buffer_id];
-			int32_t              found = 0;
-			for (size_t i = 0; buff && i < buff->var_count; i++) {
-				if (strcmp(buff->vars[i].name, name) == 0) {
-					found += 1;
-					strncpy(buff->vars[i].extra, tag, sizeof(buff->vars[i].extra));
+			sksc_meta_item_t item = {};
+			sksc_line_col(hlsl_text, comment, &item.row, &item.col);
+			strncpy(item.name,  name,  sizeof(item.name));
+			strncpy(item.tag,   tag,   sizeof(item.tag));
+			strncpy(item.value, value, sizeof(item.value));
+			items.add(item);
 
-					if (value_str) {
-						int32_t commas = count_ch(value, ',');
-
-						if (buff->vars[i].type == skg_shader_var_none) {
-							int32_t line, col;
-							sksc_line_col(hlsl_text, value_str, &line, &col);
-							sksc_log_at(log_level_warn, line, col, "Can't set default for --%s, unimplemented type", name);
-						} else if (commas + 1 != buff->vars[i].type_count) {
-							int32_t line, col;
-							sksc_line_col(hlsl_text, value_str, &line, &col);
-							sksc_log_at(log_level_warn, line, col, "Default value for --%s has an incorrect number of arguments", name);
-						} else {
-							if (buff->defaults == nullptr) {
-								buff->defaults = malloc(buff->size);
-								memset(buff->defaults, 0, buff->size);
-							}
-							uint8_t *write_at = ((uint8_t *)buff->defaults) + buff->vars[i].offset;
-
-							char *start = value;
-							char *end   = strchr(start, ',');
-							char  item[64];
-							for (size_t c = 0; c <= commas; c++) {
-								int32_t length = (int32_t)(end == nullptr ? mini(sizeof(item)-1, strlen(value)) : end - start);
-								memcpy(item, start, mini(sizeof(item), length));
-								item[length] = '\0';
-
-								double d = atof(item);
-
-								switch (buff->vars[i].type) {
-								case skg_shader_var_float:  {float    v = (float   )d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
-								case skg_shader_var_double: {double   v =           d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
-								case skg_shader_var_int:    {int32_t  v = (int32_t )d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
-								case skg_shader_var_uint:   {uint32_t v = (uint32_t)d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
-								case skg_shader_var_uint8:  {uint8_t  v = (uint8_t )d; memcpy(write_at, &v, sizeof(v)); write_at += sizeof(v); }break;
-								}
-
-								if (end != nullptr) {
-									start = end + 1;
-									end   = strchr(start, ',');
-								}
-							}
-						}
-					}
-					break;
-				}
-			}
-			for (size_t i = 0; i < ref_meta->resource_count; i++) {
-				if (strcmp(ref_meta->resources[i].name, name) == 0) {
-					if (tag_str) {
-						strncpy(ref_meta->resources[i].tags, tag, sizeof(ref_meta->resources[i].tags));
-					}
-
-					if (value_str) {
-						found += 1;
-						strncpy(ref_meta->resources[i].value, value, sizeof(ref_meta->resources[i].value));
-					} else {
-						int32_t line, col;
-						sksc_line_col(hlsl_text, value_str, &line, &col);
-						sksc_log_at(log_level_warn, line, col, "--%s doesn't properly provide a value", name);
-					}
-					break;
-				}
-			}
-			if (strcmp(name, "name") == 0) {
-				found += 1;
-				strncpy(ref_meta->name, value, sizeof(ref_meta->name));
-			}
-			
-			// TODO: This throws warnings now that we're doing this whole function multiple times! Early runs don't have all vars present, and it doesn't love that.
-			if (found != 1) {
-				int32_t line, col;
-				sksc_line_col(hlsl_text, name_start, &line, &col);
-				sksc_log_at(log_level_warn, line, col, "Can't find shader var named '%s'", name);
-			} else if (!tag_str && !value_str) {
-				int32_t line, col;
-				sksc_line_col(hlsl_text, tag_str, &line, &col);
-				sksc_log_at(log_level_warn, line, col, "Shader var tag for %s not used, missing a ':' or '='?", name);
+			if (tag[0] == '\0' && value[0] == '\0') {
+				sksc_log_at(log_level_warn, item.row, item.col, "Shader var data for '%s' has no tag or value, missing a ':' or '='?", name);
 			}
 		}
 		comment = next_comment(hlsl_text, &comment_end, &in_comment);
+	}
+	return items;
+}
+
+///////////////////////////////////////////
+
+void sksc_meta_assign_defaults(array_t<sksc_meta_item_t> items, skg_shader_meta_t *ref_meta) {
+	int32_t(*count_ch)(const char *str, char ch) = [](const char *str, char ch) {
+		const char *c      = str;
+		int32_t     result = 0;
+		while (*c != '\0') {
+			if (*c == ch) result++;
+			c++;
+		}
+		return result;
+	};
+
+	for (size_t i = 0; i < items.count; i++) {
+		sksc_meta_item_t    *item  = &items[i];
+		skg_shader_buffer_t *buff  = ref_meta->global_buffer_id == -1 ? nullptr : &ref_meta->buffers[ref_meta->global_buffer_id];
+		int32_t              found = 0;
+		for (size_t v = 0; buff && v < buff->var_count; v++) {
+			if (strcmp(buff->vars[v].name, item->name) != 0) continue;
+			
+			found += 1;
+			strncpy(buff->vars[v].extra, item->tag, sizeof(buff->vars[v].extra));
+
+			if (item->value[0] == '\0') break;
+
+			int32_t commas = count_ch(item->value, ',');
+
+			if (buff->vars[v].type == skg_shader_var_none) {
+				sksc_log_at(log_level_warn, item->row, item->col, "Can't set default for --%s, unimplemented type", item->name);
+			} else if (commas + 1 != buff->vars[v].type_count) {
+				sksc_log_at(log_level_warn, item->row, item->col, "Default value for --%s has an incorrect number of arguments", item->name);
+			} else {
+				if (buff->defaults == nullptr) {
+					buff->defaults = malloc(buff->size);
+					memset(buff->defaults, 0, buff->size);
+				}
+				uint8_t *write_at = ((uint8_t *)buff->defaults) + buff->vars[v].offset;
+
+				char *start = item->value;
+				char *end   = strchr(start, ',');
+				char  param[64];
+				for (size_t c = 0; c <= commas; c++) {
+					int32_t length = (int32_t)(end == nullptr ? mini(sizeof(param)-1, strlen(item->value)) : end - start);
+					memcpy(param, start, mini(sizeof(param), length));
+					param[length] = '\0';
+
+					double d = atof(param);
+
+					switch (buff->vars[v].type) {
+					case skg_shader_var_float:  {float    val = (float   )d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_double: {double   val =           d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_int:    {int32_t  val = (int32_t )d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_uint:   {uint32_t val = (uint32_t)d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_uint8:  {uint8_t  val = (uint8_t )d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
+					}
+
+					if (end != nullptr) {
+						start = end + 1;
+						end   = strchr(start, ',');
+					}
+				}
+			}
+			break;
+		}
+
+		for (size_t r = 0; r < ref_meta->resource_count; r++) {
+			if (strcmp(ref_meta->resources[r].name, item->name) != 0) continue;
+			found += 1;
+
+			strncpy(ref_meta->resources[r].tags,  item->tag,   sizeof(ref_meta->resources[r].tags ));
+			strncpy(ref_meta->resources[r].value, item->value, sizeof(ref_meta->resources[r].value));
+			break;
+		}
+
+		if (strcmp(item->name, "name") == 0) {
+			found += 1;
+			strncpy(ref_meta->name, item->value, sizeof(ref_meta->name));
+		}
+		
+		if (found != 1) {
+			sksc_log_at(log_level_warn, item->row, item->col, "Can't find shader var named '%s'", item->name);
+		}
 	}
 }
 
@@ -1503,7 +1514,7 @@ bool sksc_check_tags(const char *tag_list, const char *tag) {
 
 ///////////////////////////////////////////
 
-bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta) {
+bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta, array_t<sksc_meta_item_t> var_meta) {
 	try {
 		// Create compiler instance
 		spirv_cross::CompilerGLSL glsl((uint32_t*)src_stage->code, src_stage->code_size/ sizeof(uint32_t));
@@ -1540,14 +1551,13 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 
 		// Convert tagged textures to use OES samplers
 		glsl.set_variable_type_remap_callback([&](const spirv_cross::SPIRType& type, const std::string& var_name, std::string& name_of_type) {
-			for (size_t i = 0; i < meta->resource_count; i++) {
-				if (meta->resources[i].name == var_name) {
-					if (sksc_check_tags(meta->resources[i].tags, "external")) {
-						printf("Remapping %s\n", var_name.c_str());
-						name_of_type = "samplerExternalOES";
-						break;
-					}
+			for (size_t i = 0; i < var_meta.count; i++) {
+				if (strcmp(var_meta[i].name, var_name.c_str()) != 0) continue;
+				if (sksc_check_tags(var_meta[i].tag, "external")) {
+					printf("Remapping %s\n", var_name.c_str());
+					name_of_type = "samplerExternalOES";
 				}
+				break;
 			}
 		});
 

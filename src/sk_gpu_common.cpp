@@ -582,7 +582,8 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 	for (uint32_t i = 0; i < out_file->meta->resource_count; i++) {
 		skg_shader_resource_t *res = &out_file->meta->resources[i];
 		memcpy( res->name,  &bytes[at], sizeof(res->name )); at += sizeof(res->name );
-		memcpy( res->extra, &bytes[at], sizeof(res->extra)); at += sizeof(res->extra);
+		memcpy( res->value, &bytes[at], sizeof(res->value)); at += sizeof(res->value);
+		memcpy( res->tags,  &bytes[at], sizeof(res->tags )); at += sizeof(res->tags );
 		memcpy(&res->bind,  &bytes[at], sizeof(res->bind )); at += sizeof(res->bind );
 		res->name_hash = skg_hash(res->name);
 	}

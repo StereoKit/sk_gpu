@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
-
+#define NOMINMAX
 ///////////////////////////////////////////
 
 /*#pragma comment(lib,"spirv-cross-c.lib")
@@ -30,6 +30,7 @@
 #endif
 
 #include <spirv_cross_c.h>
+#include <spirv_glsl.hpp>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1001,6 +1002,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		}
 		sksc_spvc_read_meta(&spirv_stage, out_file->meta);
 #endif
+		sksc_meta_find_defaults(hlsl_text, out_file->meta);
 
 #if defined(SKSC_D3D11)
 		
@@ -1054,7 +1056,6 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 			free(spirv_stage.code);
 	}
 
-	sksc_meta_find_defaults(hlsl_text, out_file->meta);
 	out_file->stage_count = (uint32_t)stages.count;
 	out_file->stages      = stages.data;
 
@@ -1234,7 +1235,8 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 	for (uint32_t i = 0; i < file->meta->resource_count; i++) {
 		skg_shader_resource_t *res = &file->meta->resources[i];
 		data.write_fixed_str(res->name,  sizeof(res->name));
-		data.write_fixed_str(res->extra, sizeof(res->extra));
+		data.write_fixed_str(res->value, sizeof(res->value));
+		data.write_fixed_str(res->tags,  sizeof(res->tags));
 		data.write(res->bind);
 	}
 
@@ -1259,7 +1261,7 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 	// Searches for metadata in comments that look like this:
 	//--name                 = unlit/test
 	//--time: color          = 1,1,1,1
-	//--tex: 2D              = white
+	//--tex: 2D, external    = white
 	//--uv_scale: range(0,2) = 0.5
 	// Where --name is a unique keyword indicating the shader's name, and
 	// other elements follow the pattern of:
@@ -1428,9 +1430,13 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 			}
 			for (size_t i = 0; i < ref_meta->resource_count; i++) {
 				if (strcmp(ref_meta->resources[i].name, name) == 0) {
+					if (tag_str) {
+						strncpy(ref_meta->resources[i].tags, tag, sizeof(ref_meta->resources[i].tags));
+					}
+
 					if (value_str) {
 						found += 1;
-						strncpy(ref_meta->resources[i].extra, value, sizeof(ref_meta->resources[i].extra));
+						strncpy(ref_meta->resources[i].value, value, sizeof(ref_meta->resources[i].value));
 					} else {
 						int32_t line, col;
 						sksc_line_col(hlsl_text, value_str, &line, &col);
@@ -1444,7 +1450,7 @@ void sksc_meta_find_defaults(const char *hlsl_text, skg_shader_meta_t *ref_meta)
 				strncpy(ref_meta->name, value, sizeof(ref_meta->name));
 			}
 			
-
+			// TODO: This throws warnings now that we're doing this whole function multiple times! Early runs don't have all vars present, and it doesn't love that.
 			if (found != 1) {
 				int32_t line, col;
 				sksc_line_col(hlsl_text, name_start, &line, &col);
@@ -1475,112 +1481,131 @@ bool sksc_meta_check_dup_buffers(const skg_shader_meta_t *ref_meta) {
 
 ///////////////////////////////////////////
 
+bool sksc_check_tags(const char *tag_list, const char *tag) {
+	const char *start = tag_list;
+	const char *end   = tag_list;
+	while (*end != '\0') {
+		if (*end == ',' || *end == ' ') {
+			size_t length = end - start;
+			if (length > 0 && strncmp(start, tag, length) == 0) {
+				return true;
+			}
+			start = end + 1;
+		}
+		end++;
+	}
+	size_t length = end - start;
+	if (length > 0 && strncmp(start, tag, length) == 0) {
+		return true;
+	}
+	return false;
+}
+
+///////////////////////////////////////////
+
 bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta) {
-	spvc_context context = nullptr;
-	spvc_context_create            (&context);
-	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
-		sksc_log(log_level_err, "[SPIRV-Cross] %s", error);
-	}, nullptr);
+	try {
+		// Create compiler instance
+		spirv_cross::CompilerGLSL glsl((uint32_t*)src_stage->code, src_stage->code_size/ sizeof(uint32_t));
 
-	spvc_compiler  compiler_glsl = nullptr;
-	spvc_parsed_ir ir            = nullptr;
-	spvc_context_parse_spirv    (context, (const SpvId*)src_stage->code, src_stage->code_size/sizeof(SpvId), &ir);
-	spvc_context_create_compiler(context, SPVC_BACKEND_GLSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &compiler_glsl);
+		// Set up compiler options
+		spirv_cross::CompilerGLSL::Options options;
+		if (lang == skg_shader_lang_glsl_web) {
+			options.version = 300;
+			options.es      = true;
+			options.vertex.support_nonzero_base_instance = false;
+		} else if (lang == skg_shader_lang_glsl_es) {
+			options.version = 320;
+			options.es      = true;
+			options.vertex.support_nonzero_base_instance = false;
+		} else if (lang == skg_shader_lang_glsl) {
+			options.version = settings->gl_version;
+			options.es = false;
+		}
+		glsl.set_common_options(options);
 
-	spvc_resources resources = nullptr;
-	spvc_compiler_create_shader_resources(compiler_glsl, &resources);
+		// Reflect shader resources
+		spirv_cross::ShaderResources resources = glsl.get_shader_resources();
 
-	// Ensure buffer ids stay the same
-	const spvc_reflected_resource *list = nullptr;
-	size_t                         count;
-	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_UNIFORM_BUFFER, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-		for (size_t b = 0; b < meta->buffer_count; b++) {
-			const char *name = spvc_compiler_get_name(compiler_glsl, list[i].id);
-			if (strcmp(meta->buffers[b].name, name) == 0 || (strcmp(name, "_Global") == 0 && strcmp(meta->buffers[b].name, "$Global") == 0)) {
-				spvc_compiler_set_decoration(compiler_glsl, list[i].id, SpvDecorationBinding, meta->buffers[b].bind.slot);
-				break;
+		// Ensure buffer ids stay the same
+		for (spirv_cross::Resource &resource : resources.uniform_buffers) {
+			const std::string &name = glsl.get_name(resource.id);
+			for (size_t b = 0; b < meta->buffer_count; b++) {
+				if (name == meta->buffers[b].name || (name == "_Global" && meta->buffers[b].name == "$Global")) {
+					glsl.set_decoration(resource.id, spv::DecorationBinding, meta->buffers[b].bind.slot);
+					break;
+				}
 			}
 		}
-	}
 
-	// Modify options.
-	spvc_compiler_options options = nullptr;
-	spvc_compiler_create_compiler_options(compiler_glsl, &options);
-	if (lang == skg_shader_lang_glsl_web) {
-		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 300);
-		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
-		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_SUPPORT_NONZERO_BASE_INSTANCE, SPVC_FALSE);
-	} else if (lang == skg_shader_lang_glsl_es) {
-		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 320);
-		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_TRUE);
-		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_SUPPORT_NONZERO_BASE_INSTANCE, SPVC_FALSE);
-	} else if (lang == skg_shader_lang_glsl) {
-		spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, settings->gl_version);
-		spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_ES, SPVC_FALSE);
-	}
-	spvc_compiler_install_compiler_options(compiler_glsl, options);
-	if (src_stage->stage == skg_stage_vertex) {
+		// Convert tagged textures to use OES samplers
+		glsl.set_variable_type_remap_callback([&](const spirv_cross::SPIRType& type, const std::string& var_name, std::string& name_of_type) {
+			for (size_t i = 0; i < meta->resource_count; i++) {
+				if (meta->resources[i].name == var_name) {
+					if (sksc_check_tags(meta->resources[i].tags, "external")) {
+						printf("Remapping %s\n", var_name.c_str());
+						name_of_type = "samplerExternalOES";
+						break;
+					}
+				}
+			}
+		});
 
-		spvc_compiler_add_header_line(compiler_glsl, "#ifdef GL_AMD_vertex_shader_layer");
-		spvc_compiler_add_header_line(compiler_glsl, "#extension GL_AMD_vertex_shader_layer : enable");
-		spvc_compiler_add_header_line(compiler_glsl, "#elif defined(GL_NV_viewport_array2)");
-		spvc_compiler_add_header_line(compiler_glsl, "#extension GL_NV_viewport_array2 : enable");
-		spvc_compiler_add_header_line(compiler_glsl, "#else");
-		spvc_compiler_add_header_line(compiler_glsl, "#define gl_Layer int _dummy_gl_layer_var");
-		spvc_compiler_add_header_line(compiler_glsl, "#endif");
-	}
-
-	spvc_variable_id id;
-	spvc_compiler_build_dummy_sampler_for_combined_images(compiler_glsl, &id);
-	if (id) {
-		spvc_compiler_set_decoration(compiler_glsl, id, SpvDecorationDescriptorSet, 0);
-		spvc_compiler_set_decoration(compiler_glsl, id, SpvDecorationBinding, 0);
-	}
-
-	// combiner samplers/textures for OpenGL/ES
-	spvc_compiler_build_combined_image_samplers(compiler_glsl);
-
-	// Make sure sampler names stay the same in GLSL
-	const spvc_combined_image_sampler *samplers = nullptr;
-	spvc_compiler_get_combined_image_samplers(compiler_glsl, &samplers, &count);
-	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-		const char *name    = spvc_compiler_get_name      (compiler_glsl, samplers[i].image_id);
-		uint32_t    binding = spvc_compiler_get_decoration(compiler_glsl, samplers[i].image_id, SpvDecorationBinding);
-		spvc_compiler_set_name      (compiler_glsl, samplers[i].combined_id, name);
-		spvc_compiler_set_decoration(compiler_glsl, samplers[i].combined_id, SpvDecorationBinding, binding);
-	}
-
-	if (src_stage->stage == skg_stage_vertex || src_stage->stage == skg_stage_pixel) {
-		size_t             off = src_stage->stage == skg_stage_vertex ? sizeof("@entryPointOutput.")-1 : sizeof("input.")-1;
-		spvc_resource_type res = src_stage->stage == skg_stage_vertex
-			? SPVC_RESOURCE_TYPE_STAGE_OUTPUT
-			: SPVC_RESOURCE_TYPE_STAGE_INPUT;
-		
-		spvc_resources_get_resource_list_for_type(resources, res, &list, &count);
-		for (size_t i = 0; i < count; i++) {
-			char fs_name[64];
-			snprintf(fs_name, sizeof(fs_name), "fs_%s", list[i].name+off);
-			spvc_compiler_set_name(compiler_glsl, list[i].id, fs_name);
+		// Add custom header lines for vertex shaders
+		if (src_stage->stage == skg_stage_vertex) {
+			glsl.add_header_line("#ifdef GL_AMD_vertex_shader_layer");
+			glsl.add_header_line("#extension GL_AMD_vertex_shader_layer : enable");
+			glsl.add_header_line("#elif defined(GL_NV_viewport_array2)");
+			glsl.add_header_line("#extension GL_NV_viewport_array2 : enable");
+			glsl.add_header_line("#else");
+			glsl.add_header_line("#define gl_Layer int _dummy_gl_layer_var");
+			glsl.add_header_line("#endif");
 		}
-	}
 
-	const char *result = nullptr;
-	if (spvc_compiler_compile(compiler_glsl, &result) != SPVC_SUCCESS) {
-		spvc_context_destroy(context);
+		// Build dummy sampler for combined images
+		spirv_cross::VariableID dummy_sampler_id = glsl.build_dummy_sampler_for_combined_images();
+		if (dummy_sampler_id) {
+			glsl.set_decoration(dummy_sampler_id, spv::DecorationDescriptorSet, 0);
+			glsl.set_decoration(dummy_sampler_id, spv::DecorationBinding,       0);
+		}
+
+		// Combine samplers and textures
+		glsl.build_combined_image_samplers();
+
+		// Make sure sampler names stay the same in GLSL
+		for (const spirv_cross::CombinedImageSampler &remap : glsl.get_combined_image_samplers()) {
+			const std::string &name    = glsl.get_name      (remap.image_id);
+			uint32_t           binding = glsl.get_decoration(remap.image_id, spv::DecorationBinding);
+			glsl.set_name      (remap.combined_id, name);
+			glsl.set_decoration(remap.combined_id, spv::DecorationBinding, binding);
+		}
+
+		// Rename stage inputs/outputs for vertex/pixel shaders
+		if (src_stage->stage == skg_stage_vertex || src_stage->stage == skg_stage_pixel) {
+			size_t      off = src_stage->stage == skg_stage_vertex ? sizeof("@entryPointOutput.")-1 : sizeof("input.")-1;
+			spirv_cross::SmallVector<spirv_cross::Resource> &stage_resources = src_stage->stage == skg_stage_vertex ? resources.stage_outputs : resources.stage_inputs;
+			for (spirv_cross::Resource &resource : stage_resources) {
+				char fs_name[64];
+				snprintf(fs_name, sizeof(fs_name), "fs_%s", glsl.get_name(resource.id).c_str()+off);
+				glsl.set_name(resource.id, fs_name);
+			}
+		}
+
+		// Compile to GLSL
+		std::string source = glsl.compile();
+
+		// Set output stage details
+		out_stage->stage     = src_stage->stage;
+		out_stage->language  = lang;
+		out_stage->code_size = static_cast<uint32_t>(source.size()) + 1;
+		out_stage->code      = malloc(out_stage->code_size);
+		strncpy(static_cast<char*>(out_stage->code), source.c_str(), out_stage->code_size);
+
+		return true;
+	} catch (const spirv_cross::CompilerError &e) {
+		sksc_log(log_level_err, "[SPIRV-Cross] %s", e.what());
 		return false;
 	}
-
-	out_stage->stage     = src_stage->stage;
-	out_stage->language  = lang;
-	out_stage->code_size = (uint32_t)strlen(result) + 1;
-	out_stage->code      = malloc(out_stage->code_size);
-	strncpy((char*)out_stage->code, result, out_stage->code_size);
-
-	// Frees all memory we allocated so far.
-	spvc_context_destroy(context);
-	return true;
 }
 
 ///////////////////////////////////////////

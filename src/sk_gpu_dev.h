@@ -306,7 +306,8 @@ typedef struct skg_shader_buffer_t {
 typedef struct skg_shader_resource_t {
 	char       name [32];
 	uint64_t   name_hash;
-	char       extra[64];
+	char       value[64];
+	char       tags [64];
 	skg_bind_t bind;
 } skg_shader_resource_t;
 

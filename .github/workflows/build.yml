@@ -32,6 +32,10 @@ jobs:
         ref: ${{ inputs.branch }}
     - uses: lukka/get-cmake@v3.26.3
 
+    - name: Cache folder
+      run: |
+        mkdir -p .deps_cache
+
     - name: Get Cache
       uses: actions/cache@v3
       with:
@@ -73,6 +77,10 @@ jobs:
       with:
         ref: ${{ inputs.branch }}
     - uses: lukka/get-cmake@v3.26.3
+
+    - name: Cache folder
+      run: |
+        mkdir -p .deps_cache
 
     - name: Get Cache
       uses: actions/cache@v3
@@ -130,6 +138,10 @@ jobs:
         ref: ${{ inputs.branch }}
     - uses: lukka/get-cmake@v3.26.3
 
+    - name: Cache folder
+      run: |
+        mkdir -p .deps_cache
+        
     - name: Get Cache
       uses: actions/cache@v3
       with:

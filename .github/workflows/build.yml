@@ -1,4 +1,4 @@
-name: Build Package
+name: Build skshaderc
 on: 
   workflow_dispatch:
     inputs:

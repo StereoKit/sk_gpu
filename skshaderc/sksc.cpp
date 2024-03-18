@@ -1554,7 +1554,6 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 			for (size_t i = 0; i < var_meta.count; i++) {
 				if (strcmp(var_meta[i].name, var_name.c_str()) != 0) continue;
 				if (sksc_check_tags(var_meta[i].tag, "external")) {
-					printf("Remapping %s\n", var_name.c_str());
 					name_of_type = "samplerExternalOES";
 				}
 				break;

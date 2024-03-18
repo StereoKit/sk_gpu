@@ -1542,7 +1542,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		for (spirv_cross::Resource &resource : resources.uniform_buffers) {
 			const std::string &name = glsl.get_name(resource.id);
 			for (size_t b = 0; b < meta->buffer_count; b++) {
-				if (name == meta->buffers[b].name || (name == "_Global" && meta->buffers[b].name == "$Global")) {
+				if (strcmp(name.c_str(), meta->buffers[b].name) == 0 || (strcmp(name.c_str(), "_Global") && strcmp(meta->buffers[b].name, "$Global") == 0)) {
 					glsl.set_decoration(resource.id, spv::DecorationBinding, meta->buffers[b].bind.slot);
 					break;
 				}

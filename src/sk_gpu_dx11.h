@@ -38,8 +38,8 @@ typedef struct skg_computebuffer_t {
 } skg_computebuffer_t;
 
 typedef struct skg_mesh_t {
-	ID3D11Buffer *_ind_buffer;
-	ID3D11Buffer *_vert_buffer;
+	ID3D11Buffer* _ind_buffer;
+	ID3D11Buffer* _vert_buffer;
 } skg_mesh_t;
 
 typedef struct skg_shader_stage_t {

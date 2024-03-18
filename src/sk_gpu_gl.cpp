@@ -279,7 +279,7 @@
 #define GL_UNSIGNED_SHORT 0x1403
 #define GL_INT 0x1404
 #define GL_UNSIGNED_INT 0x1405
-#define GL_UNSIGNED_INT_24_8 0x84FA;
+#define GL_UNSIGNED_INT_24_8 0x84FA
 #define GL_FLOAT 0x1406
 #define GL_HALF_FLOAT 0x140B
 #define GL_DOUBLE 0x140A
@@ -940,11 +940,20 @@ bool skg_capability(skg_cap_ capability) {
 #ifdef _SKG_GL_WEB
 		return false;
 #else
+	
+	// On some platforms, glPolygonMode is a function and not a function 
+	// pointer, so glPolygonMode != nullptr is trivially true, and Clang wants
+	// to warn us about that. This isn't an actual problem, so let's suppress
+	// that warning.
+#ifdef __clang__
 #pragma clang diagnostic push
-		// On some platforms, glPolygonMode is a function and not a function pointer, so glPolygonMode != nullptr is trivially true, and Clang wants to warn us about that. This isn't an actual problem, so let's suppress that warning.
 #pragma clang diagnostic ignored "-Wtautological-pointer-compare"
+#endif
 		return glPolygonMode != nullptr;
+#ifdef __clang__
 #pragma clang diagnostic pop
+#endif
+
 #endif
 	default: return false;
 	}

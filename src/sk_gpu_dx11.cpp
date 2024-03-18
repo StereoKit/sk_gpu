@@ -46,7 +46,8 @@ ID3DUserDefinedAnnotation *d3d_annotate = nullptr;
 
 ///////////////////////////////////////////
 
-bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
+bool        skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
+DXGI_FORMAT skg_ind_to_dxgi  (skg_ind_fmt_ format);
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -597,17 +598,17 @@ void skg_mesh_name(skg_mesh_t* mesh, const char* name) {
 ///////////////////////////////////////////
 
 void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
-	if (mesh->_vert_buffer) mesh->_vert_buffer->Release();
+	if (vert_buffer && vert_buffer->_buffer) vert_buffer->_buffer->AddRef();
+	if (mesh->_vert_buffer)                  mesh->_vert_buffer->Release();
 	mesh->_vert_buffer = vert_buffer->_buffer;
-	if (mesh->_vert_buffer) mesh->_vert_buffer->AddRef();
 }
 
 ///////////////////////////////////////////
 
 void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
-	if (mesh->_ind_buffer) mesh->_ind_buffer->Release();
+	if (ind_buffer && ind_buffer->_buffer) ind_buffer->_buffer->AddRef();
+	if (mesh->_ind_buffer)                 mesh->_ind_buffer->Release();
 	mesh->_ind_buffer = ind_buffer->_buffer;
-	if (mesh->_ind_buffer) mesh->_ind_buffer->AddRef();
 }
 
 ///////////////////////////////////////////
@@ -1943,6 +1944,17 @@ const char *skg_semantic_to_d3d(skg_el_semantic_ semantic) {
 	case skg_el_semantic_color:        return "COLOR";
 	case skg_el_semantic_target_index: return "SV_RenderTargetArrayIndex";
 	default: return "";
+	}
+}
+
+///////////////////////////////////////////
+
+DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
+	switch (format) {
+	case skg_ind_fmt_u32: return DXGI_FORMAT_R32_UINT;
+	case skg_ind_fmt_u16: return DXGI_FORMAT_R16_UINT;
+	case skg_ind_fmt_u8:  return DXGI_FORMAT_R8_UINT;
+	default: abort(); break;
 	}
 }
 

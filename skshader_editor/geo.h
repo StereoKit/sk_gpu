@@ -50,7 +50,7 @@ void gen_cube(skg_mesh_t *mesh, skg_buffer_t *v_buffer, skg_buffer_t *i_buffer, 
 		inds[i*6+4] = i*4+2;
 		inds[i*6+5] = i*4+3;
 	}
-
+	
 	*v_buffer = skg_buffer_create(verts, sizeof(verts)/sizeof(skg_vert_t), sizeof(skg_vert_t), skg_buffer_type_vertex, skg_use_static);
 	*i_buffer = skg_buffer_create(inds,  sizeof(inds )/sizeof(uint32_t  ), sizeof(uint32_t),   skg_buffer_type_index,  skg_use_static);
 	*mesh     = skg_mesh_create  (v_buffer, i_buffer);

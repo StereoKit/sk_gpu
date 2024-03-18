@@ -49,7 +49,7 @@ const int32_t path_size = 2048;
 bool                read_file     (const char *filename, char **out_text, size_t *out_size);
 bool                write_file    (const char *filename, void *file_data, size_t file_size);
 bool                write_file_txt(const char *filename, void *file_data, size_t file_size);
-bool                write_header  (const char *filename, void *file_data, size_t file_size, bool zipped);
+bool                write_header  (const char *filename, void *file_data, skg_shader_ops_t *vs_shader_op_info, skg_shader_ops_t *ps_shader_op_info, size_t file_size, bool zipped);
 void                write_stages  (const skg_shader_file_t *file, const char *folder, bool trailing_slash, const char *name_ext);
 void                compile_file  (const char *filename, compiler_settings_t *settings);
 void                iterate_dir   (const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file));
@@ -335,7 +335,7 @@ void compile_file(const char *src_filename, compiler_settings_t *settings) {
 
 				char* abs_file = path_absolute(new_filename);
 				bool written = settings->output_header
-					? write_header(abs_file, sks_data, sks_size, settings->output_zipped)
+					? write_header(abs_file, sks_data, &file.meta->ops_vertex, &file.meta->ops_pixel, sks_size, settings->output_zipped)
 					: write_file  (abs_file, sks_data, sks_size);
 
 				if (settings->output_raw_shaders) {
@@ -557,7 +557,7 @@ bool write_file_txt(const char *filename, void *file_data, size_t file_size) {
 
 ///////////////////////////////////////////
 
-bool write_header(const char *filename, void *file_data, size_t file_size, bool zipped) {
+bool write_header(const char *filename, void *file_data, skg_shader_ops_t *vs_shader_op_info, skg_shader_ops_t *ps_shader_op_info, size_t file_size, bool zipped) {
 	char name[path_size];
 	file_name(filename, name, sizeof(name));
 
@@ -572,6 +572,9 @@ bool write_header(const char *filename, void *file_data, size_t file_size, bool 
 		return false;
 	}
 	fprintf(fp, "#pragma once\n\n");
+	if (vs_shader_op_info) fprintf(fp, "// --Vertex shader ops--\n// total  : %d\n// texture: %d\n// flow   : %d\n", vs_shader_op_info->total, vs_shader_op_info->tex_read, vs_shader_op_info->dynamic_flow);
+	if (ps_shader_op_info) fprintf(fp, "// --Pixel shader ops-- \n// total  : %d\n// texture: %d\n// flow   : %d\n", ps_shader_op_info->total, ps_shader_op_info->tex_read, ps_shader_op_info->dynamic_flow);
+	if (ps_shader_op_info || vs_shader_op_info) fprintf(fp, "\n");
 	int32_t ct = fprintf(fp, "const unsigned char sks_%s%s[%zu] = {\n", name, zipped ? "_zip" : "", file_size);
 	for (size_t i = 0; i < file_size; i++) {
 		unsigned char byte = ((unsigned char *)file_data)[i];  

@@ -1,6 +1,6 @@
 //--name                 = unlit/test
 //--time: color          = 1
-//--tex: 2D              = white
+//--tex: 2D, external    = white
 //--uv_scale: range(0,2) = 0.5
 //--chunks = 1, 2, 2, 1
 

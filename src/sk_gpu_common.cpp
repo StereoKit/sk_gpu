@@ -504,7 +504,7 @@ bool skg_shader_file_verify(const void *data, size_t size, uint16_t *out_version
 
 bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_t *out_file) {
 	uint16_t file_version = 0;
-	if (!skg_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 2) {
+	if (!skg_shader_file_verify(data, size, &file_version, nullptr, 0) || file_version != 3) {
 		return false;
 	}
 	
@@ -519,14 +519,24 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 	*out_file->meta = {};
 	out_file->meta->global_buffer_id = -1;
 	skg_shader_meta_reference(out_file->meta);
-	memcpy( out_file->meta->name,            &bytes[at], sizeof(out_file->meta->name          )); at += sizeof(out_file->meta->name);
-	memcpy(&out_file->meta->buffer_count,    &bytes[at], sizeof(out_file->meta->buffer_count  )); at += sizeof(out_file->meta->buffer_count);
-	memcpy(&out_file->meta->resource_count,  &bytes[at], sizeof(out_file->meta->resource_count)); at += sizeof(out_file->meta->resource_count);
-	out_file->meta->buffers   = (skg_shader_buffer_t  *)malloc(sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count  );
-	out_file->meta->resources = (skg_shader_resource_t*)malloc(sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
-	if (out_file->meta->buffers == nullptr || out_file->meta->resources == nullptr) { skg_log(skg_log_critical, "Out of memory"); return false; }
-	memset(out_file->meta->buffers,   0, sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count);
-	memset(out_file->meta->resources, 0, sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
+	memcpy( out_file->meta->name,               &bytes[at], sizeof(out_file->meta->name              )); at += sizeof(out_file->meta->name);
+	memcpy(&out_file->meta->buffer_count,       &bytes[at], sizeof(out_file->meta->buffer_count      )); at += sizeof(out_file->meta->buffer_count);
+	memcpy(&out_file->meta->resource_count,     &bytes[at], sizeof(out_file->meta->resource_count    )); at += sizeof(out_file->meta->resource_count);
+	memcpy(&out_file->meta->vertex_input_count, &bytes[at], sizeof(out_file->meta->vertex_input_count)); at += sizeof(out_file->meta->vertex_input_count);
+	out_file->meta->buffers       = (skg_shader_buffer_t  *)malloc(sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count);
+	out_file->meta->resources     = (skg_shader_resource_t*)malloc(sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
+	out_file->meta->vertex_inputs = (skg_vert_component_t *)malloc(sizeof(skg_vert_component_t ) * out_file->meta->vertex_input_count);
+	if (out_file->meta->buffers == nullptr || out_file->meta->resources == nullptr || out_file->meta->vertex_inputs == nullptr) { skg_log(skg_log_critical, "Out of memory"); return false; }
+	memset(out_file->meta->buffers,       0, sizeof(skg_shader_buffer_t  ) * out_file->meta->buffer_count);
+	memset(out_file->meta->resources,     0, sizeof(skg_shader_resource_t) * out_file->meta->resource_count);
+	memset(out_file->meta->vertex_inputs, 0, sizeof(skg_vert_component_t ) * out_file->meta->vertex_input_count);
+
+	memcpy(&out_file->meta->ops_vertex.total,        &bytes[at], sizeof(out_file->meta->ops_vertex.total));        at += sizeof(out_file->meta->ops_vertex.total);
+	memcpy(&out_file->meta->ops_vertex.tex_read,     &bytes[at], sizeof(out_file->meta->ops_vertex.tex_read));     at += sizeof(out_file->meta->ops_vertex.tex_read);
+	memcpy(&out_file->meta->ops_vertex.dynamic_flow, &bytes[at], sizeof(out_file->meta->ops_vertex.dynamic_flow)); at += sizeof(out_file->meta->ops_vertex.dynamic_flow);
+	memcpy(&out_file->meta->ops_pixel.total,         &bytes[at], sizeof(out_file->meta->ops_pixel.total));         at += sizeof(out_file->meta->ops_pixel.total);
+	memcpy(&out_file->meta->ops_pixel.tex_read,      &bytes[at], sizeof(out_file->meta->ops_pixel.tex_read));      at += sizeof(out_file->meta->ops_pixel.tex_read);
+	memcpy(&out_file->meta->ops_pixel.dynamic_flow,  &bytes[at], sizeof(out_file->meta->ops_pixel.dynamic_flow));  at += sizeof(out_file->meta->ops_pixel.dynamic_flow);
 
 	for (uint32_t i = 0; i < out_file->meta->buffer_count; i++) {
 		skg_shader_buffer_t *buffer = &out_file->meta->buffers[i];
@@ -562,10 +572,18 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 			out_file->meta->global_buffer_id = i;
 	}
 
+	for (int32_t i = 0; i < out_file->meta->vertex_input_count; i++) {
+		skg_vert_component_t *com = &out_file->meta->vertex_inputs[i];
+		memcpy(&com->format,        &bytes[at], sizeof(com->format       )); at += sizeof(com->format);
+		memcpy(&com->semantic,      &bytes[at], sizeof(com->semantic     )); at += sizeof(com->semantic);
+		memcpy(&com->semantic_slot, &bytes[at], sizeof(com->semantic_slot)); at += sizeof(com->semantic_slot);
+	}
+
 	for (uint32_t i = 0; i < out_file->meta->resource_count; i++) {
 		skg_shader_resource_t *res = &out_file->meta->resources[i];
 		memcpy( res->name,  &bytes[at], sizeof(res->name )); at += sizeof(res->name );
-		memcpy( res->extra, &bytes[at], sizeof(res->extra)); at += sizeof(res->extra);
+		memcpy( res->value, &bytes[at], sizeof(res->value)); at += sizeof(res->value);
+		memcpy( res->tags,  &bytes[at], sizeof(res->tags )); at += sizeof(res->tags );
 		memcpy(&res->bind,  &bytes[at], sizeof(res->bind )); at += sizeof(res->bind );
 		res->name_hash = skg_hash(res->name);
 	}
@@ -590,7 +608,7 @@ bool skg_shader_file_load_memory(const void *data, size_t size, skg_shader_file_
 ///////////////////////////////////////////
 
 skg_shader_stage_t skg_shader_file_create_stage(const skg_shader_file_t *file, skg_stage_ stage) {
-	skg_shader_lang_ language;
+	skg_shader_lang_ language = skg_shader_lang_hlsl;
 #if defined(SKG_DIRECT3D11) || defined(SKG_DIRECT3D12)
 	language = skg_shader_lang_hlsl;
 #elif defined(SKG_OPENGL)
@@ -697,6 +715,7 @@ void skg_shader_meta_release(skg_shader_meta_t *meta) {
 		}
 		free(meta->buffers);
 		free(meta->resources);
+		free(meta->vertex_inputs);
 		*meta = {};
 	}
 }
@@ -801,5 +820,28 @@ uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r32:           return sizeof(uint32_t);
 	case skg_tex_fmt_r8g8:          return sizeof(uint16_t);
 	default: return 0;
+	}
+}
+
+///////////////////////////////////////////
+
+int32_t skg_fmt_size(skg_fmt_ format) {
+	switch (format) {
+		case skg_fmt_f64: return 8;
+		case skg_fmt_i32:
+		case skg_fmt_ui32:
+		case skg_fmt_i32_normalized:
+		case skg_fmt_ui32_normalized:
+		case skg_fmt_f32: return 4;
+		case skg_fmt_i16:
+		case skg_fmt_ui16:
+		case skg_fmt_i16_normalized:
+		case skg_fmt_ui16_normalized:
+		case skg_fmt_f16: return 2;
+		case skg_fmt_i8:
+		case skg_fmt_ui8:
+		case skg_fmt_i8_normalized:
+		case skg_fmt_ui8_normalized: return 1;
+		default: return 0;
 	}
 }

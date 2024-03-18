@@ -45,7 +45,7 @@ include(../cmake/CPM.cmake)
 CPMAddPackage(
     NAME SPIRV-Cross
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
-    GIT_TAG 50b4d5389b6a06f86fb63a2848e1a7da6d9755ca # May 27, 2022
+    GIT_TAG vulkan-sdk-1.3.275.0
     OPTIONS 
     "SPIRV_CROSS_CLI OFF" 
     "SPIRV_CROSS_ENABLE_TESTS OFF" 
@@ -56,7 +56,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME SPIRV-Headers
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
-    GIT_TAG 5a121866927a16ab9d49bed4788b532c7fcea766 # May 25, 2022
+    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Tools version
 )
 
 # For optimizing SPIR-V shaders, a baseline amount of
@@ -65,7 +65,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME SPIRV-Tools
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
-    GIT_TAG v2022.2
+    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Headers version
     OPTIONS
     "SPIRV_SKIP_TESTS ON"
     "SPIRV_SKIP_EXECUTABLES ON"
@@ -78,7 +78,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME glslang
     GITHUB_REPOSITORY KhronosGroup/glslang
-    GIT_TAG 7dda6a6347b0bd550e202942adee475956ef462a # May 26, 2022
+    GIT_TAG 14.1.0
     OPTIONS 
     "SKIP_GLSLANG_INSTALL ON"
 )
@@ -94,6 +94,8 @@ add_executable(skshaderc
     miniz.cpp
     miniz.h
 )
+set(SKSHADERC_EXE_NAME "skshaderc_exe")
+set_target_properties(skshaderc PROPERTIES OUTPUT_NAME ${SKSHADERC_EXE_NAME})
 
 target_link_libraries(skshaderc
     PRIVATE
@@ -103,6 +105,15 @@ target_link_libraries(skshaderc
     SPIRV
     ${LINUX_LIBS}
 )
+
+
+if (NOT MSVC AND NOT APPLE)
+    add_custom_command(TARGET skshaderc POST_BUILD
+        COMMAND ${CMAKE_OBJCOPY} --only-keep-debug $<TARGET_FILE:skshaderc> $<TARGET_FILE_DIR:skshaderc>/$<TARGET_FILE_BASE_NAME:skshaderc>${SK_BIN_DEBUG_EXT}
+        COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:skshaderc>
+        COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=$<TARGET_FILE_DIR:skshaderc>/$<TARGET_FILE_BASE_NAME:skshaderc>${SK_BIN_DEBUG_EXT} $<TARGET_FILE:skshaderc>
+    )
+endif()
 
 set(SKSHADERC_EXE_PATH $<TARGET_FILE:skshaderc> PARENT_SCOPE)
 
@@ -117,7 +128,7 @@ macro(SKSHADERC_COMPILE_HEADERS LIST COMMAND_STRING OUT_LIST)
             DEPENDS 
                 ${SHADER} 
                 ${SKSHADERC_EXE_PATH}
-            COMMENT "skshaderc -h ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
+            COMMENT "${SKSHADERC_EXE_NAME} -h ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
         list(APPEND ${OUT_LIST} ${SHADER}.h)
     endforeach(SHADER)
 endmacro()
@@ -133,6 +144,6 @@ macro(SKSHADERC_COMPILE_ASSETS LIST COMMAND_STRING)
             DEPENDS 
                 ${SHADER} 
                 ${SKSHADERC_EXE_PATH}
-            COMMENT "skshaderc ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
+            COMMENT "${SKSHADERC_EXE_NAME} ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
     endforeach(SHADER)
 endmacro()

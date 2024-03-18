@@ -150,19 +150,11 @@ typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_r8g8,
 } skg_tex_fmt_;
 
-typedef enum skg_fmt_ {
-	skg_fmt_none,
-	skg_fmt_f32_1,    skg_fmt_f32_2,    skg_fmt_f32_3,    skg_fmt_f32_4,
-	skg_fmt_f16_1,    skg_fmt_f16_2,                      skg_fmt_f16_4,
-	skg_fmt_i32_1,    skg_fmt_i32_2,    skg_fmt_i32_3,    skg_fmt_i32_4,
-	skg_fmt_i16_1,    skg_fmt_i16_2,                      skg_fmt_i16_4,
-	skg_fmt_i8_1,     skg_fmt_i8_2,                       skg_fmt_i8_4,
-	skg_fmt_ui32_1,   skg_fmt_ui32_2,   skg_fmt_ui32_3,   skg_fmt_ui32_4,
-	skg_fmt_ui16_1,   skg_fmt_ui16_2,                     skg_fmt_ui16_4,
-	skg_fmt_ui8_1,    skg_fmt_ui8_2,                      skg_fmt_ui8_4,
-	skg_fmt_ui16_n_1, skg_fmt_ui16_n_2,                   skg_fmt_ui16_n_4,
-	skg_fmt_ui8_n_1,  skg_fmt_ui8_n_2,                    skg_fmt_ui8_n_4,
-} skg_fmt_;
+typedef enum skg_ind_fmt_ {
+	skg_ind_fmt_u32,
+	skg_ind_fmt_u16,
+	skg_ind_fmt_u8,
+} skg_ind_fmt_;
 
 typedef enum skg_el_semantic_ {
 	skg_el_semantic_none,
@@ -239,6 +231,45 @@ typedef struct {
 	float r, g, b, a;
 } skg_color128_t;
 
+typedef enum skg_fmt_ {
+	skg_fmt_none,
+	skg_fmt_f64,
+	skg_fmt_f32,
+	skg_fmt_f16,
+	skg_fmt_i32,
+	skg_fmt_i16,
+	skg_fmt_i8,
+	skg_fmt_i32_normalized,
+	skg_fmt_i16_normalized,
+	skg_fmt_i8_normalized,
+	skg_fmt_ui32,
+	skg_fmt_ui16,
+	skg_fmt_ui8,
+	skg_fmt_ui32_normalized,
+	skg_fmt_ui16_normalized,
+	skg_fmt_ui8_normalized,
+} skg_fmt_;
+
+typedef enum skg_semantic_ {
+	skg_semantic_none,
+	skg_semantic_position,
+	skg_semantic_texcoord,
+	skg_semantic_normal,
+	skg_semantic_binormal,
+	skg_semantic_tangent,
+	skg_semantic_color,
+	skg_semantic_psize,
+	skg_semantic_blendweight,
+	skg_semantic_blendindices,
+} skg_semantic_;
+
+typedef struct skg_vert_component_t {
+	skg_fmt_      format;
+	uint8_t       count;
+	skg_semantic_ semantic;
+	uint8_t       semantic_slot;
+} skg_vert_component_t;
+
 typedef struct skg_vert_t {
 	float         pos [3];
 	float         norm[3];
@@ -275,9 +306,16 @@ typedef struct skg_shader_buffer_t {
 typedef struct skg_shader_resource_t {
 	char       name [32];
 	uint64_t   name_hash;
-	char       extra[64];
+	char       value[64];
+	char       tags [64];
 	skg_bind_t bind;
 } skg_shader_resource_t;
+
+typedef struct skg_shader_ops_t {
+	int32_t total;
+	int32_t tex_read;
+	int32_t dynamic_flow;
+} skg_shader_ops_t;
 
 typedef struct skg_shader_meta_t {
 	char                   name[256];
@@ -287,6 +325,10 @@ typedef struct skg_shader_meta_t {
 	skg_shader_resource_t *resources;
 	int32_t                references;
 	int32_t                global_buffer_id;
+	skg_vert_component_t  *vertex_inputs;
+	int32_t                vertex_input_count;
+	skg_shader_ops_t       ops_vertex;
+	skg_shader_ops_t       ops_pixel;
 } skg_shader_meta_t;
 
 ///////////////////////////////////////////

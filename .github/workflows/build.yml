@@ -41,16 +41,16 @@ jobs:
 
     - name: Build Native Win32 x64
       run: |
-        cmake --preset Win32_x64_Release
-        cmake --build --preset Win32_x64_Release
+        cmake --preset skshaderc_Win32_x64_Release
+        cmake --build --preset skshaderc_Win32_x64_Release
 
         mkdir -p bin/distribute/win32_x64
         copy bin/intermediate/Win32_x64_Release/Release/skshaderc.exe bin/distribute/win32_x64/skshaderc.exe
 
     - name: Build Native Win32 Arm64
       run: |
-        cmake --preset Win32_Arm64_Release
-        cmake --build --preset Win32_Arm64_Release
+        cmake --preset skshaderc_Win32_Arm64_Release
+        cmake --build --preset skshaderc_Win32_Arm64_Release
 
         mkdir -p bin/distribute/win32_arm64
         copy bin/intermediate/Win32_Arm64_Release/Release/skshaderc.exe bin/distribute/win32_arm64/skshaderc.exe
@@ -89,8 +89,8 @@ jobs:
 
     - name: Build Native Linux x64
       run: |
-        cmake --preset Linux_x64_Release
-        cmake --build --preset Linux_x64_Release
+        cmake --preset skshaderc_Linux_x64_Release
+        cmake --build --preset skshaderc_Linux_x64_Release
 
         mkdir -p bin/distribute/linux_x64
         copy bin/intermediate/Linux_x64_Release/skshaderc_exe bin/distribute/linux_x64/skshaderc
@@ -105,8 +105,8 @@ jobs:
 
     - name: Build Linux Arm64
       run: |
-        cmake --preset Linux_Arm64_Release
-        cmake --build --preset Linux_Arm64_Release
+        cmake --preset skshaderc_Linux_Arm64_Release
+        cmake --build --preset skshaderc_Linux_Arm64_Release
 
         mkdir -p bin/distribute/linux_arm64
         copy bin/intermediate/Linux_Arm64_Release/skshaderc_exe bin/distribute/linux_arm64/skshaderc
@@ -139,8 +139,8 @@ jobs:
 
     - name: Build Native Linux x64
       run: |
-        cmake --preset Linux_x64_Release
-        cmake --build --preset Linux_x64_Release
+        cmake --preset skshaderc_Linux_x64_Release
+        cmake --build --preset skshaderc_Linux_x64_Release
 
         mkdir -p bin/distribute/mac_arm64
         copy bin/intermediate/Linux_Arm64_Release/Release/skshaderc_exe bin/distribute/mac_arm64/skshaderc

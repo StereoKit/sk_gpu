@@ -38,6 +38,7 @@ jobs:
         mkdir bin/distribute/tools/win32_x64
         copy bin/intermediate/Win32_x64/Release/skshaderc_exe.exe bin/distribute/tools/win32_x64/skshaderc.exe
 
+        mkdir bin/distribute/tools/src
         copy sk_gpu.h bin/distribute/src/sk_gpu.h
         copy skshaderc/CMakeLists.distribute.txt bin/distribute/CMakeLists.txt
 

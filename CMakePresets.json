@@ -94,26 +94,17 @@
                 "CMAKE_SYSTEM_NAME": "Darwin",
                 "CMAKE_C_COMPILER":  "clang",
                 "CMAKE_CXX_COMPILER":"clang++",
+                "CMAKE_OSX_ARCHITECTURES": "x86_64;arm64",
                 "SK_BUILD_EDITOR":false,
                 "SK_BUILD_EXAMPLES":false
             }
         },
         {
-            "name":        "skshaderc_Mac_x64_Release",
-            "description": "Release build for Mac x64",
+            "name":        "skshaderc_Mac_Release",
+            "description": "Release build for Mac (universal architecture)",
             "hidden":      false,
             "inherits":    "Mac",
-            "binaryDir":   "${sourceDir}/bin/intermediate/Mac_x64_Release",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name":        "skshaderc_Mac_Arm64_Release",
-            "description": "Release build for Mac Arm64",
-            "hidden":      false,
-            "inherits":    "Mac",
-            "binaryDir":   "${sourceDir}/bin/intermediate/Mac_ARM64_Release",
+            "binaryDir":   "${sourceDir}/bin/intermediate/Mac_Release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
@@ -124,7 +115,6 @@
         { "name":"skshaderc_Win32_Arm64_Release", "targets": ["sk_gpu_header", "skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_Arm64_Release", "jobs":24},
         { "name":"skshaderc_Linux_x64_Release",   "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_x64_Release",   "jobs":24},
         { "name":"skshaderc_Linux_Arm64_Release", "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_Arm64_Release", "jobs":24},
-        { "name":"skshaderc_Mac_x64_Release",   "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Mac_x64_Release",   "jobs":24},
-        { "name":"skshaderc_Mac_Arm64_Release", "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Mac_Arm64_Release", "jobs":24}
+        { "name":"skshaderc_Mac_Release",         "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Mac_Release",   "jobs":24}
     ]
 }

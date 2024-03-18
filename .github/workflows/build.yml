@@ -111,13 +111,13 @@ jobs:
         ref: ${{ inputs.branch }}
     - uses: lukka/get-cmake@v3.26.3
 
-    - name: Build Native Mac x64
+    - name: Build Native Mac
       run: |
-        cmake --preset skshaderc_Mac_x64_Release
-        cmake --build --preset skshaderc_Mac_x64_Release
+        cmake --preset skshaderc_Mac_Release
+        cmake --build --preset skshaderc_Mac_Release
 
         mkdir -p bin/distribute/mac_arm64
-        cp bin/intermediate/Mac_Arm64_Release/Release/skshaderc_exe bin/distribute/mac_arm64/skshaderc
+        cp bin/intermediate/Mac_Release/Release/skshaderc_exe bin/distribute/mac/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3

@@ -117,7 +117,7 @@ jobs:
         cmake --build --preset skshaderc_Mac_Release
 
         mkdir -p bin/distribute/mac_arm64
-        cp bin/intermediate/Mac_Release/Release/skshaderc_exe bin/distribute/mac/skshaderc
+        cp bin/intermediate/Mac_Release/skshaderc_exe bin/distribute/mac/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3

@@ -23,8 +23,6 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    env:
-      CPM_SOURCE_CACHE: .deps_cache
 
     steps:
     - uses: actions/checkout@v3
@@ -32,23 +30,12 @@ jobs:
         ref: ${{ inputs.branch }}
     - uses: lukka/get-cmake@v3.26.3
 
-    - name: Cache folder
-      run: |
-        mkdir -p .deps_cache
-
-    - name: Get Cache
-      uses: actions/cache@v3
-      with:
-        key: DependencyCache
-        path: |
-          .deps_cache
-
     - name: Build Native Win32 x64
       run: |
         cmake --preset skshaderc_Win32_x64_Release
         cmake --build --preset skshaderc_Win32_x64_Release
 
-        mkdir -p bin/distribute/win32_x64
+        mkdir bin/distribute/win32_x64
         copy bin/intermediate/Win32_x64_Release/Release/skshaderc.exe bin/distribute/win32_x64/skshaderc.exe
 
     - name: Build Native Win32 Arm64
@@ -56,7 +43,7 @@ jobs:
         cmake --preset skshaderc_Win32_Arm64_Release
         cmake --build --preset skshaderc_Win32_Arm64_Release
 
-        mkdir -p bin/distribute/win32_arm64
+        mkdir bin/distribute/win32_arm64
         copy bin/intermediate/Win32_Arm64_Release/Release/skshaderc.exe bin/distribute/win32_arm64/skshaderc.exe
 
     - name: Upload Artifacts
@@ -69,26 +56,12 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-20.04
-    #env:
-    #  CPM_SOURCE_CACHE: .deps_cache
 
     steps:
     - uses: actions/checkout@v3
       with:
         ref: ${{ inputs.branch }}
     - uses: lukka/get-cmake@v3.26.3
-
-    - name: Cache folder
-      run: |
-        mkdir -p .deps_cache
-
-    - name: Get Cache
-      uses: actions/cache@v3
-      with:
-        key: DependencyCache
-        path: |
-          .deps_cache
-
 
     - name: Install Prerequisites
       run: |
@@ -101,7 +74,7 @@ jobs:
         cmake --build --preset skshaderc_Linux_x64_Release
 
         mkdir -p bin/distribute/linux_x64
-        copy bin/intermediate/Linux_x64_Release/skshaderc_exe bin/distribute/linux_x64/skshaderc
+        cp bin/intermediate/Linux_x64_Release/skshaderc_exe bin/distribute/linux_x64/skshaderc
 
     - name: Install Arm64 Prerequisites
       run: |
@@ -117,7 +90,7 @@ jobs:
         cmake --build --preset skshaderc_Linux_Arm64_Release
 
         mkdir -p bin/distribute/linux_arm64
-        copy bin/intermediate/Linux_Arm64_Release/skshaderc_exe bin/distribute/linux_arm64/skshaderc
+        cp bin/intermediate/Linux_Arm64_Release/skshaderc_exe bin/distribute/linux_arm64/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
@@ -129,8 +102,6 @@ jobs:
 
   build-mac:
     runs-on: macos-latest
-    env:
-      CPM_SOURCE_CACHE: .deps_cache
 
     steps:
     - uses: actions/checkout@v3
@@ -138,24 +109,13 @@ jobs:
         ref: ${{ inputs.branch }}
     - uses: lukka/get-cmake@v3.26.3
 
-    - name: Cache folder
-      run: |
-        mkdir -p .deps_cache
-        
-    - name: Get Cache
-      uses: actions/cache@v3
-      with:
-        key: DependencyCache
-        path: |
-          .deps_cache
-
     - name: Build Native Linux x64
       run: |
         cmake --preset skshaderc_Linux_x64_Release
         cmake --build --preset skshaderc_Linux_x64_Release
 
         mkdir -p bin/distribute/mac_arm64
-        copy bin/intermediate/Linux_Arm64_Release/Release/skshaderc_exe bin/distribute/mac_arm64/skshaderc
+        cp bin/intermediate/Linux_Arm64_Release/Release/skshaderc_exe bin/distribute/mac_arm64/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3

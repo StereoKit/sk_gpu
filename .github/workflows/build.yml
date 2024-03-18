@@ -1,0 +1,152 @@
+name: Build Package
+on: 
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+
+###########################################
+
+  build-windows:
+    runs-on: windows-latest
+    env:
+      CPM_SOURCE_CACHE: .deps_cache
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.branch }}
+    - uses: lukka/get-cmake@v3.26.3
+
+    - name: Get Cache
+      uses: actions/cache@v3
+      with:
+        key: DependencyCache
+        path: |
+          .deps_cache
+
+    - name: Build Native Win32 x64
+      run: |
+        cmake --preset Win32_x64_Release
+        cmake --build --preset Win32_x64_Release
+
+        mkdir -p bin/distribute/win32_x64
+        copy bin/intermediate/Win32_x64_Release/Release/skshaderc.exe bin/distribute/win32_x64/skshaderc.exe
+
+    - name: Build Native Win32 Arm64
+      run: |
+        cmake --preset Win32_Arm64_Release
+        cmake --build --preset Win32_Arm64_Release
+
+        mkdir -p bin/distribute/win32_arm64
+        copy bin/intermediate/Win32_Arm64_Release/Release/skshaderc.exe bin/distribute/win32_arm64/skshaderc.exe
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: bin/distribute/
+
+###########################################
+
+  build-linux:
+    runs-on: ubuntu-20.04
+    env:
+      CPM_SOURCE_CACHE: .deps_cache
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.branch }}
+    - uses: lukka/get-cmake@v3.26.3
+
+    - name: Get Cache
+      uses: actions/cache@v3
+      with:
+        key: DependencyCache
+        path: |
+          .deps_cache
+
+
+    - name: Install Prerequisites
+      run: |
+        sudo apt-get update
+        sudo apt-get install ninja-build
+
+    - name: Build Native Linux x64
+      run: |
+        cmake --preset Linux_x64_Release
+        cmake --build --preset Linux_x64_Release
+
+        mkdir -p bin/distribute/linux_x64
+        copy bin/intermediate/Linux_x64_Release/skshaderc_exe bin/distribute/linux_x64/skshaderc
+
+    - name: Install Arm64 Prerequisites
+      run: |
+        sudo cp ./tools/docker/arm-cross-compile-sources-focal.list /etc/apt/sources.list.d/
+        sudo sed -i "s/deb mirror/deb [arch=amd64] mirror/g" /etc/apt/sources.list
+        sudo dpkg --add-architecture arm64
+        sudo apt-get update
+        sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld:arm64
+
+    - name: Build Linux Arm64
+      run: |
+        cmake --preset Linux_Arm64_Release
+        cmake --build --preset Linux_Arm64_Release
+
+        mkdir -p bin/distribute/linux_arm64
+        copy bin/intermediate/Linux_Arm64_Release/skshaderc_exe bin/distribute/linux_arm64/skshaderc
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: bin/distribute/
+
+  ###########################################
+
+  build-mac:
+    runs-on: macos-latest
+    env:
+      CPM_SOURCE_CACHE: .deps_cache
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.branch }}
+    - uses: lukka/get-cmake@v3.26.3
+
+    - name: Get Cache
+      uses: actions/cache@v3
+      with:
+        key: DependencyCache
+        path: |
+          .deps_cache
+
+    - name: Build Native Linux x64
+      run: |
+        cmake --preset Linux_x64_Release
+        cmake --build --preset Linux_x64_Release
+
+        mkdir -p bin/distribute/mac_arm64
+        copy bin/intermediate/Linux_Arm64_Release/Release/skshaderc_exe bin/distribute/mac_arm64/skshaderc
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: bin/distribute/

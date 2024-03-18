@@ -118,8 +118,15 @@ jobs:
         cmake --preset skshaderc_Mac_Release
         cmake --build --preset skshaderc_Mac_Release
 
-        mkdir -p bin/distribute/tools/mac
+    - name: Strip binary
+      run: |
+        ls -l bin/intermediate/Mac_Release/skshaderc_exe
         strip -S bin/intermediate/Mac_Release/skshaderc_exe
+        ls -l bin/intermediate/Mac_Release/skshaderc_exe
+
+    - name: Copy binary
+      run: |
+        mkdir -p bin/distribute/tools/mac
         cp bin/intermediate/Mac_Release/skshaderc_exe bin/distribute/tools/mac/skshaderc
 
     - name: Upload Artifacts

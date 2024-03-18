@@ -106,7 +106,7 @@ target_link_libraries(skshaderc
 )
 
 
-if (NOT MSVC)
+if (NOT MSVC AND NOT APPLE)
     add_custom_command(TARGET skshaderc POST_BUILD
         COMMAND ${CMAKE_OBJCOPY} --only-keep-debug $<TARGET_FILE:skshaderc> $<TARGET_FILE_DIR:skshaderc>/$<TARGET_FILE_BASE_NAME:skshaderc>${SK_BIN_DEBUG_EXT}
         COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:skshaderc>

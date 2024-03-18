@@ -90,7 +90,7 @@ jobs:
         cmake --build --preset skshaderc_Linux_Arm64_Release
 
         mkdir -p bin/distribute/linux_arm64
-        cp bin/intermediate/Linux_Arm64_Release/skshaderc_exe bin/distribute/linux_arm64/skshaderc
+        cp bin/intermediate/Linux_ARM64_Release/skshaderc_exe bin/distribute/linux_arm64/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3

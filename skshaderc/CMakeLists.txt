@@ -94,7 +94,8 @@ add_executable(skshaderc
     miniz.cpp
     miniz.h
 )
-set_target_properties(skshaderc PROPERTIES OUTPUT_NAME "skshaderc_exe")
+set(SKSHADERC_EXE_NAME "skshaderc_exe")
+set_target_properties(skshaderc PROPERTIES OUTPUT_NAME ${SKSHADERC_EXE_NAME})
 
 target_link_libraries(skshaderc
     PRIVATE
@@ -127,7 +128,7 @@ macro(SKSHADERC_COMPILE_HEADERS LIST COMMAND_STRING OUT_LIST)
             DEPENDS 
                 ${SHADER} 
                 ${SKSHADERC_EXE_PATH}
-            COMMENT "skshaderc -h ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
+            COMMENT "${SKSHADERC_EXE_NAME} -h ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
         list(APPEND ${OUT_LIST} ${SHADER}.h)
     endforeach(SHADER)
 endmacro()
@@ -143,6 +144,6 @@ macro(SKSHADERC_COMPILE_ASSETS LIST COMMAND_STRING)
             DEPENDS 
                 ${SHADER} 
                 ${SKSHADERC_EXE_PATH}
-            COMMENT "skshaderc ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
+            COMMENT "${SKSHADERC_EXE_NAME} ${COMMAND_STRING} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
     endforeach(SHADER)
 endmacro()

@@ -35,18 +35,19 @@ jobs:
         cmake --preset skshaderc_Win32_x64_Release
         cmake --build --preset skshaderc_Win32_x64_Release
 
-        mkdir bin/distribute/win32_x64
-        copy bin/intermediate/Win32_x64/Release/skshaderc_exe.exe bin/distribute/win32_x64/skshaderc.exe
+        mkdir bin/distribute/tools/win32_x64
+        copy bin/intermediate/Win32_x64/Release/skshaderc_exe.exe bin/distribute/tools/win32_x64/skshaderc.exe
 
-        copy sk_gpu.h bin/distribute/sk_gpu.h
+        copy sk_gpu.h bin/distribute/src/sk_gpu.h
+        copy skshaderc/CMakeLists.distribute.txt bin/distribute/CMakeLists.txt
 
     - name: Build Native Win32 Arm64
       run: |
         cmake --preset skshaderc_Win32_Arm64_Release
         cmake --build --preset skshaderc_Win32_Arm64_Release
 
-        mkdir bin/distribute/win32_arm64
-        copy bin/intermediate/Win32_Arm64/Release/skshaderc_exe.exe bin/distribute/win32_arm64/skshaderc.exe
+        mkdir bin/distribute/tools/win32_arm64
+        copy bin/intermediate/Win32_Arm64/Release/skshaderc_exe.exe bin/distribute/tools/win32_arm64/skshaderc.exe
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
@@ -75,8 +76,8 @@ jobs:
         cmake --preset skshaderc_Linux_x64_Release
         cmake --build --preset skshaderc_Linux_x64_Release
 
-        mkdir -p bin/distribute/linux_x64
-        cp bin/intermediate/Linux_x64_Release/skshaderc_exe bin/distribute/linux_x64/skshaderc
+        mkdir -p bin/distribute/tools/linux_x64
+        cp bin/intermediate/Linux_x64_Release/skshaderc_exe bin/distribute/tools/linux_x64/skshaderc
 
     - name: Install Arm64 Prerequisites
       run: |
@@ -91,8 +92,8 @@ jobs:
         cmake --preset skshaderc_Linux_Arm64_Release
         cmake --build --preset skshaderc_Linux_Arm64_Release
 
-        mkdir -p bin/distribute/linux_arm64
-        cp bin/intermediate/Linux_ARM64_Release/skshaderc_exe bin/distribute/linux_arm64/skshaderc
+        mkdir -p bin/distribute/tools/linux_arm64
+        cp bin/intermediate/Linux_ARM64_Release/skshaderc_exe bin/distribute/tools/linux_arm64/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
@@ -116,8 +117,8 @@ jobs:
         cmake --preset skshaderc_Mac_Release
         cmake --build --preset skshaderc_Mac_Release
 
-        mkdir -p bin/distribute/mac_arm64
-        cp bin/intermediate/Mac_Release/skshaderc_exe bin/distribute/mac/skshaderc
+        mkdir -p bin/distribute/tools/mac
+        cp bin/intermediate/Mac_Release/skshaderc_exe bin/distribute/tools/mac/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3

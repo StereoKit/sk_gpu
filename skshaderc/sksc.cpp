@@ -1440,11 +1440,11 @@ void sksc_meta_assign_defaults(array_t<sksc_meta_item_t> items, skg_shader_meta_
 					double d = atof(param);
 
 					switch (buff->vars[v].type) {
-					case skg_shader_var_float:  {float    val = (float   )d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
-					case skg_shader_var_double: {double   val =           d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
-					case skg_shader_var_int:    {int32_t  val = (int32_t )d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
-					case skg_shader_var_uint:   {uint32_t val = (uint32_t)d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
-					case skg_shader_var_uint8:  {uint8_t  val = (uint8_t )d; memcpy(write_at, &v, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_float:  {float    val = (float   )d; memcpy(write_at, &val, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_double: {double   val =           d; memcpy(write_at, &val, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_int:    {int32_t  val = (int32_t )d; memcpy(write_at, &val, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_uint:   {uint32_t val = (uint32_t)d; memcpy(write_at, &val, sizeof(val)); write_at += sizeof(val); }break;
+					case skg_shader_var_uint8:  {uint8_t  val = (uint8_t )d; memcpy(write_at, &val, sizeof(val)); write_at += sizeof(val); }break;
 					}
 
 					if (end != nullptr) {

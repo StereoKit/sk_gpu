@@ -56,6 +56,15 @@ jobs:
         name: binaries
         path: bin/distribute/
 
+    - name: Fix timestamps
+      shell: pwsh
+      run: |
+        $commitDate = git show -s --format=%cd --date=iso-strict HEAD
+        $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
+        Get-ChildItem -Path path\to\your\build\directory -Recurse | ForEach-Object {
+          $_.LastWriteTime = $date
+        }
+
 ###########################################
 
   build-linux:
@@ -102,6 +111,15 @@ jobs:
         name: binaries
         path: bin/distribute/
 
+    - name: Fix timestamps
+      shell: pwsh
+      run: |
+        $commitDate = git show -s --format=%cd --date=iso-strict HEAD
+        $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
+        Get-ChildItem -Path path\to\your\build\directory -Recurse | ForEach-Object {
+          $_.LastWriteTime = $date
+        }
+
   ###########################################
 
   build-mac:
@@ -134,3 +152,12 @@ jobs:
       with:
         name: binaries
         path: bin/distribute/
+
+    - name: Fix timestamps
+      shell: pwsh
+      run: |
+        $commitDate = git show -s --format=%cd --date=iso-strict HEAD
+        $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
+        Get-ChildItem -Path path\to\your\build\directory -Recurse | ForEach-Object {
+          $_.LastWriteTime = $date
+        }

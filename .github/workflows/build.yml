@@ -82,7 +82,7 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: sk_gpu.${{ needs.version.outputs.versionName  }}
+        name: sk_gpu.${{ needs.version.outputs.versionName  }}.windows
         path: bin/distribute/
 
 ###########################################
@@ -131,7 +131,7 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: sk_gpu.${{ needs.version.outputs.versionName }}
+        name: sk_gpu.${{ needs.version.outputs.versionName }}.linux
         path: bin/distribute/
 
   ###########################################
@@ -166,5 +166,36 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: sk_gpu.${{ needs.version.outputs.versionName }}
+        name: sk_gpu.${{ needs.version.outputs.versionName }}.macos
         path: bin/distribute/
+
+  ###########################################
+
+  make-release:
+    runs-on: ubuntu-latest
+    needs: [version, build-windows, build-linux, build-mac]
+
+    steps:
+    - name: Merge Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+        path: release/
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sk_gpu.${{ needs.version.outputs.versionName }}
+        path: release/
+
+    - name: Make draft
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref_name }}
+      run: |
+        zip -r sk_gpu.${{ needs.version.outputs.versionName }}.zip release/
+        gh release create "$tag" sk_gpu.${{ needs.version.outputs.versionName }}.zip \
+          --prerelease \
+          --verify-tag \
+          --repo="$GITHUB_REPOSITORY" \
+          --title="${{ github.ref_name }}"

@@ -50,15 +50,6 @@ jobs:
         mkdir bin/distribute/tools/win32_arm64
         copy bin/intermediate/Win32_Arm64/Release/skshaderc_exe.exe bin/distribute/tools/win32_arm64/skshaderc.exe
 
-    - name: Fix timestamps
-      shell: pwsh
-      run: |
-        $commitDate = git show -s --format=%cd --date=iso-strict HEAD
-        $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
-        Get-ChildItem -Path bin/distribute -Recurse | ForEach-Object {
-          $_.LastWriteTime = $date
-        }
-
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
       with:
@@ -105,15 +96,6 @@ jobs:
         mkdir -p bin/distribute/tools/linux_arm64
         cp bin/intermediate/Linux_ARM64_Release/skshaderc_exe bin/distribute/tools/linux_arm64/skshaderc
 
-    - name: Fix timestamps
-      shell: pwsh
-      run: |
-        $commitDate = git show -s --format=%cd --date=iso-strict HEAD
-        $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
-        Get-ChildItem -Path bin/distribute -Recurse | ForEach-Object {
-          $_.LastWriteTime = $date
-        }
-
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
       with:
@@ -146,15 +128,6 @@ jobs:
       run: |
         mkdir -p bin/distribute/tools/mac
         cp bin/intermediate/Mac_Release/skshaderc_exe bin/distribute/tools/mac/skshaderc
-
-    - name: Fix timestamps
-      shell: pwsh
-      run: |
-        $commitDate = git show -s --format=%cd --date=iso-strict HEAD
-        $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
-        Get-ChildItem -Path bin/distribute -Recurse | ForEach-Object {
-          $_.LastWriteTime = $date
-        }
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3

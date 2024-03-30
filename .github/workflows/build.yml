@@ -40,13 +40,16 @@ jobs:
       run: |
         # use the input version name only if it is not empty
         if [ -z "${{ github.event.inputs.versionName }}" ]; then
+          echo "versionName: ${{ github.ref_name }}"
           echo "versionName=${{ github.ref_name }}" >> $GITHUB_ENV
         else
+          echo "versionName: ${{ github.event.inputs.versionName }}"
           echo "versionName=${{ github.event.inputs.versionName }}" >> $GITHUB_ENV
         fi
 
   build-windows:
     runs-on: windows-latest
+    needs: version
 
     steps:
     - uses: actions/checkout@v3
@@ -84,6 +87,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-20.04
+    needs: version
 
     steps:
     - uses: actions/checkout@v3
@@ -132,6 +136,7 @@ jobs:
 
   build-mac:
     runs-on: macos-latest
+    needs: version
 
     steps:
     - uses: actions/checkout@v3

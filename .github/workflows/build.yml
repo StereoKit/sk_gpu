@@ -61,7 +61,7 @@ jobs:
       run: |
         $commitDate = git show -s --format=%cd --date=iso-strict HEAD
         $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
-        Get-ChildItem -Path path\to\your\build\directory -Recurse | ForEach-Object {
+        Get-ChildItem -Path bin/distribute -Recurse | ForEach-Object {
           $_.LastWriteTime = $date
         }
 
@@ -116,7 +116,7 @@ jobs:
       run: |
         $commitDate = git show -s --format=%cd --date=iso-strict HEAD
         $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
-        Get-ChildItem -Path path\to\your\build\directory -Recurse | ForEach-Object {
+        Get-ChildItem -Path bin/distribute -Recurse | ForEach-Object {
           $_.LastWriteTime = $date
         }
 
@@ -158,6 +158,6 @@ jobs:
       run: |
         $commitDate = git show -s --format=%cd --date=iso-strict HEAD
         $date       = [DateTime]::ParseExact($commitDate, "yyyy-MM-ddTHH:mm:ssK", $null)
-        Get-ChildItem -Path path\to\your\build\directory -Recurse | ForEach-Object {
+        Get-ChildItem -Path bin/distribute -Recurse | ForEach-Object {
           $_.LastWriteTime = $date
         }

@@ -79,6 +79,7 @@ jobs:
 
         mkdir -p bin/distribute/tools/linux_x64
         cp bin/intermediate/Linux_x64_Release/skshaderc_exe bin/distribute/tools/linux_x64/skshaderc
+        chmod +x bin/distribute/tools/linux_x64/skshaderc
 
     - name: Install Arm64 Prerequisites
       run: |
@@ -95,6 +96,7 @@ jobs:
 
         mkdir -p bin/distribute/tools/linux_arm64
         cp bin/intermediate/Linux_ARM64_Release/skshaderc_exe bin/distribute/tools/linux_arm64/skshaderc
+        chmod +x bin/distribute/tools/linux_arm64/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
@@ -128,6 +130,7 @@ jobs:
       run: |
         mkdir -p bin/distribute/tools/mac
         cp bin/intermediate/Mac_Release/skshaderc_exe bin/distribute/tools/mac/skshaderc
+        chmod +x bin/distribute/tools/mac/skshaderc
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3

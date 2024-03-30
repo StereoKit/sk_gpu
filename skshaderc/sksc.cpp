@@ -1542,7 +1542,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		for (spirv_cross::Resource &resource : resources.uniform_buffers) {
 			const std::string &name = glsl.get_name(resource.id);
 			for (size_t b = 0; b < meta->buffer_count; b++) {
-				if (strcmp(name.c_str(), meta->buffers[b].name) == 0 || (strcmp(name.c_str(), "_Global") && strcmp(meta->buffers[b].name, "$Global") == 0)) {
+				if (strcmp(name.c_str(), meta->buffers[b].name) == 0 || (strcmp(name.c_str(), "_Global") == 0 && strcmp(meta->buffers[b].name, "$Global") == 0)) {
 					glsl.set_decoration(resource.id, spv::DecorationBinding, meta->buffers[b].bind.slot);
 					break;
 				}
@@ -1560,6 +1560,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 			}
 		});
 
+		glsl.add_header_line("#extension GL_EXT_gpu_shader5 : enable");
 		// Add custom header lines for vertex shaders
 		if (src_stage->stage == skg_stage_vertex) {
 			glsl.add_header_line("#ifdef GL_AMD_vertex_shader_layer");

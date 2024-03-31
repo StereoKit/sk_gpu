@@ -193,7 +193,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         tag: ${{ github.ref_name }}
       run: |
-        zip -r sk_gpu.${{ needs.version.outputs.versionName }}.zip release/
+        cd release
+        zip -r sk_gpu.${{ needs.version.outputs.versionName }}.zip .
         gh release create "$tag" sk_gpu.${{ needs.version.outputs.versionName }}.zip \
           --prerelease \
           --verify-tag \

@@ -7,7 +7,7 @@
     },
     "configurePresets": [
         {
-            "name": "Win32",
+            "name": "Win32_Release",
             "hidden": true,
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
@@ -17,20 +17,33 @@
                 "CMAKE_SHARED_LINKER_FLAGS": "/LTCG /INCREMENTAL:NO",
                 "CMAKE_STATIC_LINKER_FLAGS": "/LTCG",
                 "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "TRUE",
-                "SK_BUILD_EDITOR":false,
-                "SK_BUILD_EXAMPLES":false
+                "SK_BUILD_EDITOR":false
             }
         },
         {
-            "name":        "skshaderc_Win32_x64_Release",
+            "name": "Win32",
+            "hidden": true,
+            "cacheVariables": {
+                "SK_BUILD_EDITOR":false
+            }
+        },
+        {
+            "name":        "test_Win32_x64",
             "inherits":    "Win32",
+            "description": "test build for Win32 x64",
+            "hidden":      false,
+            "binaryDir":   "${sourceDir}/bin/intermediate/Win32_x64"
+        },
+        {
+            "name":        "skshaderc_Win32_x64_Release",
+            "inherits":    "Win32_Release",
             "description": "Release build for Win32 x64",
             "hidden":      false,
             "binaryDir":   "${sourceDir}/bin/intermediate/Win32_x64"
         },
         {
             "name":         "skshaderc_Win32_Arm64_Release",
-            "inherits":    "Win32",
+            "inherits":     "Win32_Release",
             "description":  "Release build for Win32 Arm64",
             "hidden":       false,
             "architecture": "ARM64",
@@ -114,6 +127,8 @@
         }
     ],
     "buildPresets": [
+        { "name":"test_Win32_x64_Debug",          "targets": ["sk_gpu_header", "skg_flatscreen"], "configuration":"Debug",   "configurePreset":"test_Win32_x64",   "jobs":24},
+        { "name":"test_Win32_x64_Release",        "targets": ["sk_gpu_header", "skg_flatscreen"], "configuration":"Release", "configurePreset":"test_Win32_x64",   "jobs":24},
         { "name":"skshaderc_Win32_x64_Release",   "targets": ["sk_gpu_header", "skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_x64_Release",   "jobs":24},
         { "name":"skshaderc_Win32_Arm64_Release", "targets": ["sk_gpu_header", "skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_Arm64_Release", "jobs":24},
         { "name":"skshaderc_Linux_x64_Release",   "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_x64_Release",   "jobs":24},

@@ -1,10 +1,10 @@
 cbuffer vertexBuffer : register(b0) {
     float4x4 ProjectionMatrix;
 };
-struct VS_INPUT {
-    float3 pos  : SV_POSITION;
+struct vsIn {
+	float4 pos  : SV_Position;
 	float3 norm : NORMAL0;
-    float2 uv   : TEXCOORD0;
+	float2 uv   : TEXCOORD0;
 	float4 col  : COLOR0;
 };
 

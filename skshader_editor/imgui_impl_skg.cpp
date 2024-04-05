@@ -33,6 +33,7 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 		im_vb = skg_buffer_create(nullptr, im_vb_size, sizeof(skg_vert_t), skg_buffer_type_vertex, skg_use_dynamic);
 		free(im_vb_data);
 		im_vb_data = (skg_vert_t*)malloc(im_vb_size * sizeof(skg_vert_t));
+		memset(im_vb_data, 0, im_vb_size * sizeof(skg_vert_t));
 
 		skg_mesh_set_verts(&im_mesh, &im_vb);
 	}
@@ -42,6 +43,7 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 		im_ib = skg_buffer_create(nullptr, im_ib_size, sizeof(uint32_t), skg_buffer_type_index, skg_use_dynamic);
 		free(im_ib_data);
 		im_ib_data = (uint32_t*)malloc(im_ib_size * sizeof(uint32_t));
+		memset(im_ib_data, 0, im_ib_size * sizeof(uint32_t));
 
 		skg_mesh_set_inds(&im_mesh, &im_ib);
 	}
@@ -87,7 +89,7 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 	}
 
 	skg_pipeline_bind(&im_pipeline);
-	skg_buffer_bind(&im_shader_vars, { 0, skg_stage_vertex }, 0);
+	skg_buffer_bind(&im_shader_vars, { 0, skg_stage_vertex, skg_register_constant }, 0);
 	skg_mesh_bind(&im_mesh);
 
 	// Render command lists
@@ -113,7 +115,7 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 					(int32_t)(pcmd->ClipRect.w - pcmd->ClipRect.y)};
 				skg_scissor(rect);
 				
-				skg_tex_bind((skg_tex_t*)pcmd->TextureId, skg_bind_t{ 0, skg_stage_pixel });
+				skg_tex_bind((skg_tex_t*)pcmd->TextureId, skg_bind_t{ 0, skg_stage_pixel, skg_register_resource });
 				skg_draw(pcmd->IdxOffset + global_idx_offset, pcmd->VtxOffset + global_vtx_offset, pcmd->ElemCount, 1);
 			}
 		}

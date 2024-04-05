@@ -87,7 +87,7 @@ void window_preview_render() {
 	if (pipeline) {
 		skg_pipeline_bind(pipeline);
 		skg_mesh_bind    (&preview_meshes[preview_mesh_active].mesh);
-		skg_tex_bind     (&cube_tex, skg_bind_t{0, skg_stage_pixel});
+		skg_tex_bind     (&cube_tex, skg_bind_t{0, skg_stage_pixel, skg_register_resource});
 		skg_draw         (0, 0, preview_meshes[preview_mesh_active].faces, 1);
 	}
 

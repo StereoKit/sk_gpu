@@ -1,6 +1,6 @@
-/*Licensed under MIT or Public Domain. See bottom of file for details.
+/*Licensed under MIT. See bottom of file for details.
 	Author - Nick Klingensmith - @koujaku - https://twitter.com/koujaku
-	Repository - https://github.com/maluoi/sk_gpu
+	Repository - https://github.com/StereoKit/sk_gpu
 
 sk_gpu.h
 

@@ -22,4 +22,4 @@ These are maybe more my tests or development environments, but these are a set o
 
 ## License
 
-License is MIT / Public Domain! Have fun :)
+License is MIT! Have fun :)

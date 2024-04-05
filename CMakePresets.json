@@ -22,10 +22,7 @@
         },
         {
             "name": "Win32",
-            "hidden": true,
-            "cacheVariables": {
-                "SK_BUILD_EDITOR":false
-            }
+            "hidden": true
         },
         {
             "name":        "test_Win32_x64",
@@ -127,8 +124,8 @@
         }
     ],
     "buildPresets": [
-        { "name":"test_Win32_x64_Debug",          "targets": ["skg_flatscreen"], "configuration":"Debug",   "configurePreset":"test_Win32_x64",   "jobs":24},
-        { "name":"test_Win32_x64_Release",        "targets": ["skg_flatscreen"], "configuration":"Release", "configurePreset":"test_Win32_x64",   "jobs":24},
+        { "name":"test_Win32_x64_Debug",          "targets": ["skg_flatscreen", "skshader_editor"],  "configuration":"Debug",   "configurePreset":"test_Win32_x64",   "jobs":24},
+        { "name":"test_Win32_x64_Release",        "targets": ["skg_flatscreen", "skshader_editor"],  "configuration":"Release", "configurePreset":"test_Win32_x64",   "jobs":24},
         { "name":"skshaderc_Win32_x64_Release",   "targets": ["skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_x64_Release",   "jobs":24},
         { "name":"skshaderc_Win32_Arm64_Release", "targets": ["skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_Arm64_Release", "jobs":24},
         { "name":"skshaderc_Linux_x64_Release",   "targets": ["skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_x64_Release",   "jobs":24},

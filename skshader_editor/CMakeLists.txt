@@ -1,8 +1,11 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.14)
 
 project(skshader_editor VERSION 1.0
                         DESCRIPTION "A shader editor with a GUI!"
                         LANGUAGES CXX)
+
+
+set(CMAKE_CXX_STANDARD 17)
 
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 if(NOT CMAKE_BUILD_TYPE)
@@ -16,22 +19,18 @@ include(../cmake/CPM.cmake)
 CPMAddPackage(
     NAME SPIRV-Cross
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
-    GIT_TAG 50b4d5389b6a06f86fb63a2848e1a7da6d9755ca # May 27, 2022
+    GIT_TAG vulkan-sdk-1.3.275.0
     OPTIONS 
     "SPIRV_CROSS_CLI OFF" 
     "SPIRV_CROSS_ENABLE_TESTS OFF" 
     "SPIRV_CROSS_ENABLE_MSL OFF"
-    "SPIRV_CROSS_ENABLE_CPP OFF"
-    "SPIRV_CROSS_ENABLE_REFLECT OFF"
-    "SPIRV_CROSS_ENABLE_UTIL OFF"
-    "SPIRV_CROSS_SKIP_INSTALL ON"
 )
 
 # For SPIRV-Tools
 CPMAddPackage(
     NAME SPIRV-Headers
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
-    GIT_TAG 5a121866927a16ab9d49bed4788b532c7fcea766 # May 25, 2022
+    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Tools version
 )
 
 # For optimizing SPIR-V shaders, a baseline amount of
@@ -40,13 +39,11 @@ CPMAddPackage(
 CPMAddPackage(
     NAME SPIRV-Tools
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
-    GIT_TAG v2022.2
+    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Headers version
     OPTIONS
     "SPIRV_SKIP_TESTS ON"
     "SPIRV_SKIP_EXECUTABLES ON"
     "SPIRV_WERROR OFF"
-    "SKIP_SPIRV_TOOLS_INSTALL OFF"
-    "SPIRV_CHECK_CONTEXT OFF"
 )
 
 # This is used to convert HLSL to SPIR-V. DXC is an
@@ -55,7 +52,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME glslang
     GITHUB_REPOSITORY KhronosGroup/glslang
-    GIT_TAG 7dda6a6347b0bd550e202942adee475956ef462a # May 26, 2022
+    GIT_TAG 14.1.0
     OPTIONS 
     "SKIP_GLSLANG_INSTALL ON"
 )
@@ -74,9 +71,8 @@ add_executable(skshader_editor
     ../skshaderc/sksc.cpp
     TextEditor.cpp)
 
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/CascadiaMono.ttf 
-    ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/CascadiaMono.ttf COPYONLY)
+add_custom_command(TARGET skshader_editor POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/CascadiaMono.ttf ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/CascadiaMono.ttf )
 
 if (UNIX)
     set( GL_LIBRARIES
@@ -93,3 +89,11 @@ target_link_libraries(skshader_editor
     glslang
     SPIRV
     ${GL_LIBRARIES})
+add_dependencies(skshader_editor
+    sk_gpu_header
+    skshaderc)
+
+skshaderc_compile_headers(skshader_editor
+    ${CMAKE_BINARY_DIR}/shaders_editor
+    "-t xge"
+    imgui_shader.hlsl )

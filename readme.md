@@ -36,6 +36,8 @@ sk_gpu uses a cmake based workflow, so standard cmake builds will work. This rep
 ```sh
 cmake --preset test_Win32_x64
 cmake --build --preset test_Win32_x64_Debug
+
+bin/intermediate/Win32_x64/Debug/skg_flatscreen.exe
 ```
 
 VSCode with the cmake plugin works well as an IDE for this project.

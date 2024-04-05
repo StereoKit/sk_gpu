@@ -16,14 +16,6 @@ if (NOT DEFINED SKGPU_TEST_USE_GL)
     endif()
 endif()
 
-## Compile shaders
-
-set(SKGPU_TEST_SHADERS_HLSL
-    ../common/compute_test.hlsl
-    ../common/cubemap.hlsl
-    ../common/test.hlsl )
-skshaderc_compile_headers(SKGPU_TEST_SHADERS_HLSL "-t xge" SKGPU_TEST_SHADERS_H)
-
 ## Target definition
 
 add_executable(skg_flatscreen
@@ -39,12 +31,20 @@ add_executable(skg_flatscreen
     ../../src/sk_gpu_dx11.h
     ../../src/sk_gpu_dx11.cpp
     ../../src/sk_gpu_gl.h
-    ../../src/sk_gpu_gl.cpp
-    ${SKGPU_TEST_SHADERS_H} )
+    ../../src/sk_gpu_gl.cpp )
 
 target_include_directories(skg_flatscreen PRIVATE
     ../common
     ../../src)
+
+## Compile shaders
+
+skshaderc_compile_headers(skg_flatscreen
+    ${CMAKE_BINARY_DIR}/shaders_test
+    "-t xge" SKGPU_TEST_SHADERS_H
+    ../common/compute_test.hlsl
+    ../common/cubemap.hlsl
+    ../common/test.hlsl)
 
 if (SKGPU_TEST_USE_GL)
     if (UNIX)

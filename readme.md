@@ -2,7 +2,48 @@
 
 sk_gpu.h is a mid-level cross-platform graphics library focused on Mixed Reality rendering, in an amalgamated single file header! It currently uses D3D11 on Windows, GLES on Android, and WebGL on the Web, and works very well with OpenXR.
 
-I'm the author, [Nick Klingensmith](https://twitter.com/koujaku), and I've spent two decades doing graphics, tools and tech art as a professional game developer! I currently work at Microsoft on the Mixed Reality team.
+## Consuming
+
+To use this project as a dependency, it's recommended use the amalgamated header file and pre-compiled skshaderc executables from the releases hosted here. The release files come with a useful cmake wrapper that makes this pretty straightforward to use in a cmake project:
+
+```cmake
+cmake_minimum_required(VERSION 3.14)
+project(sk_gpu_test VERSION "0.1.0" LANGUAGES CXX C)
+
+include(FetchContent)
+FetchContent_Declare(
+  sk_gpu
+  URL https://github.com/StereoKit/sk_gpu/releases/download/v2024.3.31/sk_gpu.v2024.3.31.zip )
+FetchContent_MakeAvailable(sk_gpu)
+
+add_executable(sk_gpu_test
+  src/main.cpp )
+
+skshaderc_compile_headers(sk_gpu_test
+  ${CMAKE_BINARY_DIR}/shaders
+  "-O3 -t xge"
+  src/test.hlsl
+  src/test2.hlsl )
+
+target_link_libraries(sk_gpu_test
+  PRIVATE sk_gpu )
+```
+
+## Building
+
+sk_gpu uses a cmake based workflow, so standard cmake builds will work. This repository also comes with a number of cmake presets to make this process a bit easier!
+
+```sh
+cmake --preset test_Win32_x64
+cmake --build --preset test_Win32_x64_Debug
+```
+
+VSCode with the cmake plugin works well as an IDE for this project.
+
+### Prerequisites
+
+Python is used for header amalgamation on all platforms.
+Ninja is used by the presets for Linux and Mac
 
 ## Repository
 
@@ -14,7 +55,7 @@ These files are the core of the project, and they get squished into a single fil
 
 ### 2. [skshaderc](https://github.com/maluoi/sk_gpu/tree/master/skshaderc)
 
-This is a shader compiler that uses [DXShaderCompiler](https://github.com/microsoft/DirectXShaderCompiler) and [Spirv-Cross](https://github.com/KhronosGroup/SPIRV-Cross) to compile real HLSL shader code into a single file containing HLSL bytecode, SPIRV, GLSL, and GLSL Web, along with some metadata about buffer layout and uniforms. sk_gpu.h loads these files and picks the right chunk to use on the right platform :)
+This is a shader compiler that uses [glslang](https://github.com/KhronosGroup/glslang) and [Spirv-Cross](https://github.com/KhronosGroup/SPIRV-Cross) and [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) to compile and optimize real HLSL shader code into a single file containing HLSL bytecode, SPIRV, GLSL, GLSL ES, and GLSL Web, along with some metadata about buffer layout and uniforms. sk_gpu.h loads these files and picks the right chunk to use on the right platform :)
 
 ### 3. [Examples](https://github.com/maluoi/sk_gpu/tree/master/examples)
 

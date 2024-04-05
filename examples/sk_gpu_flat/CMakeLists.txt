@@ -60,3 +60,4 @@ endif()
 
 target_link_libraries(skg_flatscreen
     ${GL_LIBRARIES})
+add_dependencies(skg_flatscreen sk_gpu_header)

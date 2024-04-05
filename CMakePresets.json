@@ -127,12 +127,12 @@
         }
     ],
     "buildPresets": [
-        { "name":"test_Win32_x64_Debug",          "targets": ["sk_gpu_header", "skg_flatscreen"], "configuration":"Debug",   "configurePreset":"test_Win32_x64",   "jobs":24},
-        { "name":"test_Win32_x64_Release",        "targets": ["sk_gpu_header", "skg_flatscreen"], "configuration":"Release", "configurePreset":"test_Win32_x64",   "jobs":24},
-        { "name":"skshaderc_Win32_x64_Release",   "targets": ["sk_gpu_header", "skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_x64_Release",   "jobs":24},
-        { "name":"skshaderc_Win32_Arm64_Release", "targets": ["sk_gpu_header", "skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_Arm64_Release", "jobs":24},
-        { "name":"skshaderc_Linux_x64_Release",   "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_x64_Release",   "jobs":24},
-        { "name":"skshaderc_Linux_Arm64_Release", "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_Arm64_Release", "jobs":24},
-        { "name":"skshaderc_Mac_Release",         "targets": ["sk_gpu_header", "skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Mac_Release",   "jobs":24}
+        { "name":"test_Win32_x64_Debug",          "targets": ["skg_flatscreen"], "configuration":"Debug",   "configurePreset":"test_Win32_x64",   "jobs":24},
+        { "name":"test_Win32_x64_Release",        "targets": ["skg_flatscreen"], "configuration":"Release", "configurePreset":"test_Win32_x64",   "jobs":24},
+        { "name":"skshaderc_Win32_x64_Release",   "targets": ["skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_x64_Release",   "jobs":24},
+        { "name":"skshaderc_Win32_Arm64_Release", "targets": ["skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_Arm64_Release", "jobs":24},
+        { "name":"skshaderc_Linux_x64_Release",   "targets": ["skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_x64_Release",   "jobs":24},
+        { "name":"skshaderc_Linux_Arm64_Release", "targets": ["skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_Arm64_Release", "jobs":24},
+        { "name":"skshaderc_Mac_Release",         "targets": ["skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Mac_Release",   "jobs":24}
     ]
 }

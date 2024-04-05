@@ -105,6 +105,7 @@ target_link_libraries(skshaderc
     SPIRV
     ${LINUX_LIBS}
 )
+add_dependencies(skshaderc sk_gpu_header)
 
 
 if (NOT MSVC AND NOT APPLE)

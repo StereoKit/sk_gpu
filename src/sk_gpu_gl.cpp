@@ -368,6 +368,7 @@ GLE(void,     glTexParameterf,           uint32_t target, uint32_t pname, float 
 GLE(void,     glTexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
 GLE(void,     glTexStorage2DMultisample, uint32_t target, uint32_t samples, int32_t internalformat, uint32_t width, uint32_t height, uint8_t fixedsamplelocations) \
 GLE(void,     glTexStorage3DMultisample, uint32_t target, uint32_t samples, int32_t internalformat, uint32_t width, uint32_t height, uint32_t depth, uint8_t fixedsamplelocations) \
+GLE(void,     glTexImage3D,              uint32_t target, int32_t level, int32_t internalformat, uint32_t width, uint32_t height, uint32_t depth, int32_t border, uint32_t format, uint32_t type, const void *data) \
 GLE(void,     glCopyTexSubImage2D,       uint32_t target, int32_t level, int32_t xoffset, int32_t yoffset, int32_t x, int32_t y, uint32_t width, uint32_t height) \
 GLE(void,     glGetTexImage,             uint32_t target, int32_t level, uint32_t format, uint32_t type, void *img) \
 GLE(void,     glReadPixels,              int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t format, uint32_t type, void *data) \
@@ -857,9 +858,13 @@ void skg_draw_begin() {
 
 ///////////////////////////////////////////
 
-void skg_tex_target_bind(skg_tex_t *render_target) {
+void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	gl_active_rendertarget = render_target;
-	gl_current_framebuffer = render_target == nullptr ? 0 : render_target->_framebuffer;
+	gl_current_framebuffer = render_target == nullptr 
+		? 0 
+		: layer_idx >= 0 && render_target->array_count > 1
+			? render_target->_framebuffer_layers[layer_idx]
+			: render_target->_framebuffer;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	if (render_target) {
@@ -1713,7 +1718,7 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 	glXSwapBuffers(xDisplay, (Drawable) swapchain->_x_window);
 #elif defined(_SKG_GL_LOAD_EMSCRIPTEN) && defined(SKG_MANUAL_SRGB)
 	float clear[4] = { 0,0,0,1 };
-	skg_tex_target_bind(nullptr);
+	skg_tex_target_bind(nullptr, -1, 0);
 	skg_target_clear   (true, clear);
 	skg_tex_bind      (&swapchain->_surface, {0, skg_stage_pixel});
 	skg_mesh_bind     (&swapchain->_quad_mesh);
@@ -1728,16 +1733,16 @@ void skg_swapchain_bind(skg_swapchain_t *swapchain) {
 	gl_active_width  = swapchain->width;
 	gl_active_height = swapchain->height;
 #if   defined(_SKG_GL_LOAD_EMSCRIPTEN) && defined(SKG_MANUAL_SRGB)
-	skg_tex_target_bind(&swapchain->_surface);
+	skg_tex_target_bind(&swapchain->_surface, -1, 0);
 #elif defined(_SKG_GL_LOAD_WGL)
 	wglMakeCurrent((HDC)swapchain->_hdc, gl_hrc);
-	skg_tex_target_bind(nullptr);
+	skg_tex_target_bind(nullptr, -1, 0);
 #elif defined(_SKG_GL_LOAD_EGL)
 	eglMakeCurrent(egl_display, swapchain->_egl_surface, swapchain->_egl_surface, egl_context);
-	skg_tex_target_bind(nullptr);
+	skg_tex_target_bind(nullptr, -1, 0);
 #elif defined(_SKG_GL_LOAD_GLX)
 	glXMakeCurrent(xDisplay, (Drawable)swapchain->_x_window, glxContext);
-	skg_tex_target_bind(nullptr);
+	skg_tex_target_bind(nullptr, -1, 0);
 #endif
 }
 
@@ -1781,15 +1786,30 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 		glGenFramebuffers(1, &result._framebuffer);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, result._framebuffer);
-		if (array_count != 1) {
-#ifndef _SKG_GL_WEB
-			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0);
-#else
-			skg_log(skg_log_critical, "sk_gpu doesn't support array textures with WebGL?");
-#endif
-		} else {
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._target, result._texture, 0);
+		if (result.array_count > 1) glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0, 0);
+		else                        glFramebufferTexture     (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0);
+
+		uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE) {
+			skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
 		}
+
+		// Add framebuffers for individual layers of any array surfaces
+		if (result.array_count > 1) {
+			result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
+			glGenFramebuffers(result.array_count, result._framebuffer_layers);
+
+			for (int32_t i = 0; i < result.array_count; i++) {
+				glBindFramebuffer        (GL_FRAMEBUFFER, result._framebuffer_layers[i]);
+				glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0, i);
+
+				uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+				if (status != GL_FRAMEBUFFER_COMPLETE) {
+					skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
+				}
+			}
+		}
+
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
 	
@@ -1818,7 +1838,13 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 		glGenFramebuffers(1, &result._framebuffer);
 		glBindFramebuffer        (GL_FRAMEBUFFER, result._framebuffer);
 		glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, result._texture, 0, array_layer);
-		glBindFramebuffer        (GL_FRAMEBUFFER, gl_current_framebuffer);
+
+		uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE) {
+			skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
+		}
+
+		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
 
 	return result;
@@ -1863,6 +1889,13 @@ void skg_tex_name(skg_tex_t *tex, const char* name) {
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
 		glObjectLabel    (GL_FRAMEBUFFER, tex->_framebuffer, (uint32_t)strlen(postfix_name), postfix_name);
 	}
+	if (tex->_framebuffer_layers) {
+		for (int32_t i = 0; i<tex->array_count; i+=1) {
+			snprintf(postfix_name, sizeof(postfix_name), "%s_framebuffer_layer_%d", name, i);
+			glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer_layers[i]);
+			glObjectLabel    (GL_FRAMEBUFFER, tex->_framebuffer_layers[i], (uint32_t)strlen(postfix_name), postfix_name);
+		}
+	}
 }
 
 ///////////////////////////////////////////
@@ -1873,27 +1906,41 @@ bool skg_tex_is_valid(const skg_tex_t *tex) {
 
 ///////////////////////////////////////////
 
-void skg_tex_copy_to(const skg_tex_t *tex, skg_tex_t *destination) {
+void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface) {
 	if (destination->width != tex->width || destination->height != tex->height) {
 		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
 	}
 
-	if (tex->multisample > 1) {
-		uint32_t temp_framebuffer;
-		glGenFramebuffers     (1, &temp_framebuffer);
-		glBindFramebuffer     (GL_FRAMEBUFFER, temp_framebuffer);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, destination->_target, destination->_texture, 0);
+	uint32_t err = glGetError();
+	while(err) {
+		err = glGetError();
+		skg_logf(skg_log_warning, "err: %x", err);
+	}
 
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, tex->_framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, temp_framebuffer);
+	if (tex_surface == -1 && dest_surface == -1 && destination->array_count > 1) {
+		if (tex->array_count != destination->array_count) skg_log(skg_log_critical, "Mismatching texture array count.");
 
-		glBlitFramebuffer  (0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		for (int32_t i=0; i<destination->array_count; i+=1) {
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, tex        ->_framebuffer_layers[i]);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination->_framebuffer_layers[i]);
 
-		glDeleteFramebuffers(1, &temp_framebuffer);
+			glBlitFramebuffer(0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		}
 	} else {
-		glBindFramebuffer  (GL_FRAMEBUFFER, tex->_framebuffer);
-		glBindTexture      (destination->_target, destination->_texture);
-		glCopyTexSubImage2D(destination->_target, 0, 0,0,0,0,tex->width,tex->height);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, tex_surface >= 0 
+			? tex->_framebuffer_layers[tex_surface] 
+			: tex->_framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dest_surface >= 0 
+			? destination->_framebuffer_layers[dest_surface]
+			: destination->_framebuffer);
+
+		glBlitFramebuffer(0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	}
+
+	err = glGetError();
+	while(err) {
+		err = glGetError();
+		skg_logf(skg_log_warning, "blit err: %x", err);
 	}
 }
 
@@ -1914,7 +1961,14 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 			? GL_DEPTH_STENCIL_ATTACHMENT 
 			: GL_DEPTH_ATTACHMENT;
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
-		if (tex->_target == GL_TEXTURE_2D_ARRAY) {
+		if (tex->array_count > 1) glFramebufferTextureLayer(GL_FRAMEBUFFER, attach, depth->_texture, 0, 0);
+		else                      glFramebufferTexture     (GL_FRAMEBUFFER, attach, depth->_texture, 0);
+
+		uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE) {
+			skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
+		}
+		/*if (tex->_target == GL_TEXTURE_2D_ARRAY || ) {
 			if (tex->array_count == 1) {
 				glFramebufferTextureLayer(GL_FRAMEBUFFER, attach, depth->_texture, 0, tex->array_start);
 			} else {
@@ -1926,6 +1980,19 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 			}
 		} else {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, attach, tex->_target, depth->_texture, 0);
+		}*/
+
+		// Attach depth to the per-layer framebuffers
+		if (tex->array_count > 1) {
+			for (int32_t i = 0; i < tex->array_count; i++) {
+				glBindFramebuffer        (GL_FRAMEBUFFER, tex->_framebuffer_layers[i]);
+				glFramebufferTextureLayer(GL_FRAMEBUFFER, attach, depth->_texture, 0, i);
+
+				uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+				if (status != GL_FRAMEBUFFER_COMPLETE) {
+					skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
+				}
+			}
 		}
 	} else {
 		skg_log(skg_log_warning, "Can't bind a depth texture to a non-rendertarget");
@@ -2029,7 +2096,8 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		#ifndef _SKG_GL_WEB
 		if      (tex->_target == GL_TEXTURE_2D_MULTISAMPLE)       { glTexStorage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE,       multisample, tex->_format, width, height, true); }
 		else if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) { glTexStorage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, multisample, tex->_format, width, height, data_frame_count, true); }
-		else                                                      { glTexImage2D             (GL_TEXTURE_2D, 0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]); }
+		else if (tex->_target == GL_TEXTURE_2D_ARRAY)             { glTexImage3D             (GL_TEXTURE_2D_ARRAY, 0, tex->_format, width, height, data_frame_count, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]); }
+		else                                                      { glTexImage2D             (GL_TEXTURE_2D,       0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]); }
 		#else
 		glTexImage2D(GL_TEXTURE_2D, 0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
 		#endif
@@ -2041,20 +2109,29 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		glGenerateMipmap(tex->_target);
 
 	if (tex->type == skg_tex_type_rendertarget) {
-		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
-		if (tex->array_count != 1) {
-#ifndef _SKG_GL_WEB
-			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_texture, 0);
-#else
-			skg_log(skg_log_critical, "sk_gpu doesn't support array textures with WebGL?");
-#endif
-		} else {
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_target, tex->_texture, 0);
-		}
+		glBindFramebuffer   (GL_FRAMEBUFFER, tex->_framebuffer);
+		if (tex->array_count > 1) glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_texture, 0, 0);
+		else                      glFramebufferTexture     (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_texture, 0);
 
 		uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (status != GL_FRAMEBUFFER_COMPLETE) {
 			skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
+		}
+
+		// Add framebuffers for individual layers of any array surfaces
+		if (tex->array_count > 1) {
+			tex->_framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * tex->array_count);
+			glGenFramebuffers(tex->array_count, tex->_framebuffer_layers);
+
+			for (int32_t i = 0; i < tex->array_count; i++) {
+				glBindFramebuffer        (GL_FRAMEBUFFER, tex->_framebuffer_layers[i]);
+				glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex->_texture, 0, i);
+
+				uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+				if (status != GL_FRAMEBUFFER_COMPLETE) {
+					skg_logf(skg_log_critical, "Framebuffer incomplete: %x\n", status);
+				}
+			}
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
@@ -2180,6 +2257,10 @@ void skg_tex_destroy(skg_tex_t *tex) {
 	uint32_t fb_list [] = { tex->_framebuffer };
 	if (tex->_texture    ) glDeleteTextures    (1, tex_list);
 	if (tex->_framebuffer) glDeleteFramebuffers(1, fb_list );  
+	if (tex->_framebuffer_layers) {
+		glDeleteFramebuffers(tex->array_count, tex->_framebuffer_layers);  
+		free(tex->_framebuffer_layers);
+	}
 	*tex = {};
 }
 

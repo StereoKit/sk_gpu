@@ -284,7 +284,7 @@ void skg_event_end () {
 
 ///////////////////////////////////////////
 
-void skg_tex_target_bind(skg_tex_t *render_target) {
+void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	d3d_active_rendertarget = render_target;
 
 	if (render_target == nullptr) {
@@ -299,7 +299,15 @@ void skg_tex_target_bind(skg_tex_t *render_target) {
 	viewport.Height   = (float)render_target->height;
 	viewport.MaxDepth = 1.0f;
 	d3d_context->RSSetViewports(1, &viewport);
-	d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
+	if (layer_idx >= 0) {
+		int32_t mip_count = render_target->mips == skg_mip_generate
+			? skg_mip_count(render_target->width, render_target->height)
+			: 1;
+		d3d_context->OMSetRenderTargets(1, &render_target->_target_array_view[layer_idx * mip_count + mip_level], render_target->_depth_view);
+	} else {
+		d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
+	}
+	
 }
 
 ///////////////////////////////////////////
@@ -1147,7 +1155,7 @@ void skg_swapchain_present(skg_swapchain_t *swapchain) {
 ///////////////////////////////////////////
 
 void skg_swapchain_bind(skg_swapchain_t *swapchain) {
-	skg_tex_target_bind(swapchain->_target.format != 0 ? &swapchain->_target : nullptr);
+	skg_tex_target_bind(swapchain->_target.format != 0 ? &swapchain->_target : nullptr, -1, 0);
 }
 
 ///////////////////////////////////////////
@@ -1175,8 +1183,9 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result.height      = color_desc.Height;    (void)height;
 	result.array_count = color_desc.ArraySize; (void)array_count;
 	result.multisample = color_desc.SampleDesc.Count;
+	result.mips        = color_desc.MipLevels > 1 ? skg_mip_generate : skg_mip_none;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
-	skg_tex_make_view(&result, color_desc.MipLevels, 0, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
+	skg_tex_make_view(&result, color_desc.MipLevels, -1, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
 
 	return result;
 }
@@ -1195,7 +1204,8 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result._texture->GetDesc(&color_desc);
 	result.width       = color_desc.Width;  (void)width;
 	result.height      = color_desc.Height; (void)height;
-	result.array_count = 1;
+	result.array_count = color_desc.ArraySize;
+	result.array_start = array_layer;
 	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, array_layer, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
@@ -1248,22 +1258,27 @@ void skg_tex_name(skg_tex_t *tex, const char* name) {
 
 ///////////////////////////////////////////
 
-void skg_tex_copy_to(const skg_tex_t *tex, skg_tex_t *destination) {
+void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface) {
 	if (destination->width != tex->width || destination->height != tex->height) {
 		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
 	}
 
-	if (tex->multisample > 1) {
-		d3d_context->ResolveSubresource(destination->_texture, 0, tex->_texture, 0, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
+	if (tex_surface != -1 && dest_surface != -1) {
+		d3d_context->ResolveSubresource(destination->_texture, tex_surface, tex->_texture, dest_surface, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
 	} else {
-		d3d_context->CopyResource(destination->_texture, tex->_texture);
+		if (tex->multisample > 1) {
+			for (int32_t i = 0; i < tex->array_count; i++)
+				d3d_context->ResolveSubresource(destination->_texture, i, tex->_texture, i, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
+		} else {
+			d3d_context->CopyResource(destination->_texture, tex->_texture);
+		}
 	}
 }
 
 ///////////////////////////////////////////
 
 void skg_tex_copy_to_swapchain(const skg_tex_t *tex, skg_swapchain_t *destination) {
-	skg_tex_copy_to(tex, &destination->_target);
+	skg_tex_copy_to(tex, -1, &destination->_target, -1);
 }
 
 ///////////////////////////////////////////
@@ -1395,6 +1410,9 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader) {
 	DXGI_FORMAT format = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
 	HRESULT     hr     = E_FAIL;
+	
+	int32_t start = array_start == -1 ? 0 : array_start;
+	int32_t count = array_start == -1 ? tex->array_count : 1;
 
 	if (tex->type != skg_tex_type_depth) {
 		D3D11_SHADER_RESOURCE_VIEW_DESC res_desc = {};
@@ -1403,8 +1421,8 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		// the struct. Texture2DArray is representative of the union with the
 		// most data in it, so if we fill it properly, all others should also
 		// be filled correctly.
-		res_desc.Texture2DArray.FirstArraySlice = array_start;
-		res_desc.Texture2DArray.ArraySize       = tex->array_count;
+		res_desc.Texture2DArray.FirstArraySlice = start;
+		res_desc.Texture2DArray.ArraySize       = count;
 		res_desc.Texture2DArray.MipLevels       = mip_count;
 
 		if (tex->type == skg_tex_type_cubemap) {
@@ -1412,12 +1430,12 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		} else if (tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				res_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY;
-				res_desc.Texture2DMSArray.ArraySize       = tex->array_count;
-				res_desc.Texture2DMSArray.FirstArraySlice = array_start;
+				res_desc.Texture2DMSArray.ArraySize       = count;
+				res_desc.Texture2DMSArray.FirstArraySlice = start;
 			} else {
 				res_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-				res_desc.Texture2DArray.ArraySize       = tex->array_count;
-				res_desc.Texture2DArray.FirstArraySlice = array_start;
+				res_desc.Texture2DArray.ArraySize       = count;
+				res_desc.Texture2DArray.FirstArraySlice = start;
 				res_desc.Texture2DArray.MipLevels       = mip_count;
 				res_desc.Texture2DArray.MostDetailedMip = 0;
 			}
@@ -1441,17 +1459,17 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 	} else {
 		D3D11_DEPTH_STENCIL_VIEW_DESC stencil_desc = {};
 		stencil_desc.Format = format;
-		stencil_desc.Texture2DArray.FirstArraySlice = array_start;
-		stencil_desc.Texture2DArray.ArraySize       = tex->array_count;
+		stencil_desc.Texture2DArray.FirstArraySlice = start;
+		stencil_desc.Texture2DArray.ArraySize       = count;
 		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
-				stencil_desc.Texture2DMSArray.ArraySize       = tex->array_count;
-				stencil_desc.Texture2DMSArray.FirstArraySlice = array_start;
+				stencil_desc.Texture2DMSArray.ArraySize       = count;
+				stencil_desc.Texture2DMSArray.FirstArraySlice = start;
 			} else {
 				stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
-				stencil_desc.Texture2DArray.ArraySize       = tex->array_count;
-				stencil_desc.Texture2DArray.FirstArraySlice = array_start;
+				stencil_desc.Texture2DArray.ArraySize       = count;
+				stencil_desc.Texture2DArray.FirstArraySlice = start;
 				stencil_desc.Texture2DArray.MipSlice        = 0;
 			}
 		} else {
@@ -1473,17 +1491,17 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 	if (tex->type == skg_tex_type_rendertarget) {
 		D3D11_RENDER_TARGET_VIEW_DESC target_desc = {};
 		target_desc.Format = format;
-		target_desc.Texture2DArray.FirstArraySlice = array_start;
-		target_desc.Texture2DArray.ArraySize       = tex->array_count;
+		target_desc.Texture2DArray.FirstArraySlice = start;
+		target_desc.Texture2DArray.ArraySize       = count;
 		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY;
-				target_desc.Texture2DMSArray.ArraySize       = tex->array_count;
-				target_desc.Texture2DMSArray.FirstArraySlice = array_start;
+				target_desc.Texture2DMSArray.ArraySize       = count;
+				target_desc.Texture2DMSArray.FirstArraySlice = start;
 			} else {
 				target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
-				target_desc.Texture2DArray.ArraySize       = tex->array_count;
-				target_desc.Texture2DArray.FirstArraySlice = array_start;
+				target_desc.Texture2DArray.ArraySize       = count;
+				target_desc.Texture2DArray.FirstArraySlice = start;
 				target_desc.Texture2DArray.MipSlice        = 0;
 			}
 		} else {
@@ -1495,10 +1513,33 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 			}
 		}
 
+		// Create a view for the whole thing
 		hr = d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_view);
 		if (FAILED(hr)) {
 			skg_logf(skg_log_critical, "Create Render Target View error: 0x%08X", hr);
 			return false;
+		}
+
+		// Pre-create a view for each array/mip layer, just in case
+		tex->_target_array_view = (ID3D11RenderTargetView**)malloc(sizeof(ID3D11RenderTargetView*)*tex->array_count*mip_count);
+		for (int32_t i = 0; i < tex->array_count; i++) {
+			for (uint32_t m = 0; m < mip_count; m++) {
+				if (tex->multisample > 1) {
+					target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY;
+					target_desc.Texture2DMSArray.ArraySize       = 1;
+					target_desc.Texture2DMSArray.FirstArraySlice = i;
+				} else {
+					target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+					target_desc.Texture2DArray.ArraySize       = 1;
+					target_desc.Texture2DArray.FirstArraySlice = i;
+					target_desc.Texture2DArray.MipSlice        = m;
+				}
+				hr = d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_array_view[i]);
+				if (FAILED(hr)) {
+					skg_logf(skg_log_critical, "Create Render Target View error: 0x%08X", hr);
+					return false;
+				}
+			}
 		}
 	}
 
@@ -1507,8 +1548,8 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		view.Format = DXGI_FORMAT_UNKNOWN;
 		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
 			view.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
-			view.Texture2DArray.FirstArraySlice = array_start;
-			view.Texture2DArray.ArraySize       = tex->array_count;
+			view.Texture2DArray.FirstArraySlice = start;
+			view.Texture2DArray.ArraySize       = count;
 		} else {
 			view.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
 		}
@@ -1599,7 +1640,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 			free(tex_mem);
 		}
 
-		skg_tex_make_view(tex, mip_levels, 0, true);
+		skg_tex_make_view(tex, mip_levels, -1, true);
 	} else {
 		// For dynamic textures, just upload the new value into the texture!
 		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
@@ -1821,6 +1862,17 @@ void skg_tex_destroy(skg_tex_t *tex) {
 	if (tex->_resource   ) tex->_resource   ->Release();
 	if (tex->_sampler    ) tex->_sampler    ->Release();
 	if (tex->_texture    ) tex->_texture    ->Release();
+
+	if (tex->_target_array_view) {
+		int mip_count = tex->mips == skg_mip_generate
+			? skg_mip_count(tex->width, tex->height)
+			: 1;
+		for (int32_t i = 0; i < tex->array_count * mip_count; i++) {
+			if (tex->_target_array_view[i]) tex->_target_array_view[i]->Release();
+		}
+		if (tex->_target_array_view) free(tex->_target_array_view);
+	}
+	
 	*tex = {};
 }
 

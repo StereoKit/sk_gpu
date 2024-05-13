@@ -234,7 +234,7 @@ int main_step(double t, void *) {
 
 	skg_draw_begin();
 	float clear_color[4] = { 0,0,0,1 };
-	skg_tex_target_bind(&app_surface);
+	skg_tex_target_bind(&app_surface, -1, 0);
 	skg_target_clear(true, clear_color);
 
 	hmm_mat4 view = HMM_LookAt(

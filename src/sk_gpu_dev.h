@@ -427,7 +427,7 @@ SKG_API skg_tex_t           skg_tex_create_from_layer    (void *native_tex, skg_
 SKG_API skg_tex_t           skg_tex_create               (skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, skg_mip_ mip_maps);
 SKG_API void                skg_tex_name                 (      skg_tex_t *tex, const char* name);
 SKG_API bool                skg_tex_is_valid             (const skg_tex_t *tex);
-SKG_API void                skg_tex_copy_to              (const skg_tex_t *tex, skg_tex_t *destination);
+SKG_API void                skg_tex_copy_to              (const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface);
 SKG_API void                skg_tex_copy_to_swapchain    (const skg_tex_t *tex, skg_swapchain_t *destination);
 SKG_API void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
 SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
@@ -439,7 +439,7 @@ SKG_API bool                skg_tex_get_mip_contents_arr (      skg_tex_t *tex, 
 SKG_API void*               skg_tex_get_native           (const skg_tex_t *tex);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 SKG_API void                skg_tex_clear                (skg_bind_t bind);
-SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target);
+SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level);
 SKG_API skg_tex_t          *skg_tex_target_get           ();
 SKG_API void                skg_tex_destroy              (      skg_tex_t *tex);
 SKG_API int64_t             skg_tex_fmt_to_native        (skg_tex_fmt_ format);

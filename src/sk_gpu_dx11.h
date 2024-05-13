@@ -87,6 +87,7 @@ typedef struct skg_tex_t {
 	ID3D11ShaderResourceView  *_resource;
 	ID3D11UnorderedAccessView *_unordered;
 	ID3D11RenderTargetView    *_target_view;
+	ID3D11RenderTargetView   **_target_array_view;
 	ID3D11DepthStencilView    *_depth_view;
 } skg_tex_t;
 

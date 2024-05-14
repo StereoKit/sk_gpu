@@ -54,6 +54,7 @@ typedef struct skg_tex_t {
 	uint32_t      _texture;
 	uint32_t      _framebuffer;
 	uint32_t     *_framebuffer_layers;
+	uint32_t      _physical_multisample;
 	uint32_t      _target;
 	uint32_t      _access;
 	uint32_t      _format;

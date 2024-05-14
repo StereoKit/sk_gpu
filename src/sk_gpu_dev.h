@@ -221,6 +221,7 @@ typedef enum skg_log_ {
 typedef enum skg_cap_ {
 	skg_cap_tex_layer_select = 1,
 	skg_cap_wireframe,
+	skg_cap_max,
 } skg_cap_;
 
 typedef struct {
@@ -422,7 +423,7 @@ SKG_API void                skg_swapchain_present        (      skg_swapchain_t 
 SKG_API void                skg_swapchain_bind           (      skg_swapchain_t *swapchain);
 SKG_API void                skg_swapchain_destroy        (      skg_swapchain_t *swapchain);
 
-SKG_API skg_tex_t           skg_tex_create_from_existing (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count);
+SKG_API skg_tex_t           skg_tex_create_from_existing (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_count, int32_t multisample, int32_t framebuffer_multisample);
 SKG_API skg_tex_t           skg_tex_create_from_layer    (void *native_tex, skg_tex_type_ type, skg_tex_fmt_ format, int32_t width, int32_t height, int32_t array_layer);
 SKG_API skg_tex_t           skg_tex_create               (skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, skg_mip_ mip_maps);
 SKG_API void                skg_tex_name                 (      skg_tex_t *tex, const char* name);

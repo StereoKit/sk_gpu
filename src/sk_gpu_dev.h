@@ -221,6 +221,7 @@ typedef enum skg_log_ {
 typedef enum skg_cap_ {
 	skg_cap_tex_layer_select = 1,
 	skg_cap_wireframe,
+	skg_cap_tiled_multisample,
 	skg_cap_max,
 } skg_cap_;
 

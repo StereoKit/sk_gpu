@@ -442,7 +442,6 @@ uint32_t    gl_current_framebuffer = 0;
 char*       gl_adapter_name        = nullptr;
 
 bool gl_caps[skg_cap_max] = {};
-bool gl_caps_multisample_rtt = false;
 
 ///////////////////////////////////////////
 
@@ -749,7 +748,7 @@ void gl_check_exts() {
 	for (int32_t i = 0; i < ct; i++) {
 		const char* ext = (const char *)glGetStringi(GL_EXTENSIONS, i);
 		if (strcmp(ext, "GL_AMD_vertex_shader_layer"            ) == 0) gl_caps[skg_cap_tex_layer_select] = true;
-		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2") == 0) gl_caps_multisample_rtt = true;
+		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2") == 0) gl_caps[skg_cap_tiled_multisample] = true;
 	}
 	
 #ifndef _SKG_GL_WEB
@@ -1786,9 +1785,9 @@ void gl_framebuffer_attach(uint32_t texture, uint32_t target, skg_tex_fmt_ forma
 	else if (format == skg_tex_fmt_depth16 || format == skg_tex_fmt_depth32) attach = GL_DEPTH_ATTACHMENT;
 
 	bool is_framebuffer_msaa = multisample > physical_multisample;
-	if      (array_count > 1)                                        glFramebufferTextureLayer           (GL_FRAMEBUFFER, attach,         texture, mip_level, layer);
-	else if (gl_caps_multisample_rtt == true && is_framebuffer_msaa) glFramebufferTexture2DMultisampleEXT(GL_FRAMEBUFFER, attach, target, texture, mip_level, multisample);
-	else                                                             glFramebufferTexture                (GL_FRAMEBUFFER, attach,         texture, mip_level);
+	if      (array_count > 1)                                                   glFramebufferTextureLayer           (GL_FRAMEBUFFER, attach,         texture, mip_level, layer);
+	else if (gl_caps[skg_cap_tiled_multisample] == true && is_framebuffer_msaa) glFramebufferTexture2DMultisampleEXT(GL_FRAMEBUFFER, attach, target, texture, mip_level, multisample);
+	else                                                                        glFramebufferTexture                (GL_FRAMEBUFFER, attach,         texture, mip_level);
 	
 	uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -1928,8 +1927,8 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 
 	uint32_t err = glGetError();
 	while(err) {
-		err = glGetError();
 		skg_logf(skg_log_warning, "err: %x", err);
+		err = glGetError();
 	}
 
 	if (tex_surface == -1 && dest_surface == -1 && destination->array_count > 1) {
@@ -1954,8 +1953,8 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 
 	err = glGetError();
 	while(err) {
-		err = glGetError();
 		skg_logf(skg_log_warning, "blit err: %x", err);
+		err = glGetError();
 	}
 }
 
@@ -2057,7 +2056,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	tex->height                = height;
 	tex->array_count           = data_frame_count;
 	tex->multisample           = multisample; // multisample render to texture is technically an MSAA surface, but functions like a normal single sample texture.
-	tex->_physical_multisample = gl_caps_multisample_rtt ? 1 : multisample;
+	tex->_physical_multisample = gl_caps[skg_cap_tiled_multisample] ? 1 : multisample;
 	tex->_target               = gl_tex_target(tex->type, tex->array_count, tex->_physical_multisample);
 
 	glBindTexture(tex->_target, tex->_texture);

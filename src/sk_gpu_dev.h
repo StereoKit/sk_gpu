@@ -191,6 +191,7 @@ typedef enum skg_shader_var_ {
 
 typedef enum skg_transparency_ {
 	skg_transparency_none = 1,
+	skg_transparency_alpha_to_coverage,
 	skg_transparency_blend,
 	skg_transparency_add,
 } skg_transparency_;

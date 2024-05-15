@@ -191,6 +191,7 @@ typedef enum skg_shader_var_ {
 
 typedef enum skg_transparency_ {
 	skg_transparency_none = 1,
+	skg_transparency_alpha_to_coverage,
 	skg_transparency_blend,
 	skg_transparency_add,
 } skg_transparency_;
@@ -1600,6 +1601,9 @@ void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 	desc_blend.IndependentBlendEnable = false;
 	desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 	switch (pipeline->transparency) {
+	case skg_transparency_alpha_to_coverage:
+		desc_blend.AlphaToCoverageEnable = true;
+		break;
 	case skg_transparency_blend:
 		desc_blend.RenderTarget[0].BlendEnable           = true;
 		desc_blend.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
@@ -2913,6 +2917,7 @@ DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
 #ifdef _SKG_GL_MAKE_FUNCTIONS
 
 #define GL_BLEND 0x0BE2
+#define GL_SAMPLE_ALPHA_TO_COVERAGE 0x809E
 #define GL_ZERO 0
 #define GL_ONE  1
 #define GL_SRC_COLOR                0x0300
@@ -4225,17 +4230,24 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	glUseProgram(pipeline->_shader._program);
 	
 	switch (pipeline->transparency) {
+	case skg_transparency_alpha_to_coverage:
+		glDisable(GL_BLEND);
+		glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		break;
 	case skg_transparency_blend:
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glBlendEquationSeparate(GL_FUNC_ADD, GL_MAX);
 		break;
 	case skg_transparency_add:
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
 		glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
 		break;
 	case skg_transparency_none:
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		glDisable(GL_BLEND);
 		break;
 	}

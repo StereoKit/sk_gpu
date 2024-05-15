@@ -811,6 +811,9 @@ void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 	desc_blend.IndependentBlendEnable = false;
 	desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 	switch (pipeline->transparency) {
+	case skg_transparency_alpha_to_coverage:
+		desc_blend.AlphaToCoverageEnable = true;
+		break;
 	case skg_transparency_blend:
 		desc_blend.RenderTarget[0].BlendEnable           = true;
 		desc_blend.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;

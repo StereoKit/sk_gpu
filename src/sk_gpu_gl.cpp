@@ -111,6 +111,7 @@
 #ifdef _SKG_GL_MAKE_FUNCTIONS
 
 #define GL_BLEND 0x0BE2
+#define GL_SAMPLE_ALPHA_TO_COVERAGE 0x809E
 #define GL_ZERO 0
 #define GL_ONE  1
 #define GL_SRC_COLOR                0x0300
@@ -1423,17 +1424,24 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	glUseProgram(pipeline->_shader._program);
 	
 	switch (pipeline->transparency) {
+	case skg_transparency_alpha_to_coverage:
+		glDisable(GL_BLEND);
+		glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		break;
 	case skg_transparency_blend:
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glBlendEquationSeparate(GL_FUNC_ADD, GL_MAX);
 		break;
 	case skg_transparency_add:
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
 		glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
 		break;
 	case skg_transparency_none:
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		glDisable(GL_BLEND);
 		break;
 	}

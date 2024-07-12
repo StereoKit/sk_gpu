@@ -117,8 +117,8 @@
             "binaryDir":   "${sourceDir}/bin/intermediate/Mac_Release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_C_FLAGS_RELEASE": "-Os -flto",
-                "CMAKE_CXX_FLAGS_RELEASE": "-Os -flto",
+                "CMAKE_C_FLAGS_RELEASE": "-Os",
+                "CMAKE_CXX_FLAGS_RELEASE": "-Os",
                 "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "TRUE"
             }
         }

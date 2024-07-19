@@ -342,6 +342,7 @@ GLE(void,     glAttachShader,            uint32_t program, uint32_t shader) \
 GLE(void,     glDetachShader,            uint32_t program, uint32_t shader) \
 GLE(void,     glUseProgram,              uint32_t program) \
 GLE(uint32_t, glGetUniformBlockIndex,    uint32_t program, const char *uniformBlockName) \
+GLE(void,     glUniformBlockBinding,     uint32_t program, uint32_t uniformBlockIndex, uint32_t uniformBlockBinding) \
 GLE(void,     glDeleteProgram,           uint32_t program) \
 GLE(void,     glGenVertexArrays,         int32_t n, uint32_t *arrays) \
 GLE(void,     glBindVertexArray,         uint32_t array) \
@@ -1317,33 +1318,49 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 
 		glDeleteProgram(result._program);
 		result._program = 0;
-	} else {
-#ifdef _SKG_GL_WEB
-		for (size_t i = 0; i < meta->buffer_count; i++) {
-			char t_name[64];
-			snprintf(t_name, 64, "%s", meta->buffers[i].name);
-			// $Global is a near universal buffer name, we need to scrape the
-			// '$' character out.
-			char *pr = t_name;
-			while (*pr) {
-				if (*pr == '$')
-					*pr = '_';
-				pr++;
-			}
 
-			uint32_t slot = glGetUniformBlockIndex(result._program, t_name);
+		return result;
+	}
+
+	// Set buffer binds
+	char t_name[64];
+	for (uint32_t i = 0; i < meta->buffer_count; i++) {
+		snprintf(t_name, 64, "%s", meta->buffers[i].name);
+		// $Global is a near universal buffer name, we need to scrape the
+		// '$' character out.
+		char *pr = t_name;
+		while (*pr) {
+			if (*pr == '$')
+				*pr = '_';
+			pr++;
+		}
+
+		uint32_t slot = glGetUniformBlockIndex(result._program, t_name);
+		if (slot != GL_INVALID_INDEX) {
 			glUniformBlockBinding(result._program, slot, meta->buffers[i].bind.slot);
+		} else {
+			skg_logf(skg_log_warning, "Couldn't find uniform block index for: %s", meta->buffers[i].name);
+		}
+	}
 
-			if (slot == GL_INVALID_INDEX) {
-				skg_logf(skg_log_warning, "Couldn't find uniform block index for: %s", meta->buffers[i].name);
-			}
+	// Set sampler uniforms
+	glUseProgram(result._program);
+	for (uint32_t i = 0; i < meta->resource_count; i++) {
+		int32_t loc = glGetUniformLocation(result._program, meta->resources[i].name);
+		if (loc == -1) {
+			// Sometimes the shader compiler will prefix the variable with an
+			// _, particularly if it overlaps with a keyword of some sort.
+			snprintf(t_name, 64, "_%s", meta->resources[i].name);
+			loc = glGetUniformLocation(result._program, t_name);
 		}
-		glUseProgram(result._program);
-		for (size_t i = 0; i < meta->resource_count; i++) {
-			uint32_t loc = glGetUniformLocation(result._program, meta->resources[i].name);
-			glUniform1i(loc , meta->resources[i].bind.slot);
+
+		if (loc != -1) {
+			glUniform1i(loc, meta->resources[i].bind.slot);
+		} else {
+			// This may not be much of an issue under current usage patterns,
+			// but could cause problems for compute shaders later on.
+			skg_logf(skg_log_warning, "Couldn't find uniform location for: %s (is it a compute shader buffer?)", meta->resources[i].name);
 		}
-#endif
 	}
 
 	return result;

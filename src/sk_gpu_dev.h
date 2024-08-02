@@ -148,6 +148,31 @@ typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_depth32,
 	skg_tex_fmt_depth16,
 	skg_tex_fmt_r8g8,
+
+	skg_tex_fmt_bc1_rgb_srgb,
+	skg_tex_fmt_bc1_rgb, // Best for RGB, but only 1bit of alpha with black edges. 0.5 byte/px.
+	// BC2 not really relevant, use BC3
+	skg_tex_fmt_bc3_rgba_srgb,
+	skg_tex_fmt_bc3_rgba, // Best for RGB + A. 1 byte/px. Uses BC1 for RGB, and BC4 for alpha
+	skg_tex_fmt_bc4_r, // Best for for greyscale. 0.5 byte/px.
+	skg_tex_fmt_bc5_rg, // Best for 2 channel data (such as XY normal maps). 1 byte/px. Two BC4 channels.
+	//skg_tex_fmt_bc6u, // Best for HDR / high bit depth, supports 16bit color data. 1 byte/px. Less common support.
+	//skg_tex_fmt_bc6s,
+	skg_tex_fmt_bc7_rgba_srgb,
+	skg_tex_fmt_bc7_rgba, // Higher quality RBA or A. 1 byte/px. More complex compression, similar size as BC3.
+
+	skg_tex_fmt_etc1_rgb,        // GL_ETC1_RGB8_OES, GL_RGB
+	skg_tex_fmt_etc2_rgba,       // GL_COMPRESSED_RGBA8_ETC2_EAC, GL_RGBA
+	skg_tex_fmt_etc2_rgba_srgb,  // GL_COMPRESSED_RGBA8_ETC2_EAC, GL_RGBA
+	skg_tex_fmt_etc2_r11,
+	skg_tex_fmt_etc2_rg11,
+	skg_tex_fmt_pvrtc1_rgb,  // GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG, GL_RGB
+	skg_tex_fmt_pvrtc1_rgba, // GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG, GL_RGBA
+	skg_tex_fmt_pvrtc2_rgba,      // GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG, GL_RGBA, better than astc
+	skg_tex_fmt_astc4x4_rgba,    // GL_COMPRESSED_RGBA_ASTC_4x4_KHR, GL_RGBA, better than pvrtc1
+	skg_tex_fmt_astc4x4_rgba_srgb,    // GL_COMPRESSED_RGBA_ASTC_4x4_KHR, GL_RGBA, better than pvrtc1
+	skg_tex_fmt_atc_rgb,         // GL_ATC_RGB_AMD, GL_RGB
+	skg_tex_fmt_atc_rgba,         // GL_ATC_RGB_AMD, GL_RGB
 } skg_tex_fmt_;
 
 typedef enum skg_ind_fmt_ {
@@ -447,7 +472,11 @@ SKG_API skg_tex_t          *skg_tex_target_get           ();
 SKG_API void                skg_tex_destroy              (      skg_tex_t *tex);
 SKG_API int64_t             skg_tex_fmt_to_native        (skg_tex_fmt_ format);
 SKG_API skg_tex_fmt_        skg_tex_fmt_from_native      (int64_t      format);
-SKG_API uint32_t            skg_tex_fmt_size             (skg_tex_fmt_ format);
+SKG_API uint32_t            skg_tex_fmt_memory           (skg_tex_fmt_ format, int32_t width, int32_t height);
+SKG_API uint32_t            skg_tex_fmt_block_px         (skg_tex_fmt_ format);
+SKG_API uint32_t            skg_tex_fmt_block_size       (skg_tex_fmt_ format);
+SKG_API uint32_t            skg_tex_fmt_pitch            (skg_tex_fmt_ format, int32_t width);
+SKG_API bool                skg_tex_fmt_supported        (skg_tex_fmt_ format);
 
 #include "sk_gpu_common.h"
 ///////////////////////////////////////////

@@ -271,6 +271,20 @@
 #define GL_COMPRESSED_SIGNED_R11_EAC 0x9271
 #define GL_COMPRESSED_RG11_EAC 0x9272
 #define GL_COMPRESSED_SIGNED_RG11_EAC 0x9273
+#define GL_COMPRESSED_RGB_S3TC_DXT1_EXT 0x83F0
+#define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83F1
+#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT 0x83F2
+#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
+#define GL_COMPRESSED_RGBA_ASTC_4x4_KHR 0x93B0
+#define GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR 0x93D0
+#define GL_ATC_RGB_AMD 0x8C92
+#define GL_ETC1_RGB8_OES 0x8D64
+#define GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG 0x8C00
+#define GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG 0x8C01
+#define GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG 0x8C02
+#define GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG 0x8C03
+#define GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG 0x9137
+#define GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG 0x9138
 #define GL_DEPTH_COMPONENT16 0x81A5
 #define GL_DEPTH_COMPONENT32F 0x8CAC
 #define GL_DEPTH24_STENCIL8 0x88F0
@@ -2177,10 +2191,9 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 	// Make sure we've been provided enough memory to hold this texture
 	int32_t width       = 0;
 	int32_t height      = 0;
-	size_t  format_size = skg_tex_fmt_size(tex->format);
 	skg_mip_dimensions(tex->width, tex->height, mip_level, &width, &height);
 
-	if (data_size != (size_t)width * (size_t)height * format_size) {
+	if (data_size != skg_tex_fmt_memory(tex->format, width, height)) {
 		skg_log(skg_log_critical, "Insufficient buffer size for skg_tex_get_mip_contents_arr");
 		return false;
 	}
@@ -2297,6 +2310,24 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r16f:          return GL_R16F;
 	case skg_tex_fmt_r32:           return GL_R32F;
 	case skg_tex_fmt_r8g8:          return GL_RG8;
+
+	case skg_tex_fmt_etc1_rgb:          return GL_ETC1_RGB8_OES;
+	case skg_tex_fmt_etc2_rgba:         return GL_COMPRESSED_RGBA8_ETC2_EAC;
+	case skg_tex_fmt_etc2_rgba_srgb:    return GL_COMPRESSED_SRGB8_ETC2;
+	case skg_tex_fmt_etc2_r11:          return GL_COMPRESSED_R11_EAC;
+	case skg_tex_fmt_etc2_rg11:         return GL_COMPRESSED_RG11_EAC;
+	case skg_tex_fmt_pvrtc1_rgb:        return GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
+	case skg_tex_fmt_pvrtc1_rgba:       return GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
+	case skg_tex_fmt_pvrtc2_rgba:       return GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
+	case skg_tex_fmt_astc4x4_rgba:      return GL_COMPRESSED_RGBA_ASTC_4x4_KHR;
+	case skg_tex_fmt_astc4x4_rgba_srgb: return GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR;
+	case skg_tex_fmt_atc_rgb:           return GL_ATC_RGB_AMD;
+	case skg_tex_fmt_atc_rgba:          return GL_ATC_RGB_AMD;
+
+	// GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
+	case skg_tex_fmt_bc1_rgb_srgb:      return GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
+	case skg_tex_fmt_bc3_rgba_srgb:     return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+	case skg_tex_fmt_bc5_rg:            return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 	default: return 0;
 	}
 }
@@ -2322,6 +2353,21 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case GL_R16_SNORM:          return skg_tex_fmt_r16s;
 	case GL_R32F:               return skg_tex_fmt_r32;
 	case GL_RG8:                return skg_tex_fmt_r8g8;
+
+	case GL_ETC1_RGB8_OES:                       return skg_tex_fmt_etc1_rgb;
+	case GL_COMPRESSED_RGBA8_ETC2_EAC:           return skg_tex_fmt_etc2_rgba;
+	case GL_COMPRESSED_SRGB8_ETC2:               return skg_tex_fmt_etc2_rgba_srgb;
+	case GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG:     return skg_tex_fmt_pvrtc1_rgb;
+	case GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG:    return skg_tex_fmt_pvrtc1_rgba;
+	case GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG:    return skg_tex_fmt_pvrtc2_rgba;
+	case GL_COMPRESSED_RGBA_ASTC_4x4_KHR:        return skg_tex_fmt_astc4x4_rgba;
+	case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:return skg_tex_fmt_astc4x4_rgba_srgb;
+	case GL_ATC_RGB_AMD:                         return skg_tex_fmt_atc_rgb;
+
+	case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:        return skg_tex_fmt_bc1_rgb_srgb;
+	case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:       return skg_tex_fmt_bc3_rgba_srgb;
+	case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:       return skg_tex_fmt_bc5_rg;
+
 	default: return skg_tex_fmt_none;
 	}
 }
@@ -2336,7 +2382,21 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba64u:
 	case skg_tex_fmt_rgba64s:
 	case skg_tex_fmt_rgba64f:
-	case skg_tex_fmt_rgba128:       return GL_RGBA;
+	case skg_tex_fmt_rgba128:
+	case skg_tex_fmt_atc_rgba:
+	case skg_tex_fmt_pvrtc1_rgba:
+	case skg_tex_fmt_pvrtc2_rgba:
+	case skg_tex_fmt_astc4x4_rgba:
+	case skg_tex_fmt_astc4x4_rgba_srgb:
+	case skg_tex_fmt_bc3_rgba_srgb:
+	case skg_tex_fmt_bc3_rgba:
+	case skg_tex_fmt_etc2_rgba_srgb:
+	case skg_tex_fmt_etc2_rgba:     return GL_RGBA;
+	case skg_tex_fmt_etc1_rgb:
+	case skg_tex_fmt_atc_rgb:
+	case skg_tex_fmt_pvrtc1_rgb:
+	case skg_tex_fmt_bc1_rgb_srgb:
+	case skg_tex_fmt_bc1_rgb:
 	case skg_tex_fmt_rg11b10:       return GL_RGB;
 	case skg_tex_fmt_bgra32:
 	case skg_tex_fmt_bgra32_linear:
@@ -2352,7 +2412,10 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r16u:
 	case skg_tex_fmt_r16s:
 	case skg_tex_fmt_r16f:
-	case skg_tex_fmt_r32:           return GL_RED;
+	case skg_tex_fmt_r32:
+	case skg_tex_fmt_etc2_r11:      return GL_RED;
+	case skg_tex_fmt_bc5_rg:
+	case skg_tex_fmt_etc2_rg11:
 	case skg_tex_fmt_r8g8:          return GL_RG;
 	default: return 0;
 	}
@@ -2366,23 +2429,31 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba32_linear: return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_bgra32:        return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_bgra32_linear: return GL_UNSIGNED_BYTE;
-	case skg_tex_fmt_rgb10a2:       return GL_FLOAT;
-	case skg_tex_fmt_rg11b10:       return GL_FLOAT;
-	case skg_tex_fmt_rgba64u:       return GL_UNSIGNED_SHORT;
-	case skg_tex_fmt_rgba64s:       return GL_SHORT;
-	case skg_tex_fmt_rgba64f:       return GL_HALF_FLOAT;
-	case skg_tex_fmt_rgba128:       return GL_FLOAT;
-	case skg_tex_fmt_depth16:       return GL_UNSIGNED_SHORT;
-	case skg_tex_fmt_depth32:       return GL_FLOAT;
-	case skg_tex_fmt_depthstencil:  return GL_UNSIGNED_INT_24_8;
+	case skg_tex_fmt_r8g8:          return GL_UNSIGNED_BYTE;
 	case skg_tex_fmt_r8:            return GL_UNSIGNED_BYTE;
+	case skg_tex_fmt_rgba64u:       return GL_UNSIGNED_SHORT;
+	case skg_tex_fmt_depth16:       return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_r16u:          return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_r16s:          return GL_SHORT;
-	case skg_tex_fmt_r16f:          return GL_HALF_FLOAT;
+	case skg_tex_fmt_rgba64s:       return GL_SHORT;
+	case skg_tex_fmt_rgb10a2:       return GL_FLOAT;
+	case skg_tex_fmt_rg11b10:       return GL_FLOAT;
+	case skg_tex_fmt_rgba128:       return GL_FLOAT;
+	case skg_tex_fmt_depth32:       return GL_FLOAT;
 	case skg_tex_fmt_r32:           return GL_FLOAT;
-	case skg_tex_fmt_r8g8:          return GL_UNSIGNED_BYTE;
+	case skg_tex_fmt_rgba64f:       return GL_HALF_FLOAT;
+	case skg_tex_fmt_r16f:          return GL_HALF_FLOAT;
+	case skg_tex_fmt_depthstencil:  return GL_UNSIGNED_INT_24_8;
 	default: return 0;
 	}
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_fmt_supported(skg_tex_fmt_ format) {
+	int32_t supported = 0;
+	glGetInternalformativ(GL_TEXTURE_2D, skg_tex_fmt_to_native(format), GL_INTERNALFORMAT_SUPPORTED, 1, &supported);
+	return supported;
 }
 
 #endif

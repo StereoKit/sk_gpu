@@ -80,7 +80,7 @@ uint64_t skg_hash(const char *string) {
 ///////////////////////////////////////////
 
 uint32_t skg_mip_count(int32_t width, int32_t height) {
-	return (uint32_t)log2f(fminf((float)width, (float)height)) + 1;
+	return (uint32_t)log2f(fmaxf((float)width, (float)height)) + 1;
 }
 
 ///////////////////////////////////////////
@@ -798,29 +798,77 @@ const skg_shader_var_t *skg_shader_get_var_info(const skg_shader_t *shader, int3
 
 ///////////////////////////////////////////
 
-uint32_t skg_tex_fmt_size(skg_tex_fmt_ format) {
-	switch (format) {
+uint32_t skg_tex_fmt_block_px(skg_tex_fmt_ format) {
+	// All compressed formats we support are 4x4 blocks.
+	return format < skg_tex_fmt_bc1_rgb_srgb
+		? 1
+		: 4;
+}
+
+///////////////////////////////////////////
+
+uint32_t skg_tex_fmt_block_size(skg_tex_fmt_ format) {
+	switch(format) {
+	case skg_tex_fmt_etc1_rgb:
+	case skg_tex_fmt_bc1_rgb:
+	case skg_tex_fmt_bc1_rgb_srgb:
+	case skg_tex_fmt_bc4_r:
+	case skg_tex_fmt_pvrtc1_rgb:
+	case skg_tex_fmt_pvrtc1_rgba:
+	case skg_tex_fmt_atc_rgb:
+	case skg_tex_fmt_pvrtc2_rgba:
+	case skg_tex_fmt_etc2_r11: return 8;
+	case skg_tex_fmt_bc7_rgba_srgb:
+	case skg_tex_fmt_bc7_rgba:
+	case skg_tex_fmt_etc2_rgba:
+	case skg_tex_fmt_etc2_rgba_srgb:
+	case skg_tex_fmt_bc3_rgba_srgb:
+	case skg_tex_fmt_bc3_rgba:
+	case skg_tex_fmt_bc5_rg:
+	case skg_tex_fmt_astc4x4_rgba:
+	case skg_tex_fmt_atc_rgba:
+	case skg_tex_fmt_etc2_rg11: return 16;
 	case skg_tex_fmt_rgba32:
 	case skg_tex_fmt_rgba32_linear:
 	case skg_tex_fmt_bgra32:
 	case skg_tex_fmt_bgra32_linear:
+	case skg_tex_fmt_r32:
+	case skg_tex_fmt_depth32:
+	case skg_tex_fmt_depthstencil:
 	case skg_tex_fmt_rg11b10:
-	case skg_tex_fmt_rgb10a2:       return sizeof(uint8_t )*4;
-	case skg_tex_fmt_rgba64u:
-	case skg_tex_fmt_rgba64s:
-	case skg_tex_fmt_rgba64f:       return sizeof(uint16_t)*4;
-	case skg_tex_fmt_rgba128:       return sizeof(uint32_t)*4;
-	case skg_tex_fmt_depth16:       return sizeof(uint16_t);
-	case skg_tex_fmt_depth32:       return sizeof(uint32_t);
-	case skg_tex_fmt_depthstencil:  return sizeof(uint32_t);
-	case skg_tex_fmt_r8:            return sizeof(uint8_t );
+	case skg_tex_fmt_rgb10a2: return sizeof(uint32_t);
 	case skg_tex_fmt_r16u:
 	case skg_tex_fmt_r16s:
-	case skg_tex_fmt_r16f:          return sizeof(uint16_t);
-	case skg_tex_fmt_r32:           return sizeof(uint32_t);
-	case skg_tex_fmt_r8g8:          return sizeof(uint16_t);
-	default: return 0;
+	case skg_tex_fmt_r16f:
+	case skg_tex_fmt_r8g8:
+	case skg_tex_fmt_depth16: return sizeof(uint16_t);
+	case skg_tex_fmt_r8:      return sizeof(uint8_t );
+	case skg_tex_fmt_rgba64s:
+	case skg_tex_fmt_rgba64u:
+	case skg_tex_fmt_rgba64f: return sizeof(uint16_t)*4;
+	case skg_tex_fmt_rgba128: return sizeof(float)*4;
 	}
+	return 0;
+}
+
+///////////////////////////////////////////
+
+uint32_t skg_tex_fmt_memory(skg_tex_fmt_ format, int32_t width, int32_t height) {
+	uint32_t block_px    = skg_tex_fmt_block_px  (format);
+	uint32_t block_size  = skg_tex_fmt_block_size(format);
+	uint32_t block_count = 
+		((width + (block_px-1)) / block_px) *
+		((height+ (block_px-1)) / block_px);
+	return block_count * block_size;
+}
+
+///////////////////////////////////////////
+
+uint32_t skg_tex_fmt_pitch(skg_tex_fmt_ format, int32_t width) {
+	uint32_t block_px    = skg_tex_fmt_block_px  (format);
+	uint32_t block_size  = skg_tex_fmt_block_size(format);
+	uint32_t block_count = (width + (block_px-1)) / block_px;
+	return block_count * block_size;
 }
 
 ///////////////////////////////////////////

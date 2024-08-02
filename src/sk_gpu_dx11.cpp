@@ -1404,7 +1404,7 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 		default: skg_log(skg_log_warning, "Unsupported texture format for mip maps!"); break;
 		}
 		mip_data = (void*)tex_mem[m].pSysMem;
-		tex_mem[m].SysMemPitch = (UINT)(skg_tex_fmt_size(format) * mip_w);
+		tex_mem[m].SysMemPitch = (UINT)(skg_tex_fmt_pitch(format, mip_w));
 	}
 }
 
@@ -1595,7 +1595,8 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		&& skg_can_make_mips(tex->format);
 
 	uint32_t mip_levels = (mips ? skg_mip_count(width, height) : 1);
-	uint32_t px_size    = skg_tex_fmt_size(tex->format);
+	uint32_t mem_size   = skg_tex_fmt_memory(tex->format, width, height);
+	uint32_t mem_pitch  = skg_tex_fmt_pitch (tex->format, width);
 	HRESULT  hr         = E_FAIL;
 
 	if (tex->_texture == nullptr) {
@@ -1621,7 +1622,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 			for (int32_t i = 0; i < data_frame_count; i++) {
 				tex_mem[i*mip_levels] = {};
 				tex_mem[i*mip_levels].pSysMem     = data_frames[i];
-				tex_mem[i*mip_levels].SysMemPitch = (UINT)(px_size * width);
+				tex_mem[i*mip_levels].SysMemPitch = mem_pitch;
 
 				if (mips) {
 					skg_make_mips(&tex_mem[i*mip_levels], data_frames[i], tex->format, width, height, mip_levels);
@@ -1670,9 +1671,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		uint8_t *dest_line  = (uint8_t *)tex_mem.pData;
 		uint8_t *src_line   = (uint8_t *)data_frames[0];
 		for (int i = 0; i < height; i++) {
-			memcpy(dest_line, src_line, (size_t)width * px_size);
+			memcpy(dest_line, src_line, (size_t)mem_pitch);
 			dest_line += tex_mem.RowPitch;
-			src_line  += px_size * (uint64_t)width;
+			src_line  += mem_pitch;
 		}
 		
 		if (on_main) {
@@ -1718,12 +1719,12 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 	}
 
 	// Make sure we've been provided enough memory to hold this texture
-	int32_t width       = 0;
-	int32_t height      = 0;
-	size_t  format_size = skg_tex_fmt_size(tex->format);
+	int32_t width  = 0;
+	int32_t height = 0;
 	skg_mip_dimensions(tex->width, tex->height, mip_level, &width, &height);
+	size_t  mem_size = skg_tex_fmt_memory(tex->format, width, height);
 
-	if (data_size != (size_t)width * (size_t)height * format_size) {
+	if (data_size != mem_size) {
 		skg_log(skg_log_critical, "Insufficient buffer size for skg_tex_get_mip_contents_arr");
 		return false;
 	}
@@ -1779,13 +1780,13 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 	}
 
 	// Copy it into our waiting buffer
-	uint8_t *srcPtr  = (uint8_t*)data.pData;
-	uint8_t *destPtr = (uint8_t*)ref_data;
-	size_t   msize   = width*format_size;
+	uint8_t *srcPtr    = (uint8_t*)data.pData;
+	uint8_t *destPtr   = (uint8_t*)ref_data;
+	size_t   mem_pitch = skg_tex_fmt_pitch(tex->format, width);
 	for (size_t h = 0; h < desc.Height; ++h) {
-		memcpy(destPtr, srcPtr, msize);
+		memcpy(destPtr, srcPtr, mem_pitch);
 		srcPtr  += data.RowPitch;
-		destPtr += msize;
+		destPtr += mem_pitch;
 	}
 
 	// And cleanup
@@ -1957,6 +1958,15 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	case skg_tex_fmt_r16f:          return DXGI_FORMAT_R16_FLOAT;
 	case skg_tex_fmt_r32:           return DXGI_FORMAT_R32_FLOAT;
 	case skg_tex_fmt_r8g8:          return DXGI_FORMAT_R8G8_UNORM;
+
+	case skg_tex_fmt_bc1_rgb_srgb:  return DXGI_FORMAT_BC1_UNORM_SRGB;
+	case skg_tex_fmt_bc1_rgb:       return DXGI_FORMAT_BC1_UNORM;
+	case skg_tex_fmt_bc3_rgba_srgb: return DXGI_FORMAT_BC3_UNORM_SRGB;
+	case skg_tex_fmt_bc3_rgba:      return DXGI_FORMAT_BC3_UNORM;
+	case skg_tex_fmt_bc4_r:         return DXGI_FORMAT_BC4_UNORM;
+	case skg_tex_fmt_bc5_rg:        return DXGI_FORMAT_BC5_UNORM;
+	case skg_tex_fmt_bc7_rgba_srgb: return DXGI_FORMAT_BC7_UNORM_SRGB;
+	case skg_tex_fmt_bc7_rgba:      return DXGI_FORMAT_BC7_UNORM;
 	default: return DXGI_FORMAT_UNKNOWN;
 	}
 }
@@ -1984,8 +1994,28 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case DXGI_FORMAT_R16_FLOAT:           return skg_tex_fmt_r16f;
 	case DXGI_FORMAT_R32_FLOAT:           return skg_tex_fmt_r32;
 	case DXGI_FORMAT_R8G8_UNORM:          return skg_tex_fmt_r8g8;
+
+	case DXGI_FORMAT_BC1_UNORM_SRGB: return skg_tex_fmt_bc1_rgb_srgb;
+	case DXGI_FORMAT_BC1_UNORM:      return skg_tex_fmt_bc1_rgb;
+	case DXGI_FORMAT_BC3_UNORM_SRGB: return skg_tex_fmt_bc3_rgba_srgb;
+	case DXGI_FORMAT_BC3_UNORM:      return skg_tex_fmt_bc3_rgba;
+	case DXGI_FORMAT_BC4_UNORM:      return skg_tex_fmt_bc4_r;
+	case DXGI_FORMAT_BC5_UNORM:      return skg_tex_fmt_bc5_rg;
+	case DXGI_FORMAT_BC7_UNORM_SRGB: return skg_tex_fmt_bc7_rgba_srgb;
+	case DXGI_FORMAT_BC7_UNORM:      return skg_tex_fmt_bc7_rgba;
 	default: return skg_tex_fmt_none;
 	}
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_fmt_supported(skg_tex_fmt_ format) {
+	// This doesn't check if a format is valid for rendertargets, or other more complex textures.
+	uint32_t flags;
+	uint32_t desired = D3D11_FORMAT_SUPPORT_TEXTURE2D | D3D11_FORMAT_SUPPORT_SHADER_SAMPLE;
+	if (FAILED(d3d_device->CheckFormatSupport((DXGI_FORMAT)skg_tex_fmt_to_native(format), &flags)))
+		return false;
+	return (flags & desired) == desired;
 }
 
 ///////////////////////////////////////////

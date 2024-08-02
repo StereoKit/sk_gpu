@@ -211,7 +211,7 @@ bool app_init() {
 	for (int32_t m = 0; m < (int32_t)skg_mip_count(app_tex.width, app_tex.height); m++) {
 		int32_t  checker_w, checker_h;
 		skg_mip_dimensions(app_tex.width, app_tex.height, m, &checker_w, &checker_h);
-		size_t   checker_size       = skg_tex_fmt_size(skg_tex_fmt_rgba32) * checker_w * checker_h;
+		size_t   checker_size       = skg_tex_fmt_memory(skg_tex_fmt_rgba32, checker_w, checker_h);
 		uint8_t *checker_color_data = (uint8_t*)malloc(checker_size);
 
 		char mip_name[64];
@@ -330,7 +330,7 @@ bool app_init() {
 
 	// Check array texture read
 	{
-		size_t   cube_size       = skg_tex_fmt_size(skg_tex_fmt_rgba32) * app_cubemap.width * app_cubemap.height; 
+		size_t   cube_size       = skg_tex_fmt_memory(skg_tex_fmt_rgba32, app_cubemap.width, app_cubemap.height);
 		uint8_t *cube_color_data = (uint8_t*)malloc(cube_size);
 		if (skg_tex_get_mip_contents_arr(&app_cubemap, 0, 2, cube_color_data, cube_size))
 			bmp_write("cubemap_face.bmp", app_cubemap.width, app_cubemap.height, cube_color_data);
@@ -437,7 +437,7 @@ void app_test_compute_init() {
 	compute_buff_args = skg_buffer_create(&compute_args, 1, sizeof(reaction_diffusion_args_t), skg_buffer_type_constant, skg_use_static);
 	compute_buff_a    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
 	compute_buff_b    = skg_buffer_create(data, c_size*c_size, sizeof(float)*2, skg_buffer_type_compute, skg_use_compute_readwrite);
-	compute_shader   = skg_shader_create_memory(sks_compute_test_hlsl, sizeof(sks_compute_test_hlsl));
+	compute_shader    = skg_shader_create_memory(sks_compute_test_hlsl, sizeof(sks_compute_test_hlsl));
 	skg_shader_name(&compute_shader,    "compute_shader");
 	skg_buffer_name(&compute_buff_args, "compute_args_buffer");
 	skg_buffer_name(&compute_buff_args, "compute_data_swap_a_buffer");
@@ -639,7 +639,7 @@ void app_test_rendertarget(float t) {
 	static bool has_saved = false;
 	if (!has_saved) {
 		has_saved = true;
-		size_t   size       = skg_tex_fmt_size(app_target.format) * app_target.width * app_target.height;
+		size_t   size       = skg_tex_fmt_memory(app_target.format, app_target.width, app_target.height);
 		uint8_t *color_data = (uint8_t*)malloc(size);
 		if (skg_tex_get_contents(&app_target, color_data, size))
 			bmp_write("test.bmp", app_target.width, app_target.height, color_data);

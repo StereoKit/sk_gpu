@@ -34,25 +34,25 @@ Display *x_dpy;
 
 ///////////////////////////////////////////
 
-void           *app_hwnd      = nullptr;
+void           *app_hwnd          = nullptr;
 skg_swapchain_t app_swapchain     = {};
 skg_tex_t       app_surface       = {};
 skg_tex_t       app_surface_depth = {};
-bool            app_resize    = false;
-int             app_width     = 0;
-int             app_height    = 0;
+bool            app_resize        = false;
+int             app_width         = 0;
+int             app_height        = 0;
 int             app_resize_width  = 1280;
 int             app_resize_height = 720;
-const int       app_multisample = 8;
-bool            app_run       = true;
-bool            app_stereo    = false;
-const char     *app_name      = "sk_gpu.h";
+const int       app_multisample   = 8;
+bool            app_run           = true;
+bool            app_stereo        = false;
+const char     *app_name          = "sk_gpu.h";
 
 ///////////////////////////////////////////
 
-bool main_init    ();
-void main_shutdown();
-int  main_step    (double t, void *);
+bool main_init       ();
+void main_shutdown   ();
+int  main_step       (double t, void *);
 void main_step_stereo(void *userData, int, float[16], WebXRView *views);
 
 ///////////////////////////////////////////
@@ -96,8 +96,8 @@ void resize_swapchain(int width, int height) {
 	skg_tex_destroy(&app_surface_depth);
 	app_surface       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32,        skg_mip_none);
 	app_surface_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depthstencil,  skg_mip_none);
-	skg_tex_set_contents_arr(&app_surface,       nullptr, 1, width, height, 8);
-	skg_tex_set_contents_arr(&app_surface_depth, nullptr, 1, width, height, 8);
+	skg_tex_set_contents_arr(&app_surface,       nullptr, 1, 1, width, height, 8);
+	skg_tex_set_contents_arr(&app_surface_depth, nullptr, 1, 1, width, height, 8);
 	skg_tex_attach_depth(&app_surface, &app_surface_depth);
 }
 

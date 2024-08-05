@@ -325,7 +325,7 @@ bool app_init() {
 			cube_cols[f][p] = col;
 		}
 	}
-	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, cube_face_size, cube_face_size, 1);
+	skg_tex_set_contents_arr(&app_cubemap, (const void**)&cube_cols, 6, 1, cube_face_size, cube_face_size, 1);
 	skg_tex_name(&app_cubemap, "cubemap_tex");
 
 	// Check array texture read

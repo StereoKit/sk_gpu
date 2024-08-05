@@ -1263,7 +1263,7 @@ void skg_tex_name(skg_tex_t *tex, const char* name) {
 
 void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface) {
 	if (destination->width != tex->width || destination->height != tex->height) {
-		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
+		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, 1, tex->width, tex->height, tex->multisample);
 	}
 
 	if (tex_surface != -1 && dest_surface != -1) {
@@ -1570,31 +1570,32 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 
 void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
 	const void *data_arr[1] = { data };
-	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height, 1);
+	return skg_tex_set_contents_arr(tex, data_arr, 1, 1, width, height, 1);
 }
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample) {
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t array_count, int32_t mip_count, int32_t width, int32_t height, int32_t multisample) {
 	// Some warning messages
 	if (tex->use != skg_use_dynamic && tex->_texture) {
 		skg_log(skg_log_warning, "Only dynamic textures can be updated!");
 		return;
 	}
-	if (tex->use == skg_use_dynamic && (tex->mips == skg_mip_generate || data_frame_count > 1)) {
+	if (tex->use == skg_use_dynamic && (tex->mips == skg_mip_generate || array_count > 1)) {
 		skg_log(skg_log_warning, "Dynamic textures don't support mip-maps or texture arrays!");
 		return;
 	}
 
 	tex->width       = width;
 	tex->height      = height;
-	tex->array_count = data_frame_count;
+	tex->array_count = array_count;
 	tex->multisample = multisample;
-	bool mips = 
-		   tex->mips == skg_mip_generate
-		&& skg_can_make_mips(tex->format);
+	bool generate_mips = 
+		tex->mips == skg_mip_generate  &&
+		skg_can_make_mips(tex->format) &&
+		mip_count <= 1;
 
-	uint32_t mip_levels = (mips ? skg_mip_count(width, height) : 1);
+	uint32_t mip_levels = (generate_mips ? skg_mip_count(width, height) : mip_count);
 	uint32_t mem_size   = skg_tex_fmt_memory(tex->format, width, height);
 	uint32_t mem_pitch  = skg_tex_fmt_pitch (tex->format, width);
 	HRESULT  hr         = E_FAIL;
@@ -1604,28 +1605,41 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		desc.Width            = width;
 		desc.Height           = height;
 		desc.MipLevels        = mip_levels;
-		desc.ArraySize        = data_frame_count;
+		desc.ArraySize        = array_count;
 		desc.SampleDesc.Count = multisample;
 		desc.Format           = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
 		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : D3D11_BIND_SHADER_RESOURCE;
-		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || data_frames != nullptr || data_frames[0] != nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || array_data != nullptr || array_data[0] != nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
 		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
 		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 
 		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
-		if (data_frames != nullptr && data_frames[0] != nullptr) {
-			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)data_frame_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
+		if (array_data != nullptr && array_data[0] != nullptr) {
+			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)array_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
 			if (!tex_mem) { skg_log(skg_log_critical, "Out of memory"); return;  }
 
-			for (int32_t i = 0; i < data_frame_count; i++) {
-				tex_mem[i*mip_levels] = {};
-				tex_mem[i*mip_levels].pSysMem     = data_frames[i];
-				tex_mem[i*mip_levels].SysMemPitch = mem_pitch;
+			for (int32_t i = 0; i < array_count; i++) {
+				D3D11_SUBRESOURCE_DATA *subresource = &tex_mem[i*mip_levels];
+				*subresource = {};
+				subresource->pSysMem     = array_data[i];
+				subresource->SysMemPitch = mem_pitch;
 
-				if (mips) {
-					skg_make_mips(&tex_mem[i*mip_levels], data_frames[i], tex->format, width, height, mip_levels);
+				if (generate_mips) {
+					skg_make_mips(subresource, array_data[i], tex->format, width, height, mip_levels);
+				} else {
+					int32_t mip_offset = mem_size;
+					for (uint32_t m = 1; m < mip_levels; m++) {
+						D3D11_SUBRESOURCE_DATA *mip_subresource = &tex_mem[i*mip_levels + m];
+						int32_t mip_width, mip_height;
+						skg_mip_dimensions(width, height, m, &mip_width, &mip_height);
+
+						mip_subresource->pSysMem     = ((uint8_t*)array_data[i]) + mip_offset;
+						mip_subresource->SysMemPitch = skg_tex_fmt_pitch(tex->format, mip_width);
+
+						mip_offset += skg_tex_fmt_memory(tex->format, mip_width, mip_height);
+					} 
 				}
 			}
 		}
@@ -1636,10 +1650,12 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		}
 
 		if (tex_mem != nullptr) {
-			for (int32_t i = 0; i < data_frame_count; i++) {
-				for (uint32_t m = 1; m < mip_levels; m++) {
-					free((void*)tex_mem[i*mip_levels + m].pSysMem);
-				} 
+			if (generate_mips) {
+				for (int32_t i = 0; i < array_count; i++) {
+					for (uint32_t m = 1; m < mip_levels; m++) {
+						free((void*)tex_mem[i*mip_levels + m].pSysMem);
+					} 
+				}
 			}
 			free(tex_mem);
 		}
@@ -1669,7 +1685,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		}
 
 		uint8_t *dest_line  = (uint8_t *)tex_mem.pData;
-		uint8_t *src_line   = (uint8_t *)data_frames[0];
+		uint8_t *src_line   = (uint8_t *)array_data[0];
 		for (int i = 0; i < height; i++) {
 			memcpy(dest_line, src_line, (size_t)mem_pitch);
 			dest_line += tex_mem.RowPitch;

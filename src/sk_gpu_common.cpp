@@ -21,14 +21,17 @@ void skg_log(skg_log_ level, const char *text) {
 	if (_skg_log) _skg_log(level, text);
 }
 void skg_logf (skg_log_ level, const char *text, ...) {
+	if (!_skg_log) return;
+
 	va_list args, copy;
 	va_start(args, text);
 	va_copy (copy, args);
-	size_t length = vsnprintf(nullptr, 0, text, args);
-	char*  buffer = (char*)malloc(sizeof(char) * (length + 2));
-	vsnprintf(buffer, length + 2, text, copy);
+	size_t length = vsnprintf(nullptr, 0, text, args) + 1;
+	char*  buffer = (char*)malloc(sizeof(char) * length);
+	vsnprintf(buffer, length, text, copy);
 
-	skg_log(level, buffer);
+	 _skg_log(level, text);
+
 	free(buffer);
 	va_end(args);
 	va_end(copy);

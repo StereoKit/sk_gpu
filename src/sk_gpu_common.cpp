@@ -812,6 +812,7 @@ uint32_t skg_tex_fmt_block_px(skg_tex_fmt_ format) {
 
 uint32_t skg_tex_fmt_block_size(skg_tex_fmt_ format) {
 	switch(format) {
+	case skg_tex_fmt_max:
 	case skg_tex_fmt_none: return 0;
 	case skg_tex_fmt_etc1_rgb:
 	case skg_tex_fmt_bc1_rgb:

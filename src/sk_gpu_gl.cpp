@@ -272,12 +272,18 @@
 #define GL_COMPRESSED_RG11_EAC 0x9272
 #define GL_COMPRESSED_SIGNED_RG11_EAC 0x9273
 #define GL_COMPRESSED_RGB_S3TC_DXT1_EXT 0x83F0
+#define GL_COMPRESSED_SRGB_S3TC_DXT1_EXT 0x8C4C
 #define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83F1
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT 0x8C4D
 #define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT 0x83F2
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT 0x8C4E
 #define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
 #define GL_COMPRESSED_RGBA_ASTC_4x4_KHR 0x93B0
 #define GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR 0x93D0
 #define GL_ATC_RGB_AMD 0x8C92
+#define GL_ATC_RGBA_EXPLICIT_ALPHA_AMD 0x8C93
+#define GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD 0x87EE
 #define GL_ETC1_RGB8_OES 0x8D64
 #define GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG 0x8C00
 #define GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG 0x8C01
@@ -285,6 +291,12 @@
 #define GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG 0x8C03
 #define GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG 0x9137
 #define GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG 0x9138
+#define GL_COMPRESSED_SRGB_PVRTC_2BPPV1_EXT 0x8A54
+#define GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT 0x8A55
+#define GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1_EXT 0x8A56
+#define GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT 0x8A57
+#define GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV2_IMG 0x93F0
+#define GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG 0x93F1
 #define GL_DEPTH_COMPONENT16 0x81A5
 #define GL_DEPTH_COMPONENT32F 0x8CAC
 #define GL_DEPTH24_STENCIL8 0x88F0
@@ -303,6 +315,7 @@
 #define GL_MAX_SAMPLES 0x8D57
 #define GL_PACK_ALIGNMENT 0x0D05
 #define GL_UNPACK_ALIGNMENT 0x0CF5
+#define GL_INTERNALFORMAT_SUPPORTED 0x826F
 
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_VERTEX_SHADER 0x8B31
@@ -383,9 +396,15 @@ GLE(void,     glGetInternalformativ,     uint32_t target, uint32_t internalforma
 GLE(void,     glGetTexLevelParameteriv,  uint32_t target, int32_t level, uint32_t pname, int32_t *params) \
 GLE(void,     glTexParameterf,           uint32_t target, uint32_t pname, float param) \
 GLE(void,     glTexImage2D,              uint32_t target, int32_t level, int32_t internalformat, int32_t width, int32_t height, int32_t border, uint32_t format, uint32_t type, const void *data) \
+GLE(void,     glCompressedTexImage2D,    uint32_t target, int32_t level, uint32_t internalformat, uint32_t width, uint32_t height, int32_t border, uint32_t imageSize, const void *data) \
+GLE(void,     glTexStorage2D,            uint32_t target, uint32_t levels, uint32_t internalformat, uint32_t width, uint32_t height) \
 GLE(void,     glTexStorage2DMultisample, uint32_t target, uint32_t samples, int32_t internalformat, uint32_t width, uint32_t height, uint8_t fixedsamplelocations) \
 GLE(void,     glTexStorage3DMultisample, uint32_t target, uint32_t samples, int32_t internalformat, uint32_t width, uint32_t height, uint32_t depth, uint8_t fixedsamplelocations) \
 GLE(void,     glTexImage3D,              uint32_t target, int32_t level, int32_t internalformat, uint32_t width, uint32_t height, uint32_t depth, int32_t border, uint32_t format, uint32_t type, const void *data) \
+GLE(void,     glCompressedTexImage3D,    uint32_t target, int32_t level, uint32_t internalformat, uint32_t width, uint32_t height, uint32_t depth, int32_t border, uint32_t imageSize, const void *data) \
+GLE(void,     glTexStorage3D,            uint32_t target, uint32_t level, uint32_t internalFormat, uint32_t width, uint32_t height, uint32_t depth) \
+GLE(void,     glTexSubImage3D,           uint32_t target, int32_t level, int32_t xoffset, int32_t yoffset, int32_t zoffset, uint32_t width, uint32_t height, uint32_t depth, uint32_t format, uint32_t type, const void *pixels) \
+GLE(void,     glCompressedTexSubImage3D, uint32_t target, int32_t level, int32_t xoffset, int32_t yoffset, int32_t zoffset, uint32_t width, uint32_t height, uint32_t depth, uint32_t format, uint32_t imageSize, const void *pixels) \
 GLE(void,     glCopyTexSubImage2D,       uint32_t target, int32_t level, int32_t xoffset, int32_t yoffset, int32_t x, int32_t y, uint32_t width, uint32_t height) \
 GLE(void,     glGetTexImage,             uint32_t target, int32_t level, uint32_t format, uint32_t type, void *img) \
 GLE(void,     glReadPixels,              int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t format, uint32_t type, void *data) \
@@ -457,7 +476,8 @@ skg_tex_t  *gl_active_rendertarget = nullptr;
 uint32_t    gl_current_framebuffer = 0;
 char*       gl_adapter_name        = nullptr;
 
-bool gl_caps[skg_cap_max] = {};
+bool gl_caps             [skg_cap_max    ] = {};
+bool gl_tex_fmt_supported[skg_tex_fmt_max] = {};
 
 ///////////////////////////////////////////
 
@@ -781,6 +801,27 @@ void gl_check_exts() {
 	#pragma clang diagnostic pop
 #endif
 	#endif
+
+	// Clear any errors
+	while (glGetError() != 0) {}
+
+	// Create a texture of each format to check compatibility
+	for (int32_t i=0; i<skg_tex_fmt_max; i+=1) {
+		int64_t internal_format = (int64_t)skg_tex_fmt_to_native((skg_tex_fmt_)i);
+		if (internal_format == 0) {
+			gl_tex_fmt_supported[i] = false;
+			continue;
+		}
+
+		uint32_t texture;
+		glGenTextures (1, &texture);
+		glBindTexture (GL_TEXTURE_2D, texture);
+		glTexStorage2D(GL_TEXTURE_2D, 1, (uint32_t)internal_format, 1, 1);
+
+		gl_tex_fmt_supported[i] = glGetError() == 0;
+
+		glDeleteTextures(1, &texture);
+	}
 };
 
 ///////////////////////////////////////////
@@ -1961,7 +2002,7 @@ bool skg_tex_is_valid(const skg_tex_t *tex) {
 
 void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface) {
 	if (destination->width != tex->width || destination->height != tex->height) {
-		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, tex->width, tex->height, tex->multisample);
+		skg_tex_set_contents_arr(destination, nullptr, tex->array_count, 1, tex->width, tex->height, tex->multisample);
 	}
 
 	uint32_t err = glGetError();
@@ -2069,18 +2110,30 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 #ifdef _SKG_GL_DESKTOP
 	glTexParameterf(tex->_target, GL_TEXTURE_MAX_ANISOTROPY_EXT, sample == skg_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
+
+	int32_t err = glGetError();
+	while (err != 0) {
+		skg_logf(skg_log_warning, "skg_tex_settings err: 0x%x", err);
+		err = glGetError();
+	}
 }
 
 ///////////////////////////////////////////
 
 void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32_t height) {
 	const void *data_arr[1] = { data };
-	return skg_tex_set_contents_arr(tex, data_arr, 1, width, height, 1);
+	return skg_tex_set_contents_arr(tex, data_arr, 1, 1, width, height, 1);
 }
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t data_frame_count, int32_t width, int32_t height, int32_t multisample) {
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t array_count, int32_t mip_count, int32_t width, int32_t height, int32_t multisample) {
+	int32_t err = glGetError();
+	while (err != 0) {
+		skg_logf(skg_log_info, "Clearing unsourced err: 0x%x", err);
+		err = glGetError();
+	}
+
 	if (multisample > 1) {
 		int32_t max_samples = 0;
 		glGetIntegerv(GL_MAX_SAMPLES, &max_samples);
@@ -2093,7 +2146,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 
 	tex->width                 = width;
 	tex->height                = height;
-	tex->array_count           = data_frame_count;
+	tex->array_count           = array_count;
 	tex->multisample           = multisample; // multisample render to texture is technically an MSAA surface, but functions like a normal single sample texture.
 	tex->_physical_multisample = gl_caps[skg_cap_tiled_multisample] ? 1 : multisample;
 	tex->_target               = gl_tex_target(tex->type, tex->array_count, tex->_physical_multisample);
@@ -2105,31 +2158,59 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 	else if (tex->format == skg_tex_fmt_r16u || tex->format == skg_tex_fmt_r16s || tex->format == skg_tex_fmt_r16f || tex->format == skg_tex_fmt_r8g8 || tex->format == skg_tex_fmt_depth16)
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
 
-	tex->_format    = (uint32_t)skg_tex_fmt_to_native   (tex->format);
-	uint32_t layout =           skg_tex_fmt_to_gl_layout(tex->format);
-	uint32_t type   =           skg_tex_fmt_to_gl_type  (tex->format);
+	tex->_format           = (uint32_t)skg_tex_fmt_to_native    (tex->format);
+	uint32_t layout        =           skg_tex_fmt_to_gl_layout (tex->format);
+	uint32_t type          =           skg_tex_fmt_to_gl_type   (tex->format);
+	bool     is_compressed =           skg_tex_fmt_is_compressed(tex->format);
 	if (tex->type == skg_tex_type_cubemap) {
-		if (data_frame_count != 6) {
+		if (array_count != 6) {
 			skg_log(skg_log_warning, "Cubemaps need 6 data frames");
 			return;
 		}
-		for (int32_t f = 0; f < 6; f++)
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+f , 0, tex->_format, width, height, 0, layout, type, data_frames[f]);
-	} else {
-#ifndef _SKG_GL_WEB
-		if      (tex->_target == GL_TEXTURE_2D_MULTISAMPLE)       { glTexStorage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE,       tex->multisample, tex->_format, width, height, true); }
-		else if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) { glTexStorage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, tex->multisample, tex->_format, width, height, data_frame_count, true); }
-		else if (tex->_target == GL_TEXTURE_2D_ARRAY)             { glTexImage3D             (GL_TEXTURE_2D_ARRAY, 0, tex->_format, width, height, data_frame_count, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]); }
-		else                                                      { glTexImage2D             (GL_TEXTURE_2D,       0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]); }
-#else
-		glTexImage2D(GL_TEXTURE_2D, 0, tex->_format, width, height, 0, layout, type, data_frames == nullptr ? nullptr : data_frames[0]);
-#endif
+	}
+
+	if      (tex->_target == GL_TEXTURE_2D_MULTISAMPLE)       { glTexStorage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE,       tex->multisample, tex->_format, width, height, true); }
+	else if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) { glTexStorage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, tex->multisample, tex->_format, width, height, array_count, true); }
+	else if (tex->_target == GL_TEXTURE_2D_ARRAY)             { glTexStorage3D           (GL_TEXTURE_2D_ARRAY,             mip_count,        tex->_format, width, height, array_count); }
+
+	for (int32_t array_idx = 0; array_idx < array_count; array_idx++) {
+		int32_t mip_offset = 0;
+		for (int32_t m = 0; m < mip_count; m++) {
+			int32_t mip_width, mip_height;
+			skg_mip_dimensions(width, height, m, &mip_width, &mip_height);
+			int32_t mip_bytes = skg_tex_fmt_memory(tex->format, mip_width, mip_height);
+			void*   mip_data  = array_data == nullptr ? nullptr : (uint8_t*)array_data[array_idx] + mip_offset;
+
+			if (tex->_target == GL_TEXTURE_2D_ARRAY) {
+				if (is_compressed) glCompressedTexSubImage3D(GL_TEXTURE_2D_ARRAY,                    m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, mip_bytes, mip_data);
+				else               glTexSubImage3D          (GL_TEXTURE_2D_ARRAY,                    m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, type,      mip_data);
+			} else if (tex->_target == GL_TEXTURE_CUBE_MAP) {
+				if (is_compressed) glCompressedTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, mip_bytes,    mip_data);
+				else               glTexImage2D          (GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, layout, type, mip_data);
+			} else {
+				if (is_compressed) glCompressedTexImage2D(GL_TEXTURE_2D,                             m, tex->_format, mip_width, mip_height, 0, mip_bytes,    mip_data);
+				else               glTexImage2D          (GL_TEXTURE_2D,                             m, tex->_format, mip_width, mip_height, 0, layout, type, mip_data);
+			}
+			mip_offset += mip_bytes;
+		}
+	}
+
+	err = glGetError();
+	while (err != 0) {
+		skg_logf(skg_log_warning, "skg_tex_set_contents_arr creation err: 0x%x", err);
+		err = glGetError();
 	}
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
-	if (tex->mips == skg_mip_generate)
+	if (tex->mips == skg_mip_generate && mip_count == 1) {
 		glGenerateMipmap(tex->_target);
+
+		err = glGetError();
+		if (err != 0) {
+			skg_logf(skg_log_warning, "skg_tex_set_contents_arr mip err: 0x%x", err);
+		}
+	}
 
 	if (tex->type == skg_tex_type_rendertarget) {
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer);
@@ -2147,6 +2228,12 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **data_frames, int32_t 
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
+
+		err = glGetError();
+		while (err != 0) {
+			skg_logf(skg_log_warning, "skg_tex_set_contents_arr framebuffer err: 0x%x", err);
+			err = glGetError();
+		}
 	}
 
 	skg_tex_settings(tex, tex->_address, tex->_sample, tex->_anisotropy);
@@ -2316,17 +2403,26 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	case skg_tex_fmt_etc2_rgba_srgb:    return GL_COMPRESSED_SRGB8_ETC2;
 	case skg_tex_fmt_etc2_r11:          return GL_COMPRESSED_R11_EAC;
 	case skg_tex_fmt_etc2_rg11:         return GL_COMPRESSED_RG11_EAC;
+
+// These extensions are only available on real GLES
+#if defined(_SKG_GL_ES)
 	case skg_tex_fmt_pvrtc1_rgb:        return GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
+	case skg_tex_fmt_pvrtc1_rgb_srgb:   return GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT;
 	case skg_tex_fmt_pvrtc1_rgba:       return GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
+	case skg_tex_fmt_pvrtc1_rgba_srgb:  return GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT;
 	case skg_tex_fmt_pvrtc2_rgba:       return GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
+	case skg_tex_fmt_pvrtc2_rgba_srgb:  return GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG;
 	case skg_tex_fmt_astc4x4_rgba:      return GL_COMPRESSED_RGBA_ASTC_4x4_KHR;
 	case skg_tex_fmt_astc4x4_rgba_srgb: return GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR;
 	case skg_tex_fmt_atc_rgb:           return GL_ATC_RGB_AMD;
-	case skg_tex_fmt_atc_rgba:          return GL_ATC_RGB_AMD;
+	case skg_tex_fmt_atc_rgba:          return GL_ATC_RGBA_EXPLICIT_ALPHA_AMD;
+#endif
 
 	// GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
-	case skg_tex_fmt_bc1_rgb_srgb:      return GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
-	case skg_tex_fmt_bc3_rgba_srgb:     return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+	case skg_tex_fmt_bc1_rgb_srgb:      return GL_COMPRESSED_SRGB_S3TC_DXT1_EXT;
+	case skg_tex_fmt_bc1_rgb:           return GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
+	case skg_tex_fmt_bc3_rgba_srgb:     return GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT;
+	case skg_tex_fmt_bc3_rgba:          return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
 	case skg_tex_fmt_bc5_rg:            return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 	default: return 0;
 	}
@@ -2354,18 +2450,23 @@ skg_tex_fmt_ skg_tex_fmt_from_native(int64_t format) {
 	case GL_R32F:               return skg_tex_fmt_r32;
 	case GL_RG8:                return skg_tex_fmt_r8g8;
 
-	case GL_ETC1_RGB8_OES:                       return skg_tex_fmt_etc1_rgb;
-	case GL_COMPRESSED_RGBA8_ETC2_EAC:           return skg_tex_fmt_etc2_rgba;
-	case GL_COMPRESSED_SRGB8_ETC2:               return skg_tex_fmt_etc2_rgba_srgb;
-	case GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG:     return skg_tex_fmt_pvrtc1_rgb;
-	case GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG:    return skg_tex_fmt_pvrtc1_rgba;
-	case GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG:    return skg_tex_fmt_pvrtc2_rgba;
-	case GL_COMPRESSED_RGBA_ASTC_4x4_KHR:        return skg_tex_fmt_astc4x4_rgba;
-	case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:return skg_tex_fmt_astc4x4_rgba_srgb;
-	case GL_ATC_RGB_AMD:                         return skg_tex_fmt_atc_rgb;
+	case GL_ETC1_RGB8_OES:                         return skg_tex_fmt_etc1_rgb;
+	case GL_COMPRESSED_RGBA8_ETC2_EAC:             return skg_tex_fmt_etc2_rgba;
+	case GL_COMPRESSED_SRGB8_ETC2:                 return skg_tex_fmt_etc2_rgba_srgb;
+	case GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG:       return skg_tex_fmt_pvrtc1_rgb;
+	case GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT:      return skg_tex_fmt_pvrtc1_rgb_srgb;
+	case GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG:      return skg_tex_fmt_pvrtc1_rgba;
+	case GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT:return skg_tex_fmt_pvrtc1_rgba_srgb;
+	case GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG:      return skg_tex_fmt_pvrtc2_rgba;
+	case GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG:return skg_tex_fmt_pvrtc2_rgba_srgb;
+	case GL_COMPRESSED_RGBA_ASTC_4x4_KHR:          return skg_tex_fmt_astc4x4_rgba;
+	case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:  return skg_tex_fmt_astc4x4_rgba_srgb;
+	case GL_ATC_RGB_AMD:                           return skg_tex_fmt_atc_rgb;
 
-	case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:        return skg_tex_fmt_bc1_rgb_srgb;
-	case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:       return skg_tex_fmt_bc3_rgba_srgb;
+	case GL_COMPRESSED_SRGB_S3TC_DXT1_EXT:       return skg_tex_fmt_bc1_rgb_srgb;
+	case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:        return skg_tex_fmt_bc1_rgb;
+	case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT: return skg_tex_fmt_bc3_rgba_srgb;
+	case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:       return skg_tex_fmt_bc3_rgba;
 	case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:       return skg_tex_fmt_bc5_rg;
 
 	default: return skg_tex_fmt_none;
@@ -2385,7 +2486,9 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_rgba128:
 	case skg_tex_fmt_atc_rgba:
 	case skg_tex_fmt_pvrtc1_rgba:
+	case skg_tex_fmt_pvrtc1_rgba_srgb:
 	case skg_tex_fmt_pvrtc2_rgba:
+	case skg_tex_fmt_pvrtc2_rgba_srgb:
 	case skg_tex_fmt_astc4x4_rgba:
 	case skg_tex_fmt_astc4x4_rgba_srgb:
 	case skg_tex_fmt_bc3_rgba_srgb:
@@ -2395,6 +2498,7 @@ uint32_t skg_tex_fmt_to_gl_layout(skg_tex_fmt_ format) {
 	case skg_tex_fmt_etc1_rgb:
 	case skg_tex_fmt_atc_rgb:
 	case skg_tex_fmt_pvrtc1_rgb:
+	case skg_tex_fmt_pvrtc1_rgb_srgb:
 	case skg_tex_fmt_bc1_rgb_srgb:
 	case skg_tex_fmt_bc1_rgb:
 	case skg_tex_fmt_rg11b10:       return GL_RGB;
@@ -2451,9 +2555,7 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 ///////////////////////////////////////////
 
 bool skg_tex_fmt_supported(skg_tex_fmt_ format) {
-	int32_t supported = 0;
-	glGetInternalformativ(GL_TEXTURE_2D, skg_tex_fmt_to_native(format), GL_INTERNALFORMAT_SUPPORTED, 1, &supported);
-	return supported;
+	return gl_tex_fmt_supported[format];
 }
 
 #endif

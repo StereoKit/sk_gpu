@@ -30,7 +30,7 @@ void skg_logf (skg_log_ level, const char *text, ...) {
 	char*  buffer = (char*)malloc(sizeof(char) * length);
 	vsnprintf(buffer, length, text, copy);
 
-	 _skg_log(level, text);
+	 _skg_log(level, buffer);
 
 	free(buffer);
 	va_end(args);
@@ -812,14 +812,18 @@ uint32_t skg_tex_fmt_block_px(skg_tex_fmt_ format) {
 
 uint32_t skg_tex_fmt_block_size(skg_tex_fmt_ format) {
 	switch(format) {
+	case skg_tex_fmt_none: return 0;
 	case skg_tex_fmt_etc1_rgb:
 	case skg_tex_fmt_bc1_rgb:
 	case skg_tex_fmt_bc1_rgb_srgb:
 	case skg_tex_fmt_bc4_r:
 	case skg_tex_fmt_pvrtc1_rgb:
+	case skg_tex_fmt_pvrtc1_rgb_srgb:
 	case skg_tex_fmt_pvrtc1_rgba:
+	case skg_tex_fmt_pvrtc1_rgba_srgb:
 	case skg_tex_fmt_atc_rgb:
 	case skg_tex_fmt_pvrtc2_rgba:
+	case skg_tex_fmt_pvrtc2_rgba_srgb:
 	case skg_tex_fmt_etc2_r11: return 8;
 	case skg_tex_fmt_bc7_rgba_srgb:
 	case skg_tex_fmt_bc7_rgba:
@@ -829,6 +833,7 @@ uint32_t skg_tex_fmt_block_size(skg_tex_fmt_ format) {
 	case skg_tex_fmt_bc3_rgba:
 	case skg_tex_fmt_bc5_rg:
 	case skg_tex_fmt_astc4x4_rgba:
+	case skg_tex_fmt_astc4x4_rgba_srgb:
 	case skg_tex_fmt_atc_rgba:
 	case skg_tex_fmt_etc2_rg11: return 16;
 	case skg_tex_fmt_rgba32:
@@ -872,6 +877,11 @@ uint32_t skg_tex_fmt_pitch(skg_tex_fmt_ format, int32_t width) {
 	uint32_t block_size  = skg_tex_fmt_block_size(format);
 	uint32_t block_count = (width + (block_px-1)) / block_px;
 	return block_count * block_size;
+}
+///////////////////////////////////////////
+
+bool skg_tex_fmt_is_compressed(skg_tex_fmt_ format) {
+	return format >= skg_tex_fmt_compressed_start;
 }
 
 ///////////////////////////////////////////

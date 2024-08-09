@@ -470,6 +470,27 @@ static void gl_load_extensions( ) {
 
 ///////////////////////////////////////////
 
+typedef struct gl_pipeline_state_t {
+	uint32_t          program;
+	uint32_t          layout;
+	skg_transparency_ transparency;
+	skg_cull_         cull;
+	skg_depth_test_   depth_test_type;
+	bool              depth_test;
+	bool              depth_write;
+	bool              scissor;
+	bool              wireframe;
+} gl_pipeline_state_t;
+gl_pipeline_state_t gl_pipeline = {};
+
+#if !defined(SKG_GL_EXPLICIT_STATE)
+#define PIPELINE_CHECK(state_cache, state) if ((state_cache) != (state)) { state_cache = (state);
+#define PIPELINE_CHECK_END }
+#else
+#define PIPELINE_CHECK(state_cache, state)
+#define PIPELINE_CHECK_END
+#endif
+
 int32_t     gl_active_width        = 0;
 int32_t     gl_active_height       = 0;
 skg_tex_t  *gl_active_rendertarget = nullptr;
@@ -785,6 +806,10 @@ void gl_check_exts() {
 		const char* ext = (const char *)glGetStringi(GL_EXTENSIONS, i);
 		if (strcmp(ext, "GL_AMD_vertex_shader_layer"            ) == 0) gl_caps[skg_cap_tex_layer_select] = true;
 		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2") == 0) gl_caps[skg_cap_tiled_multisample] = true;
+		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc"      ) == 0) gl_caps[skg_cap_fmt_pvrtc1] = true;
+		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc2"     ) == 0) gl_caps[skg_cap_fmt_pvrtc2] = true;
+		if (strcmp(ext, "GL_KHR_texture_compression_astc_ldr"   ) == 0) gl_caps[skg_cap_fmt_astc] = true;
+		if (strcmp(ext, "GL_AMD_compressed_ATC_texture"         ) == 0) gl_caps[skg_cap_fmt_atc] = true;
 	}
 	
 #ifndef _SKG_GL_WEB
@@ -895,16 +920,22 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 #endif // !defined(NDEBUG) && !defined(_SKG_GL_WEB)
 
 	gl_check_exts();
-	
+
 	// Some default behavior
-	glEnable   (GL_DEPTH_TEST);  
-	glEnable   (GL_CULL_FACE);
-	glCullFace (GL_BACK);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
+	glEnable(GL_DEPTH_TEST);
+	gl_pipeline.depth_test = true;
+
+	glEnable  (GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	gl_pipeline.cull = skg_cull_back;
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	gl_pipeline.transparency = skg_transparency_none;
+
 #ifdef _SKG_GL_DESKTOP
 	glEnable   (GL_TEXTURE_CUBE_MAP_SEAMLESS);
 #endif
-	
+
 	return 1;
 }
 
@@ -978,7 +1009,10 @@ void skg_target_clear(bool depth, const float *clear_color_4) {
 	if (depth) {
 		clear_mask = GL_DEPTH_BUFFER_BIT;
 		// If DepthMask is false, glClear won't clear depth
+		
+		PIPELINE_CHECK(gl_pipeline.depth_write, true)
 		glDepthMask(true);
+		PIPELINE_CHECK_END
 	}
 	if (clear_color_4) {
 		clear_mask = clear_mask | GL_COLOR_BUFFER_BIT;
@@ -1211,7 +1245,10 @@ void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
 ///////////////////////////////////////////
 
 void skg_mesh_bind(const skg_mesh_t *mesh) {
-	glBindVertexArray(mesh->_layout);
+	PIPELINE_CHECK(gl_pipeline.layout, mesh->_layout)
+		glBindVertexArray(mesh->_layout);
+	PIPELINE_CHECK_END
+
 	glBindBuffer(GL_ARRAY_BUFFER,         mesh->_vert_buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer );
 }
@@ -1399,7 +1436,9 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 	}
 
 	// Set sampler uniforms
-	glUseProgram(result._program);
+	PIPELINE_CHECK(gl_pipeline.program, result._program)
+		glUseProgram(result._program);
+	PIPELINE_CHECK_END
 	for (uint32_t i = 0; i < meta->resource_count; i++) {
 		int32_t loc = glGetUniformLocation(result._program, meta->resources[i].name);
 		if (loc == -1) {
@@ -1446,8 +1485,10 @@ void skg_shader_name(skg_shader_t *shader, const char* name) {
 ///////////////////////////////////////////
 
 void skg_shader_compute_bind(const skg_shader_t *shader) {
-	if (shader) glUseProgram(shader->_program);
-	else        glUseProgram(0);
+	uint32_t program = shader? shader->_program : 0;
+	PIPELINE_CHECK(gl_pipeline.program, program)
+		glUseProgram(program);
+	PIPELINE_CHECK_END
 }
 
 ///////////////////////////////////////////
@@ -1493,69 +1534,89 @@ void skg_pipeline_name(skg_pipeline_t *pipeline, const char* name) {
 ///////////////////////////////////////////
 
 void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
-	glUseProgram(pipeline->_shader._program);
+	PIPELINE_CHECK(gl_pipeline.program, pipeline->_shader._program)
+		glUseProgram(pipeline->_shader._program);
+	PIPELINE_CHECK_END
+
 	
-	switch (pipeline->transparency) {
-	case skg_transparency_alpha_to_coverage:
-		glDisable(GL_BLEND);
-		glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		break;
-	case skg_transparency_blend:
-		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glBlendEquationSeparate(GL_FUNC_ADD, GL_MAX);
-		break;
-	case skg_transparency_add:
-		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE);
-		glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-		break;
-	case skg_transparency_none:
-		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		glDisable(GL_BLEND);
-		break;
-	}
+	PIPELINE_CHECK(gl_pipeline.transparency, pipeline->transparency)
+		switch (pipeline->transparency) {
+		case skg_transparency_alpha_to_coverage:
+			glDisable  (GL_BLEND);
+			glEnable   (GL_SAMPLE_ALPHA_TO_COVERAGE);
+			break;
+		case skg_transparency_blend:
+			glDisable  (GL_SAMPLE_ALPHA_TO_COVERAGE);
+			glEnable   (GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glBlendEquationSeparate(GL_FUNC_ADD, GL_MAX);
+			break;
+		case skg_transparency_add:
+			glDisable  (GL_SAMPLE_ALPHA_TO_COVERAGE);
+			glEnable   (GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE);
+			glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+			break;
+		case skg_transparency_none:
+			glDisable  (GL_SAMPLE_ALPHA_TO_COVERAGE);
+			glDisable  (GL_BLEND);
+			break;
+		}
+	PIPELINE_CHECK_END
 
-	switch (pipeline->cull) {
-	case skg_cull_back: {
-		glEnable  (GL_CULL_FACE);
-		glCullFace(GL_BACK);
-	} break;
-	case skg_cull_front: {
-		glEnable  (GL_CULL_FACE);
-		glCullFace(GL_FRONT);
-	} break;
-	case skg_cull_none: {
-		glDisable(GL_CULL_FACE);
-	} break;
-	}
 
-	if (pipeline->depth_test != skg_depth_test_always)
-		 glEnable (GL_DEPTH_TEST);
-	else glDisable(GL_DEPTH_TEST);
+	PIPELINE_CHECK(gl_pipeline.cull, pipeline->cull)
+		switch (pipeline->cull) {
+		case skg_cull_back: {
+			glEnable  (GL_CULL_FACE);
+			glCullFace(GL_BACK);
+		} break;
+		case skg_cull_front: {
+			glEnable  (GL_CULL_FACE);
+			glCullFace(GL_FRONT);
+		} break;
+		case skg_cull_none: {
+			glDisable (GL_CULL_FACE);
+		} break;
+		}
+	PIPELINE_CHECK_END
 
-	if (pipeline->scissor) glEnable (GL_SCISSOR_TEST);
-	else                   glDisable(GL_SCISSOR_TEST);
 
-	glDepthMask(pipeline->depth_write);
-	switch (pipeline->depth_test) {
-	case skg_depth_test_always:        glDepthFunc(GL_ALWAYS);   break;
-	case skg_depth_test_equal:         glDepthFunc(GL_EQUAL);    break;
-	case skg_depth_test_greater:       glDepthFunc(GL_GREATER);  break;
-	case skg_depth_test_greater_or_eq: glDepthFunc(GL_GEQUAL);   break;
-	case skg_depth_test_less:          glDepthFunc(GL_LESS);     break;
-	case skg_depth_test_less_or_eq:    glDepthFunc(GL_LEQUAL);   break;
-	case skg_depth_test_never:         glDepthFunc(GL_NEVER);    break;
-	case skg_depth_test_not_equal:     glDepthFunc(GL_NOTEQUAL); break; }
+	PIPELINE_CHECK(gl_pipeline.scissor, pipeline->scissor)
+		if (pipeline->scissor) glEnable (GL_SCISSOR_TEST);
+		else                   glDisable(GL_SCISSOR_TEST);
+	PIPELINE_CHECK_END
+
+
+	PIPELINE_CHECK(gl_pipeline.depth_write, pipeline->depth_write)
+		glDepthMask(pipeline->depth_write);
+	PIPELINE_CHECK_END
+
+
+	bool depth_test = pipeline->depth_test != skg_depth_test_always;
+	PIPELINE_CHECK(gl_pipeline.depth_test, depth_test)
+		if (depth_test) glEnable (GL_DEPTH_TEST);
+		else            glDisable(GL_DEPTH_TEST);
+	PIPELINE_CHECK_END
+
+
+	PIPELINE_CHECK(gl_pipeline.depth_test_type, pipeline->depth_test)
+		switch (pipeline->depth_test) {
+		case skg_depth_test_always:        glDepthFunc(GL_ALWAYS);   break;
+		case skg_depth_test_equal:         glDepthFunc(GL_EQUAL);    break;
+		case skg_depth_test_greater:       glDepthFunc(GL_GREATER);  break;
+		case skg_depth_test_greater_or_eq: glDepthFunc(GL_GEQUAL);   break;
+		case skg_depth_test_less:          glDepthFunc(GL_LESS);     break;
+		case skg_depth_test_less_or_eq:    glDepthFunc(GL_LEQUAL);   break;
+		case skg_depth_test_never:         glDepthFunc(GL_NEVER);    break;
+		case skg_depth_test_not_equal:     glDepthFunc(GL_NOTEQUAL); break;
+		}
+	PIPELINE_CHECK_END
 	
 #ifdef _SKG_GL_DESKTOP
-	if (pipeline->wireframe) {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	} else {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	}
+	PIPELINE_CHECK(gl_pipeline.wireframe, pipeline->wireframe)
+		glPolygonMode(GL_FRONT_AND_BACK, pipeline->wireframe ? GL_LINE : GL_FILL);
+	PIPELINE_CHECK_END
 #endif
 }
 
@@ -2404,19 +2465,17 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format) {
 	case skg_tex_fmt_etc2_r11:          return GL_COMPRESSED_R11_EAC;
 	case skg_tex_fmt_etc2_rg11:         return GL_COMPRESSED_RG11_EAC;
 
-// These extensions are only available on real GLES
-#if defined(_SKG_GL_ES)
-	case skg_tex_fmt_pvrtc1_rgb:        return GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
-	case skg_tex_fmt_pvrtc1_rgb_srgb:   return GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT;
-	case skg_tex_fmt_pvrtc1_rgba:       return GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
-	case skg_tex_fmt_pvrtc1_rgba_srgb:  return GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT;
-	case skg_tex_fmt_pvrtc2_rgba:       return GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
-	case skg_tex_fmt_pvrtc2_rgba_srgb:  return GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG;
-	case skg_tex_fmt_astc4x4_rgba:      return GL_COMPRESSED_RGBA_ASTC_4x4_KHR;
-	case skg_tex_fmt_astc4x4_rgba_srgb: return GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR;
-	case skg_tex_fmt_atc_rgb:           return GL_ATC_RGB_AMD;
-	case skg_tex_fmt_atc_rgba:          return GL_ATC_RGBA_EXPLICIT_ALPHA_AMD;
-#endif
+	// These extensions are only available on real GLES
+	case skg_tex_fmt_pvrtc1_rgb:        return gl_caps[skg_cap_fmt_pvrtc1] ? GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG        : 0;
+	case skg_tex_fmt_pvrtc1_rgb_srgb:   return gl_caps[skg_cap_fmt_pvrtc1] ? GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT       : 0;
+	case skg_tex_fmt_pvrtc1_rgba:       return gl_caps[skg_cap_fmt_pvrtc1] ? GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG       : 0;
+	case skg_tex_fmt_pvrtc1_rgba_srgb:  return gl_caps[skg_cap_fmt_pvrtc1] ? GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT : 0;
+	case skg_tex_fmt_pvrtc2_rgba:       return gl_caps[skg_cap_fmt_pvrtc2] ? GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG       : 0;
+	case skg_tex_fmt_pvrtc2_rgba_srgb:  return gl_caps[skg_cap_fmt_pvrtc2] ? GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG : 0;
+	case skg_tex_fmt_astc4x4_rgba:      return gl_caps[skg_cap_fmt_astc  ] ? GL_COMPRESSED_RGBA_ASTC_4x4_KHR           : 0;
+	case skg_tex_fmt_astc4x4_rgba_srgb: return gl_caps[skg_cap_fmt_astc  ] ? GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR   : 0;
+	case skg_tex_fmt_atc_rgb:           return gl_caps[skg_cap_fmt_atc   ] ? GL_ATC_RGB_AMD                            : 0;
+	case skg_tex_fmt_atc_rgba:          return gl_caps[skg_cap_fmt_atc   ] ? GL_ATC_RGBA_EXPLICIT_ALPHA_AMD            : 0;
 
 	// GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
 	case skg_tex_fmt_bc1_rgb_srgb:      return GL_COMPRESSED_SRGB_S3TC_DXT1_EXT;

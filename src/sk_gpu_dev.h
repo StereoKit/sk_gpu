@@ -25,6 +25,12 @@ sk_gpu.h
 // Linux to run on Windows, and this may not be critical in all cases.
 //#define SKG_NO_D3DCOMPILER
 
+// For OpenGL, sk_gpu caches GL state to reduce the number of state switches
+// executed using GL's API. When debugging with a tool like RenderDoc, this can
+// obscure the draw calls a bit. You can define this to turn off this
+// optimization for clearer debug information.
+//#define SKG_GL_EXPLICIT_STATE
+
 #if   defined( SKG_FORCE_NULL )
 #define SKG_NULL
 #elif defined( SKG_FORCE_DIRECT3D11 )
@@ -251,6 +257,10 @@ typedef enum skg_cap_ {
 	skg_cap_tex_layer_select = 1,
 	skg_cap_wireframe,
 	skg_cap_tiled_multisample,
+	skg_cap_fmt_pvrtc1,
+	skg_cap_fmt_pvrtc2,
+	skg_cap_fmt_astc,
+	skg_cap_fmt_atc,
 	skg_cap_max,
 } skg_cap_;
 

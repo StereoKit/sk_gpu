@@ -1900,9 +1900,8 @@ void skg_tex_destroy(skg_tex_t *tex) {
 
 template <typename T>
 void skg_downsample_4(T *data, T data_max, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
-	*out_width  = width  / 2;
-	*out_height = height / 2;
-	*out_data   = (T*)malloc((int64_t)(*out_width) * (*out_height) * sizeof(T) * 4);
+	skg_mip_dimensions(width, height, 1, out_width, out_height);
+	*out_data = (T*)malloc((int64_t)(*out_width) * (*out_height) * sizeof(T) * 4);
 	if (*out_data == nullptr) { skg_log(skg_log_critical, "Out of memory"); return; }
 	T *result = *out_data;
 
@@ -1933,9 +1932,8 @@ void skg_downsample_4(T *data, T data_max, int32_t width, int32_t height, T **ou
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height) {
-	*out_width  = width  / 2;
-	*out_height = height / 2;
-	*out_data   = (T*)malloc((int64_t)(*out_width) * (*out_height) * sizeof(T));
+	skg_mip_dimensions(width, height, 1, out_width, out_height);
+	*out_data = (T*)malloc((int64_t)(*out_width) * (*out_height) * sizeof(T));
 	if (*out_data == nullptr) { skg_log(skg_log_critical, "Out of memory"); return; }
 	T *result = *out_data;
 

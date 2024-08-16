@@ -1152,16 +1152,10 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 
 ///////////////////////////////////////////
 
-void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
+void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind) {
 	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute)
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
-	else if (buffer->type == skg_buffer_type_vertex) {
-#ifdef _SKG_GL_WEB
-		glBindBuffer(buffer->_target, buffer->_buffer);
-#else
-		glBindVertexBuffer(bind.slot, buffer->_buffer, offset, buffer->stride);
-#endif
-	} else
+	else
 		glBindBuffer(buffer->_target, buffer->_buffer);
 }
 

@@ -541,10 +541,10 @@ void skg_buffer_clear(skg_bind_t bind) {
 }
 
 ///////////////////////////////////////////
-void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
+void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind) {
 	switch (bind.register_type) {
-	case skg_register_index:  d3d_context->IASetIndexBuffer(buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
-	case skg_register_vertex: d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, &offset); break;
+	case skg_register_index:  d3d_context->IASetIndexBuffer(buffer->_buffer, DXGI_FORMAT_R32_UINT, 0); break;
+	case skg_register_vertex: d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, NULL); break;
 	case skg_register_constant: {
 #if !defined(NDEBUG)
 		if (buffer->type != skg_buffer_type_constant) skg_log(skg_log_critical, "Attempting to bind the wrong buffer type to a constant register! Use skg_buffer_type_constant");

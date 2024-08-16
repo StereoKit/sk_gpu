@@ -457,12 +457,12 @@ void app_test_compute_destroy() {
 void app_test_compute_update() {
 	static int i = 0; 
 	skg_shader_compute_bind(&compute_shader);
-	skg_buffer_bind(&compute_buff_args, skg_bind_t{ 0, skg_stage_compute, skg_register_constant }, 0);
+	skg_buffer_bind(&compute_buff_args, skg_bind_t{ 0, skg_stage_compute, skg_register_constant });
 
 	skg_tex_bind(&compute_tex, { 1, skg_stage_compute, skg_register_readwrite });
 	for (size_t c = 0; c < 8; c++) 		{
-		skg_buffer_bind(i%2==0?&compute_buff_a:&compute_buff_b, { 0, skg_stage_compute, skg_register_resource }, 0);
-		skg_buffer_bind(i%2==0?&compute_buff_b:&compute_buff_a, { 0, skg_stage_compute, skg_register_readwrite }, 0);
+		skg_buffer_bind(i%2==0?&compute_buff_a:&compute_buff_b, { 0, skg_stage_compute, skg_register_resource  });
+		skg_buffer_bind(i%2==0?&compute_buff_b:&compute_buff_a, { 0, skg_stage_compute, skg_register_readwrite });
 
 		skg_compute(c_size/32, c_size/32, 1);
 		skg_buffer_clear({ 0, skg_stage_compute, skg_register_readwrite });
@@ -488,7 +488,7 @@ void app_test_compute_update() {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,-3,0} }) * HMM_Scale(hmm_vec3{ {9.f,9.f,9.f} }) * HMM_Rotate(90, hmm_vec3{ {1,0,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_quad.mesh);
 	skg_pipeline_bind(&app_mat_default);
@@ -527,7 +527,7 @@ void app_test_dyn_update(float time) {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,-2,0} }) * HMM_Scale(hmm_vec3{ {6,6,6} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_wave.mesh);
 	skg_pipeline_bind(&app_mat_default);
@@ -544,7 +544,7 @@ void app_test_colors(float t) {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_tri.mesh);
 	skg_pipeline_bind(&app_mat_default);
@@ -556,7 +556,7 @@ void app_test_colors(float t) {
 	world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,3,0} }) * HMM_Scale(hmm_vec3{ {1,.25f,1} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_quad.mesh);
 	skg_pipeline_bind(&app_mat_default);
@@ -567,7 +567,7 @@ void app_test_colors(float t) {
 	world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,2.75f,0} }) * HMM_Scale(hmm_vec3{ {1,.25f,1} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_quad.mesh);
 	skg_pipeline_bind(&app_mat_default);
@@ -578,7 +578,7 @@ void app_test_colors(float t) {
 		world = HMM_Transpose(HMM_Translate(hmm_vec3{ {(i/2+1) * (i%2==0?-2.0f:2.0f),2,0} }) * HMM_Scale(hmm_vec3{ {1,1,1} }));
 		memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 		skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-		skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+		skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 		skg_mesh_bind    (&app_mesh_quad.mesh);
 		skg_pipeline_bind(&app_mat_default);
@@ -593,7 +593,7 @@ void app_test_cubemap() {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {6,6,6} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_cube.mesh);
 	skg_pipeline_bind(&app_mat_cube);
@@ -621,12 +621,12 @@ void app_test_rendertarget(float t) {
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
-	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
+	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind);
 
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,0,0} }) * HMM_Scale(hmm_vec3{ {.4f,.4f,.4f} }) *HMM_Rotate((float)t * 0.05f, hmm_vec3{ {0,1,0} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst_t));
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_tri.mesh);
 	skg_pipeline_bind(&app_mat_default);
@@ -653,7 +653,7 @@ void app_test_blend() {
 	hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {0,.5f,0} }) * HMM_Scale(hmm_vec3{ {.5f,.5f,.5f} }));
 	memcpy(&app_shader_inst[0].world, &world, sizeof(float) * 16);
 	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst_t) );
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind, 0);
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_cube_inst_bind);
 
 	skg_mesh_bind    (&app_mesh_cube.mesh);
 	skg_pipeline_bind(&app_mat_transparent);
@@ -670,8 +670,8 @@ void app_test_instancing() {
 		hmm_mat4 world = HMM_Transpose(HMM_Translate(hmm_vec3{ {((float)x-0.5f)*2.5f,0,((float)y-0.5f)*2.5f} }) * HMM_Scale(hmm_vec3{{.4f,.4f,.4f}}));
 		memcpy(&app_shader_inst[i].world, &world, sizeof(float) * 16);
 	}
-	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst,         sizeof(app_shader_inst));
-	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind, 0);
+	skg_buffer_set_contents(&app_shader_inst_buffer, &app_shader_inst, sizeof(app_shader_inst));
+	skg_buffer_bind        (&app_shader_inst_buffer, app_sh_default_inst_bind);
 
 	app_mesh_t *mesh = skg_buffer_is_valid(&app_mesh_model.vert_buffer)
 		? &app_mesh_model
@@ -697,8 +697,8 @@ void app_render(float t, hmm_mat4 view, hmm_mat4 proj) {
 
 	hmm_mat4 view_proj = HMM_Transpose( proj * view );
 	memcpy(app_shader_data.view_proj, &view_proj, sizeof(float) * 16);
-	skg_buffer_set_contents(&app_shader_data_buffer, &app_shader_data,         sizeof(app_shader_data));
-	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind, 0);
+	skg_buffer_set_contents(&app_shader_data_buffer, &app_shader_data, sizeof(app_shader_data));
+	skg_buffer_bind        (&app_shader_data_buffer, app_sh_default_data_bind);
 
 	app_test_compute_update();
 	app_test_colors(t);

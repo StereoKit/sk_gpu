@@ -413,7 +413,7 @@ SKG_API void                skg_buffer_name              (      skg_buffer_t *bu
 SKG_API bool                skg_buffer_is_valid          (const skg_buffer_t *buffer);
 SKG_API void                skg_buffer_set_contents      (      skg_buffer_t *buffer, const void *data, uint32_t size_bytes);
 SKG_API void                skg_buffer_get_contents      (const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
-SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
+SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc);
 SKG_API void                skg_buffer_clear             (      skg_bind_t bind);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 

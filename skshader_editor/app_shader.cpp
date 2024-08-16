@@ -336,6 +336,6 @@ void app_shader_update_buffers() {
 	}
 	for (size_t i = 0; i < shader_buffers.count; i++) {
 		skg_buffer_set_contents(&shader_buffers[i].buffer, shader_buffers[i].data, shader_buffers[i].data_size);
-		skg_buffer_bind(&shader_buffers[i].buffer, shader_buffers[i].bind, 0);
+		skg_buffer_bind(&shader_buffers[i].buffer, shader_buffers[i].bind);
 	}
 }

@@ -89,7 +89,7 @@ void ImGui_ImplSkg_RenderDrawData(ImDrawData* draw_data) {
 	}
 
 	skg_pipeline_bind(&im_pipeline);
-	skg_buffer_bind(&im_shader_vars, { 0, skg_stage_vertex, skg_register_constant }, 0);
+	skg_buffer_bind(&im_shader_vars, { 0, skg_stage_vertex, skg_register_constant });
 	skg_mesh_bind(&im_mesh);
 
 	// Render command lists

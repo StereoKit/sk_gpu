@@ -678,7 +678,7 @@ SKG_API void                skg_buffer_name              (      skg_buffer_t *bu
 SKG_API bool                skg_buffer_is_valid          (const skg_buffer_t *buffer);
 SKG_API void                skg_buffer_set_contents      (      skg_buffer_t *buffer, const void *data, uint32_t size_bytes);
 SKG_API void                skg_buffer_get_contents      (const skg_buffer_t *buffer, void *ref_buffer, uint32_t buffer_size);
-SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc, uint32_t offset_vi);
+SKG_API void                skg_buffer_bind              (const skg_buffer_t *buffer, skg_bind_t slot_vc);
 SKG_API void                skg_buffer_clear             (      skg_bind_t bind);
 SKG_API void                skg_buffer_destroy           (      skg_buffer_t *buffer);
 
@@ -1374,10 +1374,10 @@ void skg_buffer_clear(skg_bind_t bind) {
 }
 
 ///////////////////////////////////////////
-void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
+void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind) {
 	switch (bind.register_type) {
-	case skg_register_index:  d3d_context->IASetIndexBuffer(buffer->_buffer, DXGI_FORMAT_R32_UINT, offset); break;
-	case skg_register_vertex: d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, &offset); break;
+	case skg_register_index:  d3d_context->IASetIndexBuffer(buffer->_buffer, DXGI_FORMAT_R32_UINT, 0); break;
+	case skg_register_vertex: d3d_context->IASetVertexBuffers(bind.slot, 1, &buffer->_buffer, &buffer->stride, NULL); break;
 	case skg_register_constant: {
 #if !defined(NDEBUG)
 		if (buffer->type != skg_buffer_type_constant) skg_log(skg_log_critical, "Attempting to bind the wrong buffer type to a constant register! Use skg_buffer_type_constant");
@@ -3373,6 +3373,8 @@ typedef struct gl_pipeline_state_t {
 	bool              depth_write;
 	bool              scissor;
 	bool              wireframe;
+	uint32_t          tex_bind[32];
+	uint32_t          buffer_bind[4];
 } gl_pipeline_state_t;
 gl_pipeline_state_t gl_pipeline = {};
 
@@ -3389,6 +3391,8 @@ int32_t     gl_active_height       = 0;
 skg_tex_t  *gl_active_rendertarget = nullptr;
 uint32_t    gl_current_framebuffer = 0;
 char*       gl_adapter_name        = nullptr;
+
+const uint32_t skg_settings_tex_slot = GL_TEXTURE0+33;
 
 bool gl_caps             [skg_cap_max    ] = {};
 bool gl_tex_fmt_supported[skg_tex_fmt_max] = {};
@@ -3724,6 +3728,7 @@ void gl_check_exts() {
 	while (glGetError() != 0) {}
 
 	// Create a texture of each format to check compatibility
+	glActiveTexture(skg_settings_tex_slot);
 	for (int32_t i=0; i<skg_tex_fmt_max; i+=1) {
 		int64_t internal_format = (int64_t)skg_tex_fmt_to_native((skg_tex_fmt_)i);
 		if (internal_format == 0) {
@@ -3842,6 +3847,8 @@ const char* skg_adapter_name() {
 
 void skg_shutdown() {
 	free(gl_adapter_name); gl_adapter_name = nullptr;
+
+	gl_pipeline = {};
 
 #if defined(_SKG_GL_LOAD_WGL)
 	wglMakeCurrent(NULL, NULL);
@@ -4013,6 +4020,7 @@ skg_buffer_t skg_buffer_create(const void *data, uint32_t size_count, uint32_t s
 
 	glGenBuffers(1, &result._buffer);
 	glBindBuffer(result._target, result._buffer);
+	gl_pipeline.buffer_bind[result.type] = result._buffer;
 	glBufferData(result._target, size_count * size_stride, data, use == skg_use_static ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
 
 	return result;
@@ -4039,23 +4047,22 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 		return;
 	}
 
-	glBindBuffer   (buffer->_target, buffer->_buffer);
+	PIPELINE_CHECK(gl_pipeline.buffer_bind[buffer->type], buffer->_buffer)
+	glBindBuffer(buffer->_target, buffer->_buffer);
+	PIPELINE_CHECK_END
 	glBufferSubData(buffer->_target, 0, size_bytes, data);
 }
 
 ///////////////////////////////////////////
 
-void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind, uint32_t offset) {
+void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind) {
 	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute)
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
-	else if (buffer->type == skg_buffer_type_vertex) {
-#ifdef _SKG_GL_WEB
+	else {
+		PIPELINE_CHECK(gl_pipeline.buffer_bind[buffer->type], buffer->_buffer)
 		glBindBuffer(buffer->_target, buffer->_buffer);
-#else
-		glBindVertexBuffer(bind.slot, buffer->_buffer, offset, buffer->stride);
-#endif
-	} else
-		glBindBuffer(buffer->_target, buffer->_buffer);
+		PIPELINE_CHECK_END
+	}
 }
 
 ///////////////////////////////////////////
@@ -4072,6 +4079,13 @@ void skg_buffer_clear(skg_bind_t bind) {
 ///////////////////////////////////////////
 
 void skg_buffer_destroy(skg_buffer_t *buffer) {
+	// If this buffer is currently bound, we unbind it and remove it from our
+	// pipeline cache to prevent accidental re-use of any kind.
+	if (gl_pipeline.buffer_bind[buffer->type] == buffer->_buffer) {
+		gl_pipeline.buffer_bind[buffer->type] = 0;
+		glBindBuffer(buffer->_target, 0);
+	}
+
 	uint32_t buffer_list[] = { buffer->_buffer };
 	glDeleteBuffers(1, buffer_list);
 	*buffer = {};
@@ -4111,11 +4125,14 @@ void skg_mesh_set_verts(skg_mesh_t *mesh, const skg_buffer_t *vert_buffer) {
 			mesh->_layout = 0;
 		}
 
+		PIPELINE_CHECK(gl_pipeline.buffer_bind[skg_buffer_type_vertex], mesh->_vert_buffer)
 		glBindBuffer(GL_ARRAY_BUFFER, mesh->_vert_buffer);
+		PIPELINE_CHECK_END
 
 		// Create a vertex layout
 		glGenVertexArrays(1, &mesh->_layout);
 		glBindVertexArray(mesh->_layout);
+		gl_pipeline.layout = mesh->_layout;
 		// enable the vertex data for the shader
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
@@ -4139,16 +4156,27 @@ void skg_mesh_set_inds(skg_mesh_t *mesh, const skg_buffer_t *ind_buffer) {
 
 void skg_mesh_bind(const skg_mesh_t *mesh) {
 	PIPELINE_CHECK(gl_pipeline.layout, mesh->_layout)
-		glBindVertexArray(mesh->_layout);
+	glBindVertexArray(mesh->_layout);
 	PIPELINE_CHECK_END
 
-	glBindBuffer(GL_ARRAY_BUFFER,         mesh->_vert_buffer);
+	PIPELINE_CHECK(gl_pipeline.buffer_bind[skg_buffer_type_vertex], mesh->_vert_buffer)
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->_vert_buffer);
+	PIPELINE_CHECK_END
+	
+	PIPELINE_CHECK(gl_pipeline.buffer_bind[skg_buffer_type_index], mesh->_ind_buffer)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->_ind_buffer );
+	PIPELINE_CHECK_END
 }
 
 ///////////////////////////////////////////
 
 void skg_mesh_destroy(skg_mesh_t *mesh) {
+	// If this layout is currently bound, unbind it before deleting.
+	if (gl_pipeline.layout == mesh->_layout){
+		gl_pipeline.layout = 0;
+		glBindVertexArray(0);
+	}
+
 	uint32_t vao_list[] = {mesh->_layout};
 	glDeleteVertexArrays(1, vao_list);
 	*mesh = {};
@@ -4589,6 +4617,7 @@ bool skg_pipeline_get_scissor(const skg_pipeline_t *pipeline) {
 ///////////////////////////////////////////
 
 void skg_pipeline_destroy(skg_pipeline_t *pipeline) {
+	// TODO: destroy pipeline handles and reset gl_pipeline state
 	skg_shader_meta_release(pipeline->_shader.meta);
 	*pipeline = {};
 }
@@ -4729,8 +4758,8 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	skg_tex_fmt_ color_fmt = swapchain->_surface.format;
 	skg_tex_fmt_ depth_fmt = swapchain->_surface_depth.format;
 
-	skg_tex_destroy(&swapchain->_surface);
-	skg_tex_destroy(&swapchain->_surface_depth);
+	if (skg_tex_is_valid(&swapchain->_surface      )) skg_tex_destroy(&swapchain->_surface);
+	if (skg_tex_is_valid(&swapchain->_surface_depth)) skg_tex_destroy(&swapchain->_surface_depth);
 
 	swapchain->_surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, color_fmt, skg_mip_none);
 	skg_tex_set_contents(&swapchain->_surface, nullptr, swapchain->width, swapchain->height);
@@ -5052,6 +5081,7 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 	// Multisample textures throw errors if you try to set sampler states.
 	if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE || tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) return;
 
+	glActiveTexture(skg_settings_tex_slot);
 	glBindTexture(tex->_target, tex->_texture);
 
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);
@@ -5105,6 +5135,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 	tex->_physical_multisample = gl_caps[skg_cap_tiled_multisample] ? 1 : multisample;
 	tex->_target               = gl_tex_target(tex->type, tex->array_count, tex->_physical_multisample);
 
+	glActiveTexture(skg_settings_tex_slot);
 	glBindTexture(tex->_target, tex->_texture);
 
 	if (tex->format == skg_tex_fmt_r8)
@@ -5242,7 +5273,8 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 	}
 
 	int64_t layout = skg_tex_fmt_to_gl_layout(tex->format);
-	glBindTexture (tex->_target, tex->_texture);
+	glActiveTexture(skg_settings_tex_slot);
+	glBindTexture  (tex->_target, tex->_texture);
 
 #if defined(_SKG_GL_WEB) || defined(_SKG_GL_ES)
 	// Referenced from here:
@@ -5261,8 +5293,6 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 	glBindFramebuffer   (GL_FRAMEBUFFER, 0);
 	glDeleteFramebuffers(1, &fbo);
 #else
-	glBindTexture(tex->_target, tex->_texture);
-
 	if (tex->_target == GL_TEXTURE_CUBE_MAP) {
 		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X+arr_index, mip_level, (uint32_t)layout, skg_tex_fmt_to_gl_type(tex->format), ref_data);
 	} else {
@@ -5294,8 +5324,10 @@ void skg_tex_bind(const skg_tex_t *texture, skg_bind_t bind) {
 		glBindImageTexture(bind.slot, texture->_texture, 0, false, 0, texture->_access, (uint32_t)skg_tex_fmt_to_native( texture->format ));
 #endif
 	} else {
+		PIPELINE_CHECK(gl_pipeline.tex_bind[bind.slot], texture->_texture)
 		glActiveTexture(GL_TEXTURE0 + bind.slot);
 		glBindTexture(texture->_target, texture->_texture);
+		PIPELINE_CHECK_END
 	}
 }
 
@@ -5307,6 +5339,16 @@ void skg_tex_clear(skg_bind_t bind) {
 ///////////////////////////////////////////
 
 void skg_tex_destroy(skg_tex_t *tex) {
+	// Make sure it's not bound or cached in our pipeline state
+	int32_t slot_count = sizeof(gl_pipeline.tex_bind) / sizeof(gl_pipeline.tex_bind[0]);
+	for (int32_t i = 0; i < slot_count; i++) {
+		if (gl_pipeline.tex_bind[i] != tex->_texture) continue;
+
+		glActiveTexture(GL_TEXTURE0 + i);
+		glBindTexture  (tex->_target, 0);
+		gl_pipeline.tex_bind[i] = 0;
+	}
+	
 	uint32_t tex_list[] = { tex->_texture     };
 	uint32_t fb_list [] = { tex->_framebuffer };
 	if (tex->_texture    ) glDeleteTextures    (1, tex_list);

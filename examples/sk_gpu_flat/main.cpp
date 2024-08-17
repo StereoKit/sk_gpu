@@ -92,8 +92,8 @@ void resize_swapchain(int width, int height) {
 
 	skg_swapchain_resize(&app_swapchain, app_width, app_height);
 
-	skg_tex_destroy(&app_surface);
-	skg_tex_destroy(&app_surface_depth);
+	if (skg_tex_is_valid(&app_surface      )) skg_tex_destroy(&app_surface);
+	if (skg_tex_is_valid(&app_surface_depth)) skg_tex_destroy(&app_surface_depth);
 	app_surface       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32,        skg_mip_none);
 	app_surface_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depthstencil,  skg_mip_none);
 	skg_tex_set_contents_arr(&app_surface,       nullptr, 1, 1, width, height, 8);

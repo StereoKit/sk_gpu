@@ -160,6 +160,7 @@ float4 ps(psIn input) : SV_TARGET {
 		ImGui_ImplSkg_RenderDrawData(ImGui::GetDrawData());
 
 		skg_swapchain_present(&g_pSwapChain);
+		skg_draw_end();
 	}
 
 	// Cleanup

@@ -53,3 +53,7 @@ typedef struct skg_swapchain_t {
 
 typedef struct skg_platform_data_t {
 } skg_platform_data_t;
+
+typedef struct skg_timer_t {
+	uint64_t last_time;
+} skg_timer_t;

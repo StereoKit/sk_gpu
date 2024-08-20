@@ -199,9 +199,6 @@ int32_t skg_init(const char *, void *adapter_id) {
 	desc_depthstate.BackFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
 	d3d_device->CreateDepthStencilState(&desc_depthstate, &d3d_depthstate);
 
-	// This sets the default rasterize, depth_stencil, topology mode, etc.
-	skg_draw_begin();
-
 	return 1;
 }
 
@@ -227,6 +224,8 @@ void skg_shutdown() {
 ///////////////////////////////////////////
 
 void skg_draw_begin() {
+	skg_timer_begin_frame();
+
 	ID3D11CommandList* command_list = nullptr;
 	WaitForSingleObject(d3d_deferred_mtx, INFINITE);
 	d3d_deferred->FinishCommandList(false, &command_list);
@@ -241,12 +240,18 @@ void skg_draw_begin() {
 
 ///////////////////////////////////////////
 
+void skg_draw_end() {
+	skg_timer_end_frame();
+}
+
+///////////////////////////////////////////
+
 skg_platform_data_t skg_get_platform_data() {
 	skg_platform_data_t result = {};
-	result._d3d11_device = d3d_device;
+	result._d3d11_device           = d3d_device;
 	result._d3d11_deferred_context = d3d_deferred;
-	result._d3d_deferred_mtx = d3d_deferred_mtx;
-	result._d3d_main_thread_id = d3d_main_thread;
+	result._d3d_deferred_mtx       = d3d_deferred_mtx;
+	result._d3d_main_thread_id     = d3d_main_thread;
 	return result;
 }
 
@@ -2055,6 +2060,66 @@ DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
 	case skg_ind_fmt_u8:  return DXGI_FORMAT_R8_UINT;
 	default: abort(); break;
 	}
+}
+
+///////////////////////////////////////////
+
+const int32_t frame_buffering = 5;
+ID3D11Query*                        frame_queries[frame_buffering] = {};
+int32_t                             frame_in_flight = 0;
+D3D11_QUERY_DATA_TIMESTAMP_DISJOINT frame_query_freq;
+bool                                frame_query_checked;
+
+void skg_timer_begin_frame () {
+	if(frame_queries[0] == nullptr) {
+		D3D11_QUERY_DESC desc = {};
+		desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+		for (int32_t i = 0; i < frame_buffering; i++)
+			d3d_device->CreateQuery(&desc, &frame_queries[i]);
+	}
+	frame_in_flight += 1;
+	frame_query_checked = false;
+	d3d_context->Begin(frame_queries[frame_in_flight%frame_buffering]);
+}
+
+///////////////////////////////////////////
+
+void skg_timer_end_frame () {
+	d3d_context->End(frame_queries[frame_in_flight%frame_buffering]);
+}
+
+///////////////////////////////////////////
+
+skg_timer_t skg_timer_create () {
+	skg_timer_t      result = {};
+	D3D11_QUERY_DESC desc   = {};
+	desc.Query = D3D11_QUERY_TIMESTAMP;
+	for (int32_t i = 0; i < frame_buffering; i++)
+		d3d_device->CreateQuery(&desc, &result._query[i]);
+	return result;
+}
+
+///////////////////////////////////////////
+
+void skg_timer_insert (skg_timer_t *timer) {
+	d3d_context->End(timer->_query[frame_in_flight%frame_buffering]);
+}
+
+///////////////////////////////////////////
+
+double skg_timer_get_time (skg_timer_t *timer) {
+	if (frame_query_checked == false) {
+		frame_query_checked = true;
+		d3d_context->GetData(frame_queries[(frame_in_flight+1)%frame_buffering], &frame_query_freq, sizeof(frame_query_freq), 0);
+	}
+	
+	if (frame_query_freq.Frequency == 0)
+		return 0;
+
+	if (!frame_query_freq.Disjoint) {
+		d3d_context->GetData(timer->_query[(frame_in_flight+1)%frame_buffering], &timer->last_time, sizeof(uint64_t), 0);
+	}
+	return (timer->last_time / (double)frame_query_freq.Frequency);
 }
 
 #endif

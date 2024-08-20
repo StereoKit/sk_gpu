@@ -401,6 +401,7 @@ SKG_API void                skg_event_begin              (const char *name);
 SKG_API void                skg_event_end                ();
 
 SKG_API void                skg_draw_begin               ();
+SKG_API void                skg_draw_end                 ();
 SKG_API void                skg_draw                     (int32_t index_start, int32_t index_base, int32_t index_count, int32_t instance_count);
 SKG_API void                skg_compute                  (uint32_t thread_count_x, uint32_t thread_count_y, uint32_t thread_count_z);
 SKG_API void                skg_viewport                 (const int32_t *xywh);
@@ -491,6 +492,13 @@ SKG_API uint32_t            skg_tex_fmt_block_size       (skg_tex_fmt_ format);
 SKG_API uint32_t            skg_tex_fmt_pitch            (skg_tex_fmt_ format, int32_t width);
 SKG_API bool                skg_tex_fmt_supported        (skg_tex_fmt_ format);
 SKG_API bool                skg_tex_fmt_is_compressed    (skg_tex_fmt_ format);
+
+SKG_API void                skg_timer_begin_frame        ();
+SKG_API void                skg_timer_end_frame          ();
+SKG_API skg_timer_t         skg_timer_create             ();
+SKG_API void                skg_timer_insert             (skg_timer_t *timer);
+SKG_API double              skg_timer_get_time           (skg_timer_t *timer);
+
 
 #include "sk_gpu_common.h"
 ///////////////////////////////////////////

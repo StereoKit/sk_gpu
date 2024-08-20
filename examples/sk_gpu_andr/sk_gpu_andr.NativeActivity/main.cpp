@@ -145,6 +145,7 @@ static void engine_draw_frame(struct engine* engine) {
 	app_render(frame * 0.016f, view, proj);
 
 	skg_swapchain_present(&engine->swapchain);
+	skg_draw_end();
 }
 
 static void engine_term_display(struct engine* engine) {

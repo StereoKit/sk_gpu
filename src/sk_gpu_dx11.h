@@ -1,6 +1,5 @@
 #pragma once
 #include "sk_gpu_dev.h"
-
 // Forward declare our D3D structs, so we don't have to pay the cost for
 // including the d3d11 header in every file that includes this one.
 struct ID3D11Buffer;
@@ -18,6 +17,7 @@ struct ID3D11RenderTargetView;
 struct ID3D11DepthStencilView;
 struct IDXGISwapChain1;
 struct ID3D11Texture2D;
+struct ID3D11Query;
 
 ///////////////////////////////////////////
 
@@ -105,3 +105,8 @@ typedef struct skg_platform_data_t {
 	void *_d3d_deferred_mtx;
 	uint32_t _d3d_main_thread_id;
 } skg_platform_data_t;
+
+typedef struct skg_timer_t {
+	uint64_t     last_time; 
+	ID3D11Query *_query[5];
+} skg_timer_t;

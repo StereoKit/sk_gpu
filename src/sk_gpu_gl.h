@@ -101,3 +101,7 @@ typedef struct skg_platform_data_t {
 	void *_glx_context;
 #endif
 } skg_platform_data_t;
+
+typedef struct skg_timer_t {
+	uint64_t last_time;
+} skg_timer_t;

@@ -247,6 +247,9 @@ int main_step(double t, void *) {
 
 	skg_tex_copy_to_swapchain(&app_surface, &app_swapchain);
 	skg_swapchain_present(&app_swapchain);
+	
+	skg_draw_end();
+
 	return 1;
 }
 
@@ -271,6 +274,7 @@ void main_step_stereo(void* userData, int, float[16], WebXRView* views) {
 		skg_event_end();
 	}
 
+	skg_draw_end();
 	skg_viewport(old_viewport);
 }
 

@@ -1559,8 +1559,26 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 				break;
 			}
 		});
+		
+		// Check if we had an external texture. We need to know this now, but
+		// the callback above doesn't happen until later.
+		bool use_external = false;
+		for (spirv_cross::Resource &image : resources.separate_images) {
+			const std::string &name = glsl.get_name(image.id);
+
+			for (size_t i = 0; i < var_meta.count; i++) {
+				if (strcmp(var_meta[i].name, name.c_str()) != 0) continue;
+				if (sksc_check_tags(var_meta[i].tag, "external")) {
+					use_external = true;
+				}
+				break;
+			}
+		}
 
 		glsl.add_header_line("#extension GL_EXT_gpu_shader5 : enable");
+		if (use_external == true && lang == skg_shader_lang_glsl_es) {
+			glsl.add_header_line("#extension GL_OES_EGL_image_external_essl3 : enable");
+		}
 		// Add custom header lines for vertex shaders
 		if (src_stage->stage == skg_stage_vertex) {
 			glsl.add_header_line("#ifdef GL_AMD_vertex_shader_layer");

@@ -1,40 +1,25 @@
-#include "stereokit.hlslinc"
-
-//--name = sk/skybox
-//--blur = 0
-
-float blur; 
+#include "stereokit.hlsli"
 
 struct vsIn {
-	float4 pos  : SV_POSITION;
-	float3 norm : NORMAL0;
+	float4 pos : SV_Position;
 };
 struct psIn {
-	float4 pos  : SV_POSITION;
+	float4 pos  : SV_Position;
 	float3 norm : NORMAL0;
 	uint view_id : SV_RenderTargetArrayIndex;
 };
-struct psOut {
-    float4 color : SV_Target;
-    float  depth : SV_Depth;
-};
 
 psIn vs(vsIn input, uint id : SV_InstanceID) {
-	psIn output;
-	output.pos     = mul(float4(input.pos.xyz, 0), sk_viewproj[sk_inst[id].view_id]);
-	output.view_id = sk_inst[id].view_id;
-	output.norm    = input.norm;
-	return output;
+	psIn o;
+	o.view_id = id % sk_view_count;
+	id        = id / sk_view_count;
+	o.pos     = float4(input.pos.xy, 1, 1);
+
+	float4 proj_inv = mul(o.pos, sk_proj_inv[o.view_id]);
+	o.norm = mul(float4(proj_inv.xyz, 0), transpose(sk_view[o.view_id])).xyz;
+	return o;
 }
 
-psOut ps(vsIn input) {
-	psOut result;
-
-	float w, h;
-	uint mip_levels;
-	sk_cubemap.GetDimensions(0, w, h, mip_levels);
-
-	result.color = sk_cubemap.SampleLevel(sk_cubemap_s, input.norm, blur * mip_levels);
-	result.depth = 0.99999;
-	return result;
+float4 ps(psIn input) : SV_TARGET {
+	return sk_cubemap.Sample(sk_cubemap_s, input.norm);
 }

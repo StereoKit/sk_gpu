@@ -101,6 +101,7 @@ typedef enum skg_tex_type_ {
 	skg_tex_type_cubemap,
 	skg_tex_type_rendertarget,
 	skg_tex_type_depth,
+	skg_tex_type_depth_readable,
 } skg_tex_type_;
 
 typedef enum skg_use_ {

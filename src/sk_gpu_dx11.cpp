@@ -46,8 +46,10 @@ ID3DUserDefinedAnnotation *d3d_annotate = nullptr;
 
 ///////////////////////////////////////////
 
-bool        skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
-DXGI_FORMAT skg_ind_to_dxgi  (skg_ind_fmt_ format);
+bool        skg_tex_make_view    (skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
+DXGI_FORMAT skg_ind_to_dxgi      (skg_ind_fmt_ format);
+int64_t     d3d_tex_fmt_to_native(skg_tex_fmt_ format, bool depth_readable);
+DXGI_FORMAT d3d_tex_fmt_to_view  (int64_t format);
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -1267,11 +1269,11 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 	}
 
 	if (tex_surface != -1 && dest_surface != -1) {
-		d3d_context->ResolveSubresource(destination->_texture, tex_surface, tex->_texture, dest_surface, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
+		d3d_context->ResolveSubresource(destination->_texture, tex_surface, tex->_texture, dest_surface, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable));
 	} else {
 		if (tex->multisample > 1) {
 			for (int32_t i = 0; i < tex->array_count; i++)
-				d3d_context->ResolveSubresource(destination->_texture, i, tex->_texture, i, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
+				d3d_context->ResolveSubresource(destination->_texture, i, tex->_texture, i, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable));
 		} else {
 			d3d_context->CopyResource(destination->_texture, tex->_texture);
 		}
@@ -1293,7 +1295,7 @@ bool skg_tex_is_valid(const skg_tex_t *tex) {
 ///////////////////////////////////////////
 
 void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
-	if (depth->type == skg_tex_type_depth) {
+	if (depth->type == skg_tex_type_depth || depth->type == skg_tex_type_depth_readable) {
 		if (tex->_depth_view) tex->_depth_view->Release();
 		tex->_depth_view = depth->_depth_view;
 		tex->_depth_view->AddRef();
@@ -1331,7 +1333,7 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 	desc_sampler.Filter   = filter;
 	desc_sampler.MaxAnisotropy  = anisotropy;
 	desc_sampler.MaxLOD         = D3D11_FLOAT32_MAX;
-	desc_sampler.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	desc_sampler.ComparisonFunc = D3D11_COMPARISON_LESS;
 
 	// D3D will already return the same sampler when provided the same 
 	// settings, so we can just lean on that to prevent sampler duplicates :)
@@ -1411,7 +1413,7 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 ///////////////////////////////////////////
 
 bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader) {
-	DXGI_FORMAT format = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
+	DXGI_FORMAT format = d3d_tex_fmt_to_view(d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable));
 	HRESULT     hr     = E_FAIL;
 	
 	int32_t start = array_start == -1 ? 0 : array_start;
@@ -1459,9 +1461,10 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 				return false;
 			}
 		}
-	} else {
+	} 
+	if (tex->type == skg_tex_type_depth || tex->type == skg_tex_type_depth_readable) {
 		D3D11_DEPTH_STENCIL_VIEW_DESC stencil_desc = {};
-		stencil_desc.Format = format;
+		stencil_desc.Format = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, false);
 		stencil_desc.Texture2DArray.FirstArraySlice = start;
 		stencil_desc.Texture2DArray.ArraySize       = count;
 		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
@@ -1607,9 +1610,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 		desc.MipLevels        = mip_levels;
 		desc.ArraySize        = array_count;
 		desc.SampleDesc.Count = multisample;
-		desc.Format           = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
-		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : D3D11_BIND_SHADER_RESOURCE;
-		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || array_data != nullptr || array_data[0] != nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+		desc.Format           = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable);
+		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : tex->type == skg_tex_type_depth_readable ? D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE : D3D11_BIND_SHADER_RESOURCE;
+		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || tex->type == skg_tex_type_depth_readable || array_data != nullptr || array_data[0] != nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
 		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
@@ -1951,7 +1954,7 @@ void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 
 ///////////////////////////////////////////
 
-int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
+int64_t d3d_tex_fmt_to_native(skg_tex_fmt_ format, bool depth_readable) {
 	switch (format) {
 	case skg_tex_fmt_rgba32:        return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	case skg_tex_fmt_rgba32_linear: return DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -1963,9 +1966,9 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	case skg_tex_fmt_rgba64s:       return DXGI_FORMAT_R16G16B16A16_SNORM;
 	case skg_tex_fmt_rgba64f:       return DXGI_FORMAT_R16G16B16A16_FLOAT;
 	case skg_tex_fmt_rgba128:       return DXGI_FORMAT_R32G32B32A32_FLOAT;
-	case skg_tex_fmt_depth16:       return DXGI_FORMAT_D16_UNORM;
-	case skg_tex_fmt_depth32:       return DXGI_FORMAT_D32_FLOAT;
-	case skg_tex_fmt_depthstencil:  return DXGI_FORMAT_D24_UNORM_S8_UINT;
+	case skg_tex_fmt_depth16:       return depth_readable ? DXGI_FORMAT_R16_TYPELESS   : DXGI_FORMAT_D16_UNORM;
+	case skg_tex_fmt_depth32:       return depth_readable ? DXGI_FORMAT_R32_TYPELESS   : DXGI_FORMAT_D32_FLOAT;
+	case skg_tex_fmt_depthstencil:  return depth_readable ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_D24_UNORM_S8_UINT;
 	case skg_tex_fmt_r8:            return DXGI_FORMAT_R8_UNORM;
 	case skg_tex_fmt_r16u:          return DXGI_FORMAT_R16_UNORM;
 	case skg_tex_fmt_r16s:          return DXGI_FORMAT_R16_SNORM;
@@ -1983,6 +1986,23 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	case skg_tex_fmt_bc7_rgba:      return DXGI_FORMAT_BC7_UNORM;
 	default: return DXGI_FORMAT_UNKNOWN;
 	}
+}
+
+///////////////////////////////////////////
+
+DXGI_FORMAT d3d_tex_fmt_to_view(int64_t format) {
+	switch (format) {
+	case DXGI_FORMAT_R16_TYPELESS:   return DXGI_FORMAT_R16_UNORM;
+	case DXGI_FORMAT_R32_TYPELESS:   return DXGI_FORMAT_R32_FLOAT;
+	case DXGI_FORMAT_R24G8_TYPELESS: return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	default: return (DXGI_FORMAT)format;
+	}
+}
+
+///////////////////////////////////////////
+
+int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
+	return d3d_tex_fmt_to_native(format, false);
 }
 
 ///////////////////////////////////////////

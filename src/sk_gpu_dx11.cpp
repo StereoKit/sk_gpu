@@ -1189,6 +1189,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result.mips        = color_desc.MipLevels > 1 ? skg_mip_generate : skg_mip_none;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, -1, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
+	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, 0);
 
 	return result;
 }
@@ -1212,6 +1213,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, array_layer, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
+	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, 0);
 
 	return result;
 }

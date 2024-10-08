@@ -1,7 +1,7 @@
 // https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
 
 #define _CRT_SECURE_NO_WARNINGS
-
+#define _CRT_INTERNAL_NONSTDC_NAMES 1
 #include <sys/stat.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -10,6 +10,15 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <direct.h>
+
+// These are missing from MSVC's copy of sys/stat.h
+#if !defined(S_ISREG) && defined(S_IFMT) && defined(S_IFREG)
+  #define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+  #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+
 #elif defined(__linux__) || defined(__APPLE__)
 #include <sys/types.h>
 #include <unistd.h>
@@ -68,7 +77,6 @@ bool                path_is_file  (const char *path);
 bool                path_is_wild  (const char *path);
 char               *path_absolute (const char *relative_dir);
 bool                recurse_mkdir (const char *dirname);
-void                make_cs_name  (const char *name, char *out_cs_name);
 
 ///////////////////////////////////////////
 
@@ -117,7 +125,7 @@ compiler_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	}
 
 	compiler_settings_t result = {};
-	result.replace_ext           = false;
+	result.replace_ext           = true;
 	result.output_header         = false;
 	result.output_skcs           = false;
 	result.force_sks             = false;
@@ -289,11 +297,9 @@ void compile_file(const char *src_filename, compiler_settings_t *settings) {
 	char dir     [path_size];
 	char name    [path_size];
 	char name_ext[path_size];
-	char cs_name [path_size];
 	file_dir     (src_filename, dir,      sizeof(dir));
 	file_name    (src_filename, name,     sizeof(name));
 	file_name_ext(src_filename, name_ext, sizeof(name_ext));
-	make_cs_name (name, cs_name);
 
 	const char *dest_folder    = settings->out_folder ? settings->out_folder : dir;
 	char        trailing_char  = dest_folder[strlen(dest_folder) - 1];
@@ -309,7 +315,7 @@ void compile_file(const char *src_filename, compiler_settings_t *settings) {
 	char new_filename_cs [path_size];
 	snprintf(new_filename_sks, sizeof(new_filename_sks), "%s%s%s.sks",        dest_folder, trailing_slash, name_ext_mod);
 	snprintf(new_filename_h,   sizeof(new_filename_h  ), "%s%s%s.h",          dest_folder, trailing_slash, name_ext_mod);
-	snprintf(new_filename_cs,  sizeof(new_filename_cs ), "%s%sMaterial%s.cs", dest_folder, trailing_slash, cs_name);
+	snprintf(new_filename_cs,  sizeof(new_filename_cs ), "%s%sMaterial%s.cs", dest_folder, trailing_slash, name_ext_mod);
 
 	// Skip this file if it hasn't changed 
 	uint64_t src_file_time          = file_time(src_filename);
@@ -673,11 +679,8 @@ void make_cs_name(const char *name, char *out_cs_name) {
 
 bool write_skcs(const char *filename, void *file_data, size_t file_size, const char *original_name, skg_shader_file_t *file) {
 	char name      [path_size];
-	char cs_name   [path_size];
 	char cs_varname[path_size];
 	snprintf(name, path_size, "%s", original_name);
-
-	make_cs_name(original_name, cs_name);
 
 	// '.' may be common, and will bork the variable name
 	size_t len = strlen(name);
@@ -706,7 +709,7 @@ class Material%s : Material
 	/// compiled from %s.hlsl. </summary>
 	public Material%s() : base(SourceShader) {}
 
-)", original_name, cs_name, original_name, cs_name);
+)", original_name, name, original_name, name);
 
 	for (uint32_t i=0; i<file->meta->resource_count; i+=1) {
 		skg_shader_resource_t *res = &file->meta->resources[i];
@@ -861,11 +864,7 @@ void file_dir(const char *file, char *out_path, size_t path_size) {
 
 bool file_exists(const char *path) {
 	struct stat buffer;
-#if _WIN32
-	return (stat(path, &buffer) == 0);
-#else
 	return (stat(path, &buffer) == 0 && !(S_ISDIR(buffer.st_mode)));
-#endif
 }
 
 ///////////////////////////////////////////

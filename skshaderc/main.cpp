@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <libgen.h>
+#include <ctype.h>
 #endif
 
 #define SKG_IMPL

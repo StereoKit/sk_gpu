@@ -18,7 +18,7 @@
 #endif
 
 #define SKG_IMPL
-#define SKG_FORCE_NULL 
+#define SKG_FORCE_NULL
 #include "../sk_gpu.h"
 
 #define SKSC_IMPL
@@ -32,6 +32,8 @@ typedef struct compiler_settings_t {
 	bool replace_ext;
 	bool output_header;
 	bool output_zipped;
+	bool output_skcs;
+	bool force_sks;
 	bool output_raw_shaders;
 	bool only_if_changed;
 	char *out_folder;
@@ -50,7 +52,8 @@ bool                read_file     (const char *filename, char **out_text, size_t
 bool                write_file    (const char *filename, void *file_data, size_t file_size);
 bool                write_file_txt(const char *filename, void *file_data, size_t file_size);
 bool                write_header  (const char *filename, void *file_data, skg_shader_ops_t *vs_shader_op_info, skg_shader_ops_t *ps_shader_op_info, size_t file_size, bool zipped);
-void                write_stages  (const skg_shader_file_t *file, const char *folder, bool trailing_slash, const char *name_ext);
+bool                write_skcs    (const char *filename, void *file_data, size_t file_size, const char* original_name, skg_shader_file_t *file);
+bool                write_stages  (const skg_shader_file_t *file, const char *folder, bool trailing_slash, const char *name_ext);
 void                compile_file  (const char *filename, compiler_settings_t *settings);
 void                iterate_dir   (const char *directory_path, void *callback_data, void (*on_item)(void *callback_data, const char *name, bool file));
 compiler_settings_t check_settings(int32_t argc, char **argv, bool *exit); 
@@ -64,6 +67,7 @@ bool                path_is_file  (const char *path);
 bool                path_is_wild  (const char *path);
 char               *path_absolute (const char *relative_dir);
 bool                recurse_mkdir (const char *dirname);
+void                make_cs_name  (const char *name, char *out_cs_name);
 
 ///////////////////////////////////////////
 
@@ -77,14 +81,17 @@ int main(int argc, char **argv) {
 	sksc_init();
 
 #if defined(_WIN32)
-	const char *path = argv[argc - 1];
-	if (path_is_file(path) && !path_is_wild(path)) {
-		compile_file(path, &settings);
-	} else {
-		iterate_dir(path, &settings, [](void *callback_data, const char *src_filename, bool file) {
-			if (!file) return;
-			compile_file(src_filename, (compiler_settings_t*)callback_data);
-		});
+	for (size_t i = 1; i < argc; i++) {
+		const char *path = argv[i];
+
+		if (file_exists(path)) {
+			compile_file(path, &settings);
+		} else if (path_is_file(path) && path_is_wild(path)) {
+			iterate_dir(path, &settings, [](void *callback_data, const char *src_filename, bool file) {
+				if (!file) return;
+				compile_file(src_filename, (compiler_settings_t*)callback_data);
+			});
+		}
 	}
 #else
 	for (size_t i = 1; i < argc; i++) {
@@ -109,9 +116,11 @@ compiler_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	}
 
 	compiler_settings_t result = {};
-	result.replace_ext     = false;
-	result.output_header   = false;
-	result.only_if_changed = true;
+	result.replace_ext           = false;
+	result.output_header         = false;
+	result.output_skcs           = false;
+	result.force_sks             = false;
+	result.only_if_changed       = true;
 	result.shaderc.debug         = false;
 	result.shaderc.optimize      = 3;
 	result.shaderc.row_major     = false;
@@ -125,6 +134,8 @@ compiler_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 	bool set_targets = false;
 	for (int32_t i=1; i<argc-1; i++) {
 		if      (strcmp(argv[i], "-h" ) == 0) result.output_header         = true;
+		else if (strcmp(argv[i], "-sk") == 0) result.output_skcs           = true;
+		else if (strcmp(argv[i], "-sks")== 0) result.force_sks             = true;
 		else if (strcmp(argv[i], "-z" ) == 0) result.output_zipped         = true;
 		else if (strcmp(argv[i], "-raw")== 0) result.output_raw_shaders    = true;
 		else if (strcmp(argv[i], "-e" ) == 0) result.replace_ext           = false;
@@ -221,10 +232,14 @@ Options:
 	-z		Zips and compresses output data with miniz
 	-raw		Outputs the raw shader stage data as additional files in the same
 			directory. Useful for debugging shader transpilation.
+	-sk		This outputs a StereoKit compatible C# file for the shader, and
+			skips outputting a normal .sks file.
+	-sks		If some other flag like -sk prevents outputting a .sks file,
+			this flag will force the .sks to be made anyhow.
 	-e		Appends the sks extension to the resulting file instead of 
 			replacing the extension with sks. Default will replace the 
 			extension.
-	-s		Silent, no errors, warnings or info are printed when compiling 
+	-s		Silent, no errors, warnings or info are printed when compiling
 			shaders.
 	-sw		No info or warnings are printed when compiling shaders.
 	-si		No info is printed when compiling shaders.
@@ -273,24 +288,42 @@ void compile_file(const char *src_filename, compiler_settings_t *settings) {
 	char dir     [path_size];
 	char name    [path_size];
 	char name_ext[path_size];
+	char cs_name [path_size];
 	file_dir     (src_filename, dir,      sizeof(dir));
 	file_name    (src_filename, name,     sizeof(name));
 	file_name_ext(src_filename, name_ext, sizeof(name_ext));
+	make_cs_name (name, cs_name);
 
-	char        new_filename[path_size];
 	const char *dest_folder    = settings->out_folder ? settings->out_folder : dir;
 	char        trailing_char  = dest_folder[strlen(dest_folder) - 1];
-	bool        trailing_slash = trailing_char == '/' || trailing_char == '\\';
-	if (settings->replace_ext) {
-		snprintf(new_filename, sizeof(new_filename), "%s%s%s.%s", dest_folder, trailing_slash ? "":"/", name,     settings->output_header?"h":"sks");
-	} else {
-		snprintf(new_filename, sizeof(new_filename), "%s%s%s.%s", dest_folder, trailing_slash ? "":"/", name_ext, settings->output_header?"h":"sks");
-	}
+	const char *trailing_slash = trailing_char == '/' ? "/" : (trailing_char == '\\' ? "\\" : "");
+	const char *name_ext_mod   = settings->replace_ext ? name : name_ext;
+	bool        make_sks       = settings->force_sks || (
+		settings->output_header      == false && 
+		settings->output_raw_shaders == false && 
+		settings->output_skcs        == false);
+
+	char new_filename_sks[path_size];
+	char new_filename_h  [path_size];
+	char new_filename_cs [path_size];
+	snprintf(new_filename_sks, sizeof(new_filename_sks), "%s%s%s.sks",        dest_folder, trailing_slash, name_ext_mod);
+	snprintf(new_filename_h,   sizeof(new_filename_h  ), "%s%s%s.h",          dest_folder, trailing_slash, name_ext_mod);
+	snprintf(new_filename_cs,  sizeof(new_filename_cs ), "%s%sMaterial%s.cs", dest_folder, trailing_slash, cs_name);
 
 	// Skip this file if it hasn't changed 
-	uint64_t src_file_time      = file_time(src_filename);
-	uint64_t compiled_file_time = file_time(new_filename);
-	if (settings->only_if_changed && src_file_time < compiled_file_time && exe_file_time < compiled_file_time) {
+	uint64_t src_file_time          = file_time(src_filename);
+	uint64_t compiled_file_time_sks = make_sks                     ? file_time(new_filename_sks) : UINT64_MAX;
+	uint64_t compiled_file_time_h   = settings->output_header      ? file_time(new_filename_h)   : UINT64_MAX;
+	uint64_t compiled_file_time_cs  = settings->output_skcs        ? file_time(new_filename_cs)  : UINT64_MAX;
+	uint64_t compiled_file_time_raw = settings->output_raw_shaders ? 0                           : UINT64_MAX;
+	uint64_t oldest_time = compiled_file_time_sks;
+	if (oldest_time > compiled_file_time_h)
+		oldest_time = compiled_file_time_h;
+	if (oldest_time > compiled_file_time_cs)
+		oldest_time = compiled_file_time_cs;
+	if (oldest_time > compiled_file_time_raw)
+		oldest_time = compiled_file_time_raw;
+	if (settings->only_if_changed && src_file_time < oldest_time && exe_file_time < oldest_time) {
 		if (!settings->shaderc.silent_info) {
 			printf("File '%s' is already up-to-date, skipping...\n", src_filename);
 		}
@@ -299,69 +332,88 @@ void compile_file(const char *src_filename, compiler_settings_t *settings) {
 
 	char  *file_text;
 	size_t file_size;
-	if (read_file(src_filename, &file_text, &file_size)) {
-		skg_shader_file_t file;
-		sksc_log(log_level_info, "Compiling %s..", src_filename);
-		if (sksc_compile(src_filename, file_text, &settings->shaderc, &file)) {
+	if (read_file(src_filename, &file_text, &file_size) == false) {
+		printf("Couldn't read file '%s'!\n", src_filename);
+		return;
+	}
+	
+	skg_shader_file_t file;
+	sksc_log(log_level_info, "Compiling %s..", src_filename);
+	if (sksc_compile(src_filename, file_text, &settings->shaderc, &file)) {
+		
+		// Turn the shader data into a binary file
+		void  *sks_data;
+		size_t sks_size;
+		sksc_build_file(&file, &sks_data, &sks_size);
+		
+		// Zip data
+		bool err = false;
+		if (settings->output_zipped) {
+			mz_ulong sks_size_z = mz_compressBound((mz_ulong)sks_size);
+			void*    sks_data_z = malloc(sks_size_z);
 			
-			// Turn the shader data into a binary file
-			void  *sks_data;
-			size_t sks_size;
-			sksc_build_file(&file, &sks_data, &sks_size);
-			
-			// Zip data
-			bool err = false;
-			if (settings->output_zipped) {
-				mz_ulong sks_size_z = mz_compressBound((mz_ulong)sks_size);
-				void*    sks_data_z = malloc(sks_size_z);
-				
-				int status = mz_compress2((unsigned char*)sks_data_z, &sks_size_z, (unsigned char*)sks_data, (mz_ulong)sks_size, MZ_BEST_COMPRESSION);
-				if (status != MZ_OK) {
-					sksc_log(log_level_err, "Failed to compress data! %d\n", status);
-					err = true;
-				}
-				
-				free(sks_data);
-				sks_data = sks_data_z;
-				sks_size = sks_size_z;
+			int status = mz_compress2((unsigned char*)sks_data_z, &sks_size_z, (unsigned char*)sks_data, (mz_ulong)sks_size, MZ_BEST_COMPRESSION);
+			if (status != MZ_OK) {
+				sksc_log(log_level_err, "Failed to compress data! %d\n", status);
+				err = true;
 			}
+			
+			free(sks_data);
+			sks_data = sks_data_z;
+			sks_size = sks_size_z;
+		}
 
-			// Write to file
-			if (!err) {
-				// Make sure the folder exists
-				char folder[path_size];
-				file_dir(new_filename, folder, sizeof(folder));
-				recurse_mkdir(folder);
+		// Write to file
+		if (!err) {
+			// Make sure the folder exists
+			char folder[path_size];
+			file_dir(new_filename_sks, folder, sizeof(folder));
+			recurse_mkdir(folder);
 
-				char* abs_file = path_absolute(new_filename);
-				bool written = settings->output_header
-					? write_header(abs_file, sks_data, &file.meta->ops_vertex, &file.meta->ops_pixel, sks_size, settings->output_zipped)
-					: write_file  (abs_file, sks_data, sks_size);
+			if (settings->output_skcs) {
+				char* abs_file = path_absolute(new_filename_cs);
+				bool  success  = write_skcs(abs_file, sks_data, sks_size, name, &file);
 
-				if (settings->output_raw_shaders) {
-					write_stages(&file, dest_folder, trailing_slash, name_ext);
-				}
-
-				if (written) sksc_log(log_level_info, "Compiled successfully to %s", abs_file);
+				if (success) sksc_log(log_level_info, "Compiled successfully to %s", abs_file);
 				else         sksc_log(log_level_err,  "Failed to write file! %s", abs_file);
 			}
-			free(sks_data);
+			if (settings->output_header) {
+				char* abs_file = path_absolute(new_filename_h);
+				bool  success  = write_header(abs_file, sks_data, &file.meta->ops_vertex, &file.meta->ops_pixel, sks_size, settings->output_zipped);
 
-			skg_shader_file_destroy(&file);
+				if (success) sksc_log(log_level_info, "Compiled successfully to %s", abs_file);
+				else         sksc_log(log_level_err,  "Failed to write file! %s", abs_file);
+			}
+			if (settings->output_raw_shaders) {
+				char* abs_file = path_absolute(new_filename_cs);
+				bool  success  = write_stages(&file, dest_folder, trailing_slash, name_ext);
+
+				if (success) sksc_log(log_level_info, "Compiled raw files successfully to %s", dest_folder);
+				else         sksc_log(log_level_err,  "Failed to write raw files! %s", dest_folder);
+			}
+			if (make_sks) {
+				char* abs_file = path_absolute(new_filename_sks);
+				bool  success  = write_file(abs_file, sks_data, sks_size);
+
+				if (success) sksc_log(log_level_info, "Compiled successfully to %s", abs_file);
+				else         sksc_log(log_level_err,  "Failed to write file! %s", abs_file);
+			}
 		}
-		
-		char* abs_src_file = path_absolute(src_filename);
-		sksc_log_print(abs_src_file, &settings->shaderc);
-		sksc_log_clear();
-		free(file_text);
-	} else {
-		printf("Couldn't read file '%s'!\n", src_filename);
+		free(sks_data);
+
+		skg_shader_file_destroy(&file);
 	}
+	
+	char* abs_src_file = path_absolute(src_filename);
+	sksc_log_print(abs_src_file, &settings->shaderc);
+	sksc_log_clear();
+	free(file_text);
 }
 
 ///////////////////////////////////////////
 
-void write_stages(const skg_shader_file_t *file, const char *folder, bool trailing_slash, const char *name_ext) {
+bool write_stages(const skg_shader_file_t *file, const char *folder, bool trailing_slash, const char *name_ext) {
+	bool result = true;
 	for (uint32_t i = 0; i < file->stage_count; i++) {
 		skg_shader_file_stage_t *stage = &file->stages[i];
 
@@ -383,11 +435,12 @@ void write_stages(const skg_shader_file_t *file, const char *folder, bool traili
 		}
 		snprintf(sub_filename, sizeof(sub_filename), "%s%s%s.%s.%s", folder, trailing_slash ? "":"/", name_ext, stage_name, lang);
 		if (text) {
-			write_file_txt(sub_filename, stage->code, stage->code_size-1);
+			result = write_file_txt(sub_filename, stage->code, stage->code_size-1) && result;
 		} else {
-			write_file    (sub_filename, stage->code, stage->code_size);
+			result = write_file    (sub_filename, stage->code, stage->code_size)   && result;
 		}
 	}
+	return result;
 }
 
 ///////////////////////////////////////////
@@ -544,9 +597,11 @@ bool write_file(const char *filename, void *file_data, size_t file_size) {
 ///////////////////////////////////////////
 
 bool write_file_txt(const char *filename, void *file_data, size_t file_size) {
+	printf("Writing: %s\n", filename);
 	// Open and write
 	FILE *fp = fopen(filename, "w");
 	if (fp == nullptr) {
+		printf("...failed\n");
 		return false;
 	}
 	fwrite(file_data, file_size, 1, fp);
@@ -575,7 +630,7 @@ bool write_header(const char *filename, void *file_data, skg_shader_ops_t *vs_sh
 	if (vs_shader_op_info) fprintf(fp, "// --Vertex shader ops--\n// total  : %d\n// texture: %d\n// flow   : %d\n", vs_shader_op_info->total, vs_shader_op_info->tex_read, vs_shader_op_info->dynamic_flow);
 	if (ps_shader_op_info) fprintf(fp, "// --Pixel shader ops-- \n// total  : %d\n// texture: %d\n// flow   : %d\n", ps_shader_op_info->total, ps_shader_op_info->tex_read, ps_shader_op_info->dynamic_flow);
 	if (ps_shader_op_info || vs_shader_op_info) fprintf(fp, "\n");
-	int32_t ct = fprintf(fp, "const unsigned char sks_%s%s[%zu] = {\n", name, zipped ? "_zip" : "", file_size);
+	int32_t ct = fprintf(fp, "const unsigned char sks_%s%s[%zu] = {", name, zipped ? "_zip" : "", file_size);
 	for (size_t i = 0; i < file_size; i++) {
 		unsigned char byte = ((unsigned char *)file_data)[i];  
 		ct += fprintf(fp, "%d,", byte);
@@ -585,6 +640,140 @@ bool write_header(const char *filename, void *file_data, skg_shader_ops_t *vs_sh
 		}
 	}
 	fprintf(fp, "};\n");
+	fflush(fp);
+	fclose(fp);
+
+	return true;
+}
+
+///////////////////////////////////////////
+
+void make_cs_name(const char *name, char *out_cs_name) {
+	const char* src = name;
+	char* dst = out_cs_name;
+
+	bool upper = true;
+	while (*src != 0) {
+		char c = *src;
+		src++;
+
+		if (c == '.') continue;
+		if (c == '_') { upper = true; continue; }
+
+		*dst = upper ? toupper(c) : c;
+		dst++;
+
+		upper = false;
+	}
+	*dst = '\0';
+}
+
+///////////////////////////////////////////
+
+bool write_skcs(const char *filename, void *file_data, size_t file_size, const char *original_name, skg_shader_file_t *file) {
+	char name      [path_size];
+	char cs_name   [path_size];
+	char cs_varname[path_size];
+	snprintf(name, path_size, "%s", original_name);
+
+	make_cs_name(original_name, cs_name);
+
+	// '.' may be common, and will bork the variable name
+	size_t len = strlen(name);
+	for (size_t i = 0; i < len; i++) {
+		if (name[i] == '.') name[i] = '_';
+	}
+
+	FILE *fp = fopen(filename, "w");
+	if (fp == nullptr) {
+		return false;
+	}
+	
+	fprintf(fp, "// This file was generated by skshaderc.\n\n");
+	fprintf(fp, "// --Vertex shader ops--\n// total  : %d\n// texture: %d\n// flow   : %d\n", file->meta->ops_vertex.total, file->meta->ops_vertex.tex_read, file->meta->ops_vertex.dynamic_flow);
+	fprintf(fp, "// --Pixel shader ops--\n// total  : %d\n// texture: %d\n// flow   : %d\n", file->meta->ops_pixel.total,  file->meta->ops_pixel.tex_read,  file->meta->ops_pixel.dynamic_flow);
+
+	fprintf(fp, R"(
+using StereoKit;
+
+/// <summary> An auto-generated class wrapping the '%s' Shader as a Material
+/// with discoverable type-safe bindings. This also bakes the shader data into
+/// the application binary instead of as an asset file. </summary>
+class Material%s : Material
+{
+	/// <summary> Constructs a new instance of a Material based on the Shader
+	/// compiled from %s.hlsl. </summary>
+	public Material%s() : base(SourceShader) {}
+
+)", original_name, cs_name, original_name, cs_name);
+
+	for (uint32_t i=0; i<file->meta->resource_count; i+=1) {
+		skg_shader_resource_t *res = &file->meta->resources[i];
+		make_cs_name(res->name, cs_varname);
+		fprintf(fp, R"(	/// <summary>This auto-generated property updates or retrieves the
+	/// Material's Shader texture named '%s'.</summary>
+)", res->name);
+		fprintf(fp, "	public Tex %s { get { return GetTexture(\"%s\"); } set { SetTexture(\"%s\", value); } }\n", cs_varname, res->name, res->name);
+	}
+
+	skg_shader_buffer_t *buff = &file->meta->buffers[file->meta->global_buffer_id];
+	for (uint32_t i=0; i<buff->var_count; i+=1) {
+		skg_shader_var_t *v = &buff->vars[i];
+
+		make_cs_name(v->name, cs_varname);
+
+		const char *tname   = nullptr;
+		const char *setname = nullptr;
+		const char *getname = nullptr;
+		switch (v->type) {
+			case skg_shader_var_float: 
+			if      (v->type_count == 1)  { tname = "float";  getname = "Float";   setname = "Float"; }
+			else if (v->type_count == 2)  { tname = "Vec2";   getname = "Vector2"; setname = "Vector"; }
+			else if (v->type_count == 3)  { tname = "Vec3";   getname = "Vector3"; setname = "Vector"; }
+			else if (v->type_count == 4 && strcmp(v->extra, "color") == 0) { tname = "Color"; getname = "Color"; setname = "Color"; }
+			else if (v->type_count == 4)  { tname = "Vec4";   getname = "Vector4"; setname = "Vector"; }
+			else if (v->type_count == 16) { tname = "Matrix"; getname = "Matrix";  setname = "Matrix"; }
+			break;
+			//case skg_shader_var_double:
+			//if      (v->type_count == 1) { tname = "double"; getname = "Double"; }
+			//break;
+			case skg_shader_var_int:
+			if      (v->type_count == 1) { tname = "int";  getname = "Int"; setname = "Int"; }
+			break;
+			case skg_shader_var_uint:
+			if      (v->type_count == 1) { tname = "uint"; getname = "UInt"; setname = "UInt"; }
+			break;
+			//case skg_shader_var_uint8:
+			//if      (v->type_count == 1) tname = "byte";
+			//break;
+		}
+
+		if (tname == nullptr) continue;
+		fprintf(fp, R"(	/// <summary>This auto-generated property updates or retrieves the
+	/// Material's Shader property named '%s'.</summary>
+)", v->name);
+		fprintf(fp, "	public %s %s { get { return Get%s(\"%s\"); } set { Set%s(\"%s\", value); } }\n", tname, cs_varname, getname, v->name, setname, v->name);
+	}
+
+	fprintf(fp, R"(
+	/// <summary> Lazy initialized Shader for this Material. This is created
+	/// from compiled shader binary data baked into this Material's .cs file.
+	/// </summary>
+	public  static Shader  SourceShader { get { if (shader == null) shader = Shader.FromMemory(shaderData); return shader; } }
+	private static Shader  shader     = null;
+	private static byte[]  shaderData = {
+)");
+
+	int32_t ct = 0;
+	for (size_t i = 0; i < file_size; i++) {
+		unsigned char byte = ((unsigned char *)file_data)[i];  
+		ct += fprintf(fp, "%d,", byte);
+		if (ct > 80) { 
+			fprintf(fp, "\n"); 
+			ct = 0; 
+		}
+	}
+	fprintf(fp, "\n	};\n}\n");
 	fflush(fp);
 	fclose(fp);
 

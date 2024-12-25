@@ -45,7 +45,7 @@ include(../cmake/CPM.cmake)
 CPMAddPackage(
     NAME SPIRV-Cross
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
-    GIT_TAG vulkan-sdk-1.3.275.0
+    GIT_TAG vulkan-sdk-1.3.296.0
     OPTIONS 
     "SPIRV_CROSS_CLI OFF" 
     "SPIRV_CROSS_ENABLE_TESTS OFF" 
@@ -56,7 +56,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME SPIRV-Headers
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
-    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Tools version
+    GIT_TAG vulkan-sdk-1.3.296.0 # This version should match up with the SPIRV-Tools version
 )
 
 # For optimizing SPIR-V shaders, a baseline amount of
@@ -65,7 +65,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME SPIRV-Tools
     GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
-    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Headers version
+    GIT_TAG vulkan-sdk-1.3.296.0 # This version should match up with the SPIRV-Headers version
     OPTIONS
     "SPIRV_SKIP_TESTS ON"
     "SPIRV_SKIP_EXECUTABLES ON"
@@ -78,7 +78,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME glslang
     GITHUB_REPOSITORY KhronosGroup/glslang
-    GIT_TAG 14.1.0
+    GIT_TAG vulkan-sdk-1.3.296.0
     OPTIONS 
     "SKIP_GLSLANG_INSTALL ON"
 )

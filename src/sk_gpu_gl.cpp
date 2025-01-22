@@ -2111,14 +2111,37 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 			glBlitFramebuffer(0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 		}
 	} else {
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, tex_surface >= 0 
-			? tex->_framebuffer_layers[tex_surface] 
-			: tex->_framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dest_surface >= 0 
+		bool     src_destroy = false;
+		uint32_t src_buffer  = tex_surface > 0
+			? tex->_framebuffer_layers[tex_surface]
+			: tex->_framebuffer;
+		bool     dest_destroy = false;
+		uint32_t dest_buffer  = dest_surface > 0
 			? destination->_framebuffer_layers[dest_surface]
-			: destination->_framebuffer);
+			: destination->_framebuffer;
+
+		// This could be problematic if we're genuinely interested in the
+		// primary surface, but this is probably unlikely.
+		if (src_buffer == 0) {
+			src_destroy = true;
+			glGenFramebuffers(1, &src_buffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, src_buffer);
+			gl_framebuffer_attach(tex->_texture, tex->_target, tex->format, tex->_physical_multisample, tex->multisample, 0, 0, 0);
+		}
+		if (dest_buffer == 0) {
+			dest_destroy = true;
+			glGenFramebuffers(1, &dest_buffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, dest_buffer);
+			gl_framebuffer_attach(destination->_texture, destination->_target, destination->format, destination->_physical_multisample, destination->multisample, 0, 0, 0);
+		}
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, src_buffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dest_buffer);
 
 		glBlitFramebuffer(0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+		if (src_destroy ) glDeleteFramebuffers(1, &src_buffer );
+		if (dest_destroy) glDeleteFramebuffers(1, &dest_buffer);
 	}
 
 	err = glGetError();
@@ -2350,9 +2373,7 @@ bool skg_tex_get_mip_contents(skg_tex_t *tex, int32_t mip_level, void *ref_data,
 bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size) {
 	uint32_t result = glGetError();
 	while (result != 0) {
-		char text[128];
-		snprintf(text, 128, "skg_tex_get_mip_contents_arr: eating a gl error from somewhere else: %d", result);
-		skg_log(skg_log_warning, text);
+		skg_logf(skg_log_warning, "skg_tex_get_mip_contents_arr: eating a gl error from somewhere else: 0x%x", result);
 		result = glGetError();
 	}
 	
@@ -2409,12 +2430,28 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 
 	result = glGetError();
 	if (result != 0) {
-		char text[128];
-		snprintf(text, 128, "skg_tex_get_mip_contents_arr error: %d", result);
-		skg_log(skg_log_critical, text);
+		skg_logf(skg_log_critical, "skg_tex_get_mip_contents_arr error: 0x%x", result);
 	}
 
 	return result == 0;
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_gen_mips(skg_tex_t *tex_mipped_rt) {
+	uint32_t err = glGetError();
+	while (err != 0) {
+		skg_logf(skg_log_warning, "skg_tex_gen_mips: eating a gl error from somewhere else: 0x%x", err);
+		err = glGetError();
+	}
+
+	glGenerateMipmap(tex_mipped_rt->_target);
+
+	err = glGetError();
+	if (err != 0)
+		skg_logf(skg_log_critical, "skg_tex_gen_mips error: 0x%x", err);
+
+	return err == 0;
 }
 
 ///////////////////////////////////////////

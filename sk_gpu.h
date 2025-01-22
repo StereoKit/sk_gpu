@@ -742,6 +742,7 @@ SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, 
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 SKG_API bool                skg_tex_get_mip_contents     (      skg_tex_t *tex, int32_t mip_level, void *ref_data, size_t data_size);
 SKG_API bool                skg_tex_get_mip_contents_arr (      skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size);
+SKG_API bool                skg_tex_gen_mips             (      skg_tex_t *tex);
 SKG_API void*               skg_tex_get_native           (const skg_tex_t *tex);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 SKG_API void                skg_tex_clear                (skg_bind_t bind);
@@ -1074,12 +1075,29 @@ void skg_draw_begin() {
 
 ///////////////////////////////////////////
 
+ID3D11DeviceContext* d3d_threadsafe_context_get() {
+	if (GetCurrentThreadId() != d3d_main_thread) {
+		WaitForSingleObject(d3d_deferred_mtx, INFINITE);
+		return d3d_deferred;
+	}
+	return d3d_context;
+}
+
+///////////////////////////////////////////
+
+void d3d_threadsafe_context_release(ID3D11DeviceContext* context) {
+	if (context != d3d_context)
+		ReleaseMutex(d3d_deferred_mtx);
+}
+
+///////////////////////////////////////////
+
 skg_platform_data_t skg_get_platform_data() {
 	skg_platform_data_t result = {};
-	result._d3d11_device = d3d_device;
+	result._d3d11_device           = d3d_device;
 	result._d3d11_deferred_context = d3d_deferred;
-	result._d3d_deferred_mtx = d3d_deferred_mtx;
-	result._d3d_main_thread_id = d3d_main_thread;
+	result._d3d_deferred_mtx       = d3d_deferred_mtx;
+	result._d3d_main_thread_id     = d3d_main_thread;
 	return result;
 }
 
@@ -1309,29 +1327,18 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 	// context this can be tricky, here we're using a deferred context to
 	// push this operation over to the main thread. The deferred context is
 	// then executed in skg_draw_begin.
-	bool on_main = GetCurrentThreadId() == d3d_main_thread;
-	if (on_main) {
-		hr = d3d_context->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	} else {
-		WaitForSingleObject(d3d_deferred_mtx, INFINITE);
-		hr = d3d_deferred->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	}
+	ID3D11DeviceContext* context = d3d_threadsafe_context_get();
+	hr = context->Map(buffer->_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
 	if (FAILED(hr)) {
 		skg_logf(skg_log_critical, "Failed to set contents of buffer, may not be using a writeable buffer type: 0x%08X", hr);
-		if (!on_main) {
-			ReleaseMutex(d3d_deferred_mtx);
-		}
+		d3d_threadsafe_context_release(context);
 		return;
 	}
 
 	memcpy(resource.pData, data, size_bytes);
-		
-	if (on_main) {
-		d3d_context->Unmap(buffer->_buffer, 0);
-	} else {
-		d3d_deferred->Unmap(buffer->_buffer, 0);
-		ReleaseMutex(d3d_deferred_mtx);
-	}
+
+	context->Unmap(buffer->_buffer, 0);
+	d3d_threadsafe_context_release(context);
 }
 
 ///////////////////////////////////////////
@@ -2372,7 +2379,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 					target_desc.Texture2DArray.FirstArraySlice = i;
 					target_desc.Texture2DArray.MipSlice        = m;
 				}
-				hr = d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_array_view[i]);
+				hr = d3d_device->CreateRenderTargetView(tex->_texture, &target_desc, &tex->_target_array_view[i*mip_count+m]);
 				if (FAILED(hr)) {
 					skg_logf(skg_log_critical, "Create Render Target View error: 0x%08X", hr);
 					return false;
@@ -2410,7 +2417,182 @@ void skg_tex_set_contents(skg_tex_t *tex, const void *data, int32_t width, int32
 
 ///////////////////////////////////////////
 
-void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t array_count, int32_t mip_count, int32_t width, int32_t height, int32_t multisample) {
+bool d3d_gen_mips(ID3D11DeviceContext* context, ID3D11Texture2D *temp_rt_tex) {
+	D3D11_TEXTURE2D_DESC mip_generator_desc;
+	temp_rt_tex->GetDesc(&mip_generator_desc);
+
+	// Verify this texture qualifies for mips
+	if ((mip_generator_desc.MiscFlags & D3D11_RESOURCE_MISC_GENERATE_MIPS) == 0 ||
+	    (mip_generator_desc.BindFlags & D3D11_BIND_RENDER_TARGET         ) == 0 ||
+	    (mip_generator_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE       ) == 0 ||
+	     mip_generator_desc.MipLevels == 0) {
+			skg_log(skg_log_critical, "Can't mip texture, must be a render target with mips enabled.");
+			return false;
+		}
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC mip_view_desc = {};
+	mip_view_desc.Format = mip_generator_desc.Format;
+	if (mip_generator_desc.SampleDesc.Count > 1) {
+		skg_log(skg_log_critical, "Can't mip MSAA textures");
+		return false;
+	} 
+	else if ((mip_generator_desc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) > 0) {
+		mip_view_desc.ViewDimension         = D3D11_SRV_DIMENSION_TEXTURECUBE;
+		mip_view_desc.TextureCube.MipLevels = -1;
+	} 
+	else if (mip_generator_desc.ArraySize > 1) {
+		mip_view_desc.ViewDimension            = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+		mip_view_desc.Texture2DArray.ArraySize = mip_generator_desc.ArraySize;
+		mip_view_desc.Texture2DArray.MipLevels = -1;
+	}
+	else if (mip_generator_desc.ArraySize == 1) {
+		mip_view_desc.ViewDimension       = D3D11_SRV_DIMENSION_TEXTURE2D;
+		mip_view_desc.Texture2D.MipLevels = -1;
+	} 
+	else {
+		skg_log(skg_log_critical, "Can't make a resource view for mipping");
+		return false;
+	}
+
+	ID3D11ShaderResourceView *mip_generator_view;
+	HRESULT hr = d3d_device->CreateShaderResourceView(temp_rt_tex, &mip_view_desc, &mip_generator_view);
+	if (FAILED(hr)) {
+		skg_logf(skg_log_critical, "Create Shader Resource View error: 0x%08X", hr);
+		return false;
+	}
+
+	context->GenerateMips(mip_generator_view);
+	mip_generator_view->Release();
+
+	// GenerateMips has no return code for failure, but it can fail. We can
+	// check for failure by looking at the mip levels of the texture!
+	D3D11_TEXTURE2D_DESC generated_desc;
+	temp_rt_tex->GetDesc(&generated_desc);
+	if (generated_desc.MipLevels <= 1) { 
+		skg_log(skg_log_critical, "Unable to generate mips for texture");
+		return false;
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////
+
+ID3D11Texture2D *d3d_gen_mips_data(ID3D11DeviceContext *context, D3D11_TEXTURE2D_DESC desc, const void** array_data) {
+	if ( desc.MipLevels                      != 1       || // Must have data, but not a full mip chain
+		(desc.Usage & D3D11_USAGE_IMMUTABLE) >  0       || // Immutable won't won't allow for copies from the mip generating tex
+		array_data                           == nullptr ||
+		array_data[0]                        == nullptr) {
+			skg_log(skg_log_critical, "Invalid texture for mipping");
+			return nullptr;
+		}
+
+	// Create the intermediate texture
+	ID3D11Texture2D*     tex_intermediate;
+	D3D11_TEXTURE2D_DESC tex_intermediate_desc = desc;
+	tex_intermediate_desc.MipLevels  = 0;
+	tex_intermediate_desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
+	tex_intermediate_desc.BindFlags |= D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	HRESULT hr = d3d_device->CreateTexture2D(&tex_intermediate_desc, nullptr, &tex_intermediate);
+	if (FAILED(hr)) {
+		skg_logf(skg_log_critical, "Create mip generator texture error: 0x%08X", hr);
+		return nullptr;
+	}
+	
+	// If the final texture is already a rendertarget/shader resource, our
+	// intermediate _and_ final texture can be the same!
+	ID3D11Texture2D* tex_result;
+	if ((desc.BindFlags & D3D11_BIND_RENDER_TARGET  ) > 0 &&
+	    (desc.BindFlags & D3D11_BIND_SHADER_RESOURCE) > 0) {
+		tex_result = tex_intermediate;
+		tex_result->AddRef();
+	} else {
+		desc.MipLevels = skg_mip_count(desc.Width, desc.Height);
+		d3d_device->CreateTexture2D(&desc, nullptr, &tex_result);
+		if (FAILED(hr)) {
+			skg_logf(skg_log_critical, "Create texture error: 0x%08X", hr);
+			tex_intermediate->Release();
+			return nullptr;
+		}
+	}
+
+	// Upload the first mip to our texture
+	skg_tex_fmt_ mem_fmt   = skg_tex_fmt_from_native(desc.Format);
+	uint32_t     mem_pitch = skg_tex_fmt_pitch(mem_fmt, desc.Width);
+	int32_t      mips      = skg_mip_count(desc.Width, desc.Height);
+	for (int32_t i = 0; i < desc.ArraySize; i++) {
+		context->UpdateSubresource(tex_intermediate, i*mips, nullptr, array_data[i], mem_pitch, 0);
+	}
+
+	// Generate remaining mips on the GPU
+	if (!d3d_gen_mips(context, tex_intermediate)) {
+		tex_intermediate->Release();
+		tex_result      ->Release();
+		return nullptr;
+	}
+
+	// Copy the mips to the final texture if necessary
+	if (tex_intermediate != tex_result) {
+		context->CopyResource(tex_result, tex_intermediate);
+	}
+
+	tex_intermediate->Release();
+	return tex_result;
+}
+
+///////////////////////////////////////////
+
+/*ID3D11Texture2D *d3d_gen_mips_tex(ID3D11DeviceContext *context, ID3D11Texture2D *src_tex, D3D11_TEXTURE2D_DESC dest_desc) {
+	D3D11_TEXTURE2D_DESC src_desc;
+	src_tex->GetDesc(&src_desc);
+
+	// Create the intermediate texture
+	ID3D11Texture2D*     tex_intermediate;
+	D3D11_TEXTURE2D_DESC tex_intermediate_desc = dest_desc;
+	tex_intermediate_desc.MipLevels  = 0;
+	tex_intermediate_desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
+	tex_intermediate_desc.BindFlags |= D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	HRESULT hr = d3d_device->CreateTexture2D(&src_desc, nullptr, &tex_intermediate);
+	if (FAILED(hr)) {
+		skg_logf(skg_log_critical, "Create mip generator texture error: 0x%08X", hr);
+		return nullptr;
+	}
+
+	ID3D11Texture2D* tex_result;
+	d3d_device->CreateTexture2D(&dest_desc, nullptr, &tex_result);
+	if (FAILED(hr)) {
+		skg_logf(skg_log_critical, "Create texture error: 0x%08X", hr);
+		tex_intermediate->Release();
+		return nullptr;
+	}
+
+	if (src_desc.SampleDesc.Count > 1 && dest_desc.SampleDesc.Count == 1) {
+		// MSAA surfaces must be resolved
+		for (int32_t i = 0; i < src_desc.ArraySize; i++)
+			context->ResolveSubresource(tex_intermediate, i, src_tex, i, dest_desc.Format);
+	} else {
+		context->CopyResource(tex_intermediate, src_tex);
+	}
+
+	// Generate remaining mips on the GPU
+	if (!d3d_gen_mips(context, tex_intermediate)) {
+		tex_intermediate->Release();
+		tex_result      ->Release();
+		return nullptr;
+	}
+
+	// Copy the mips to the final texture if necessary
+	if (tex_intermediate != tex_result) {
+		context->CopyResource(tex_result, tex_intermediate);
+	}
+
+	tex_intermediate->Release();
+	return tex_result;
+}*/
+
+///////////////////////////////////////////
+
+void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t array_count, int32_t array_mip_count, int32_t width, int32_t height, int32_t multisample) {
 	// Some warning messages
 	if (tex->use != skg_use_dynamic && tex->_texture) {
 		skg_log(skg_log_warning, "Only dynamic textures can be updated!");
@@ -2425,12 +2607,15 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 	tex->height      = height;
 	tex->array_count = array_count;
 	tex->multisample = multisample;
-	bool generate_mips = 
-		tex->mips == skg_mip_generate  &&
-		skg_can_make_mips(tex->format) &&
-		mip_count <= 1;
+	bool generate_mips =
+		(width > 1 || height > 1)         && // 1x1 textures can't be mipped
+		tex->mips     == skg_mip_generate &&
+		array_data    != nullptr          &&
+		array_data[0] != nullptr          &&
+		skg_can_make_mips(tex->format)    &&
+		array_mip_count <= 1;
 
-	uint32_t mip_levels = (generate_mips ? skg_mip_count(width, height) : mip_count);
+	uint32_t mip_levels = (generate_mips ? skg_mip_count(width, height) : array_mip_count);
 	uint32_t mem_size   = skg_tex_fmt_memory(tex->format, width, height);
 	uint32_t mem_pitch  = skg_tex_fmt_pitch (tex->format, width);
 	HRESULT  hr         = E_FAIL;
@@ -2439,31 +2624,37 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 		D3D11_TEXTURE2D_DESC desc = {};
 		desc.Width            = width;
 		desc.Height           = height;
-		desc.MipLevels        = mip_levels;
 		desc.ArraySize        = array_count;
 		desc.SampleDesc.Count = multisample;
 		desc.Format           = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
 		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : D3D11_BIND_SHADER_RESOURCE;
-		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || array_data == nullptr || array_data[0] == nullptr ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || array_data == nullptr || array_data[0] == nullptr || generate_mips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
 		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
 		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+		if (tex->type == skg_tex_type_rendertarget && tex->mips == skg_mip_generate ) desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
-		D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
-		if (array_data != nullptr && array_data[0] != nullptr) {
-			tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)array_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
-			if (!tex_mem) { skg_log(skg_log_critical, "Out of memory"); return;  }
+		if (generate_mips) {
+			desc.MipLevels = array_mip_count;
 
-			for (int32_t i = 0; i < array_count; i++) {
-				D3D11_SUBRESOURCE_DATA *subresource = &tex_mem[i*mip_levels];
-				*subresource = {};
-				subresource->pSysMem     = array_data[i];
-				subresource->SysMemPitch = mem_pitch;
+			ID3D11DeviceContext *context = d3d_threadsafe_context_get();
+			tex->_texture = d3d_gen_mips_data(context, desc, array_data);
+			d3d_threadsafe_context_release(context);
+		} else {
+			desc.MipLevels = mip_levels;
 
-				if (generate_mips) {
-					skg_make_mips(subresource, array_data[i], tex->format, width, height, mip_levels);
-				} else {
+			D3D11_SUBRESOURCE_DATA *tex_mem = nullptr;
+			if (array_data != nullptr && array_data[0] != nullptr) {
+				tex_mem = (D3D11_SUBRESOURCE_DATA *)malloc((int64_t)array_count * mip_levels * sizeof(D3D11_SUBRESOURCE_DATA));
+				if (!tex_mem) { skg_log(skg_log_critical, "Out of memory"); return;  }
+
+				for (int32_t i = 0; i < array_count; i++) {
+					D3D11_SUBRESOURCE_DATA *subresource = &tex_mem[i*mip_levels];
+					*subresource = {};
+					subresource->pSysMem     = array_data[i];
+					subresource->SysMemPitch = mem_pitch;
+
 					int32_t mip_offset = mem_size;
 					for (uint32_t m = 1; m < mip_levels; m++) {
 						D3D11_SUBRESOURCE_DATA *mip_subresource = &tex_mem[i*mip_levels + m];
@@ -2474,23 +2665,13 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 						mip_subresource->SysMemPitch = skg_tex_fmt_pitch(tex->format, mip_width);
 
 						mip_offset += skg_tex_fmt_memory(tex->format, mip_width, mip_height);
-					} 
+					}
 				}
 			}
-		}
-
-		hr = d3d_device->CreateTexture2D(&desc, tex_mem, &tex->_texture);
-		if (FAILED(hr)) {
-			skg_logf(skg_log_critical, "Create texture error: 0x%08X", hr);
-		}
-
-		if (tex_mem != nullptr) {
-			if (generate_mips) {
-				for (int32_t i = 0; i < array_count; i++) {
-					for (uint32_t m = 1; m < mip_levels; m++) {
-						free((void*)tex_mem[i*mip_levels + m].pSysMem);
-					} 
-				}
+			
+			hr = d3d_device->CreateTexture2D(&desc, tex_mem, &tex->_texture);
+			if (FAILED(hr)) {
+				skg_logf(skg_log_critical, "Create texture error: 0x%08X", hr);
 			}
 			free(tex_mem);
 		}
@@ -2498,24 +2679,18 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 		skg_tex_make_view(tex, mip_levels, -1, true);
 	} else {
 		// For dynamic textures, just upload the new value into the texture!
-		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
 		
 		// Map the memory so we can access it on CPU! In a multi-threaded
 		// context this can be tricky, here we're using a deferred context to
 		// push this operation over to the main thread. The deferred context is
 		// then executed in skg_draw_begin.
-		bool on_main = GetCurrentThreadId() == d3d_main_thread;
-		if (on_main) {
-			hr = d3d_context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
-		} else {
-			WaitForSingleObject(d3d_deferred_mtx, INFINITE);
-			hr = d3d_deferred->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
-		}
+		ID3D11DeviceContext *context = d3d_threadsafe_context_get();
+
+		D3D11_MAPPED_SUBRESOURCE tex_mem = {};
+		hr = context->Map(tex->_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &tex_mem);
 		if (FAILED(hr)) {
 			skg_logf(skg_log_critical, "Failed mapping a texture: 0x%08X", hr);
-			if (!on_main) {
-				ReleaseMutex(d3d_deferred_mtx);
-			}
+			d3d_threadsafe_context_release(context);
 			return;
 		}
 
@@ -2527,12 +2702,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 			src_line  += mem_pitch;
 		}
 		
-		if (on_main) {
-			d3d_context->Unmap(tex->_texture, 0);
-		} else {
-			d3d_deferred->Unmap(tex->_texture, 0);
-			ReleaseMutex(d3d_deferred_mtx);
-		}
+		context->Unmap(tex->_texture, 0);
+
+		d3d_threadsafe_context_release(context);
 	}
 
 	// If the sampler has not been set up yet, we'll make a default one real quick.
@@ -2646,6 +2818,15 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 		copy_tex->Release();
 
 	return true;
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_gen_mips(skg_tex_t *tex_mipped_rt) {
+	ID3D11DeviceContext *context = d3d_threadsafe_context_get();
+	bool result = d3d_gen_mips(context, tex_mipped_rt->_texture);
+	d3d_threadsafe_context_release(context);
+	return result;
 }
 
 ///////////////////////////////////////////
@@ -5006,14 +5187,37 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 			glBlitFramebuffer(0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 		}
 	} else {
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, tex_surface >= 0 
-			? tex->_framebuffer_layers[tex_surface] 
-			: tex->_framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dest_surface >= 0 
+		bool     src_destroy = false;
+		uint32_t src_buffer  = tex_surface > 0
+			? tex->_framebuffer_layers[tex_surface]
+			: tex->_framebuffer;
+		bool     dest_destroy = false;
+		uint32_t dest_buffer  = dest_surface > 0
 			? destination->_framebuffer_layers[dest_surface]
-			: destination->_framebuffer);
+			: destination->_framebuffer;
+
+		// This could be problematic if we're genuinely interested in the
+		// primary surface, but this is probably unlikely.
+		if (src_buffer == 0) {
+			src_destroy = true;
+			glGenFramebuffers(1, &src_buffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, src_buffer);
+			gl_framebuffer_attach(tex->_texture, tex->_target, tex->format, tex->_physical_multisample, tex->multisample, 0, 0, 0);
+		}
+		if (dest_buffer == 0) {
+			dest_destroy = true;
+			glGenFramebuffers(1, &dest_buffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, dest_buffer);
+			gl_framebuffer_attach(destination->_texture, destination->_target, destination->format, destination->_physical_multisample, destination->multisample, 0, 0, 0);
+		}
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, src_buffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dest_buffer);
 
 		glBlitFramebuffer(0, 0, tex->width, tex->height, 0, 0, tex->width, tex->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+		if (src_destroy ) glDeleteFramebuffers(1, &src_buffer );
+		if (dest_destroy) glDeleteFramebuffers(1, &dest_buffer);
 	}
 
 	err = glGetError();
@@ -5245,9 +5449,7 @@ bool skg_tex_get_mip_contents(skg_tex_t *tex, int32_t mip_level, void *ref_data,
 bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size) {
 	uint32_t result = glGetError();
 	while (result != 0) {
-		char text[128];
-		snprintf(text, 128, "skg_tex_get_mip_contents_arr: eating a gl error from somewhere else: %d", result);
-		skg_log(skg_log_warning, text);
+		skg_logf(skg_log_warning, "skg_tex_get_mip_contents_arr: eating a gl error from somewhere else: 0x%x", result);
 		result = glGetError();
 	}
 	
@@ -5304,12 +5506,28 @@ bool skg_tex_get_mip_contents_arr(skg_tex_t *tex, int32_t mip_level, int32_t arr
 
 	result = glGetError();
 	if (result != 0) {
-		char text[128];
-		snprintf(text, 128, "skg_tex_get_mip_contents_arr error: %d", result);
-		skg_log(skg_log_critical, text);
+		skg_logf(skg_log_critical, "skg_tex_get_mip_contents_arr error: 0x%x", result);
 	}
 
 	return result == 0;
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_gen_mips(skg_tex_t *tex_mipped_rt) {
+	uint32_t err = glGetError();
+	while (err != 0) {
+		skg_logf(skg_log_warning, "skg_tex_gen_mips: eating a gl error from somewhere else: 0x%x", err);
+		err = glGetError();
+	}
+
+	glGenerateMipmap(tex_mipped_rt->_target);
+
+	err = glGetError();
+	if (err != 0)
+		skg_logf(skg_log_critical, "skg_tex_gen_mips error: 0x%x", err);
+
+	return err == 0;
 }
 
 ///////////////////////////////////////////

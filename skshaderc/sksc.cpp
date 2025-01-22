@@ -1576,6 +1576,7 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		}
 
 		glsl.add_header_line("#extension GL_EXT_gpu_shader5 : enable");
+		glsl.add_header_line("#extension GL_OES_sample_variables : enable");
 		if (use_external == true && lang == skg_shader_lang_glsl_es) {
 			glsl.add_header_line("#extension GL_OES_EGL_image_external_essl3 : enable");
 		}

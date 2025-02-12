@@ -91,8 +91,13 @@ int main(int argc, char **argv) {
 
 #if defined(_WIN32)
 	for (size_t i = 1; i < argc; i++) {
-		const char *path = argv[i];
+		if (strcmp(argv[i], "-o") == 0 ||
+			strcmp(argv[i], "-i") == 0) { // Skip trying to compile paths
+			i++;
+			continue;
+		}
 
+		const char *path = argv[i];
 		if (file_exists(path)) {
 			compile_file(path, &settings);
 		} else if (path_is_file(path) && path_is_wild(path)) {
@@ -104,6 +109,12 @@ int main(int argc, char **argv) {
 	}
 #else
 	for (size_t i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-o") == 0 ||
+			strcmp(argv[i], "-i") == 0) { // Skip trying to compile paths
+			i++;
+			continue;
+		}
+
 		if (file_exists(argv[i])) {
 			compile_file(argv[i], &settings);
 		}
@@ -245,9 +256,8 @@ Options:
 			skips outputting a normal .sks file.
 	-sks		If some other flag like -sk prevents outputting a .sks file,
 			this flag will force the .sks to be made anyhow.
-	-e		Appends the sks extension to the resulting file instead of 
-			replacing the extension with sks. Default will replace the 
-			extension.
+	-e		Appends the extension to the resulting file instead of replacing 
+			the extension. Default will replace the extension.
 	-s		Silent, no errors, warnings or info are printed when compiling
 			shaders.
 	-sw		No info or warnings are printed when compiling shaders.
@@ -276,9 +286,10 @@ Options:
 
 	-i folder	Adds a folder to the include path when searching for #include
 			files.
-	-o folder	Sets the output folder for compiled shaders. Default will 
-			leave them in the same folder as the original file.
-	-gl version	Sets the target GLSL version for generated desktop OpenGL 
+	-o path	Sets the output folder for compiled shaders. Default will
+			leave them in the same folder as the original file. Can also be a
+			specific filename.
+	-gl version	Sets the target GLSL version for generated desktop OpenGL
 			shaders. By default this is '430'.
 	-t targets	Sets a list of shader language targets to generate. This is a
 			string of characters, where each character represents a language.
@@ -316,6 +327,12 @@ void compile_file(const char *src_filename, compiler_settings_t *settings) {
 	snprintf(new_filename_sks, sizeof(new_filename_sks), "%s%s%s.sks",        dest_folder, trailing_slash, name_ext_mod);
 	snprintf(new_filename_h,   sizeof(new_filename_h  ), "%s%s%s.h",          dest_folder, trailing_slash, name_ext_mod);
 	snprintf(new_filename_cs,  sizeof(new_filename_cs ), "%s%sMaterial%s.cs", dest_folder, trailing_slash, name_ext_mod);
+
+	if (settings->out_folder && path_is_file(settings->out_folder)) {
+		snprintf(new_filename_sks, sizeof(new_filename_sks), "%s", settings->out_folder);
+		snprintf(new_filename_h,   sizeof(new_filename_h  ), "%s", settings->out_folder);
+		snprintf(new_filename_cs,  sizeof(new_filename_cs ), "%s", settings->out_folder);
+	}
 
 	// Skip this file if it hasn't changed 
 	uint64_t src_file_time          = file_time(src_filename);

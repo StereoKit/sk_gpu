@@ -29,8 +29,8 @@
 	#include <spirv-tools/optimizer.hpp>
 #endif
 
-#include <spirv_cross_c.h>
 #include <spirv_glsl.hpp>
+#include <spirv_hlsl.hpp>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -708,12 +708,11 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 
 	// Optimize the SPIRV we just generated
 	spvtools::Optimizer optimizer(SPV_ENV_UNIVERSAL_1_0);
-	//core.SetMessageConsumer(print_msg_to_stderr);
 	optimizer.SetMessageConsumer([](spv_message_level_t, const char*, const spv_position_t&, const char* m) {
 		printf("SPIRV optimization error: %s\n", m);
 	});
-	
-	//optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
+
+
 	optimizer.RegisterPerformancePasses();
 	std::vector<uint32_t> spirv_optimized;
 	if (!optimizer.Run((uint32_t*)spirv_code, spirv_size/sizeof(uint32_t), &spirv_optimized)) {
@@ -1533,6 +1532,8 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 			options.version = settings->gl_version;
 			options.es = false;
 		}
+		//if (src_stage->stage == skg_stage_vertex)
+		//	options.ovr_multiview_view_count = 2;
 		glsl.set_common_options(options);
 
 		// Reflect shader resources
@@ -1576,19 +1577,15 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 		}
 
 		glsl.add_header_line("#extension GL_EXT_gpu_shader5 : enable");
-		glsl.add_header_line("#extension GL_OES_sample_variables : enable");
+		//glsl.add_header_line("#extension GL_OES_sample_variables : enable");
 		if (use_external == true && lang == skg_shader_lang_glsl_es) {
 			glsl.add_header_line("#extension GL_OES_EGL_image_external_essl3 : enable");
 		}
 		// Add custom header lines for vertex shaders
 		if (src_stage->stage == skg_stage_vertex) {
-			glsl.add_header_line("#ifdef GL_AMD_vertex_shader_layer");
-			glsl.add_header_line("#extension GL_AMD_vertex_shader_layer : enable");
-			glsl.add_header_line("#elif defined(GL_NV_viewport_array2)");
-			glsl.add_header_line("#extension GL_NV_viewport_array2 : enable");
-			glsl.add_header_line("#else");
+			//glsl.add_header_line("#extension GL_OVR_multiview2 : require");
+			//glsl.add_header_line("layout(num_views = 2) in;");
 			glsl.add_header_line("#define gl_Layer int _dummy_gl_layer_var");
-			glsl.add_header_line("#endif");
 		}
 
 		// Build dummy sampler for combined images
@@ -1640,18 +1637,10 @@ bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sks
 ///////////////////////////////////////////
 
 bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_meta_t *ref_meta) {
-	spvc_context context = nullptr;
-	spvc_context_create            (&context);
-	spvc_context_set_error_callback( context, [](void *userdata, const char *error) {
-		sksc_log(log_level_err, "[SPIRV-Cross] %s", error);
-	}, nullptr);
-
-	spvc_compiler  compiler  = nullptr;
-	spvc_parsed_ir ir        = nullptr;
-	spvc_resources resources = nullptr;
-	spvc_context_parse_spirv             (context, (const SpvId*)spirv_stage->code, spirv_stage->code_size/sizeof(SpvId), &ir);
-	spvc_context_create_compiler         (context, SPVC_BACKEND_HLSL, ir, SPVC_CAPTURE_MODE_COPY, &compiler);
-	spvc_compiler_create_shader_resources(compiler, &resources);
+	spirv_cross::CompilerHLSL* compiler = nullptr;
+	try                            { compiler = new spirv_cross::CompilerHLSL((const uint32_t*)spirv_stage->code, spirv_stage->code_size/sizeof(uint32_t)); }
+	catch(const std::exception& e) { sksc_log(log_level_err, "[SPIRV-Cross] Failed to create compiler: %s", e.what()); }
+	spirv_cross::ShaderResources resources = compiler->get_shader_resources();
 
 	array_t<skg_shader_buffer_t> buffer_list = {};
 	buffer_list.data      = ref_meta->buffers;
@@ -1662,136 +1651,125 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 	resource_list.capacity = ref_meta->resource_count;
 	resource_list.count    = ref_meta->resource_count;
 
-	const spvc_reflected_resource *list = nullptr;
-	size_t                         count;
-
-	// Get buffers
-	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_UNIFORM_BUFFER, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-
+	for (spirv_cross::Resource& buffer : resources.uniform_buffers) {
 		// Find or create a buffer
-		int64_t id = buffer_list.index_where([](auto &buff, void *data) { 
+		int64_t id = buffer_list.index_where([](const skg_shader_buffer_t &buff, void *data) { 
 			return strcmp(buff.name, (char*)data) == 0; 
-		}, (void*)list[i].name);
+		}, (void*)buffer.name.c_str());
 		bool is_new = id == -1;
 		if (is_new) id = buffer_list.add({});
 
 		// Update the stage of this buffer
-		skg_shader_buffer_t *buffer = &buffer_list[id];
-		buffer->bind.stage_bits |= spirv_stage->stage;
+		skg_shader_buffer_t *buff = &buffer_list[id];
+		buff->bind.stage_bits |= spirv_stage->stage;
 
 		// And skip the rest if we've already seen it
 		if (!is_new) continue;
-		
-		spvc_type type  = spvc_compiler_get_type_handle(compiler, list[i].base_type_id);
-		int32_t   count = spvc_type_get_num_member_types(type);
-		size_t    type_size;
-		spvc_compiler_get_declared_struct_size(compiler, type, &type_size);
 
-		buffer->size               = (uint32_t)(type_size%16==0? type_size : (type_size/16 + 1)*16);
-		buffer->bind.slot          = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
-		buffer->bind.stage_bits    = spirv_stage->stage;
-		buffer->bind.register_type = skg_register_constant;
-		buffer->var_count          = count;
-		buffer->vars               = (skg_shader_var_t*)malloc(count * sizeof(skg_shader_var_t));
-		memset(buffer->vars, 0, count * sizeof(skg_shader_var_t));
-		strncpy(buffer->name, list[i].name, sizeof(buffer->name));
+		uint32_t              type_id   = buffer.base_type_id;
+		spirv_cross::SPIRType type      = compiler->get_type(type_id);
+		size_t                type_size = compiler->get_declared_struct_size(type);
+		uint32_t              count     = (uint32_t)type.member_types.size();
 
-		for(int32_t m=0; m<count; m+=1) {
-			spvc_type_id tid        = spvc_type_get_member_type(type, m);
-			spvc_type    mem_type   = spvc_compiler_get_type_handle(compiler, tid);
-			const char  *name       = spvc_compiler_get_member_name(compiler, list[i].base_type_id, m);
-			uint32_t     member_offset;
-			size_t       member_size;
-			spvc_compiler_type_struct_member_offset      (compiler, type, m, &member_offset);
-			spvc_compiler_get_declared_struct_member_size(compiler, type, m, &member_size);
+		buff->size               = (uint32_t)(type_size%16==0? type_size : (type_size/16 + 1)*16);
+		buff->bind.slot          = compiler->get_decoration(buffer.id, spv::DecorationBinding);
+		buff->bind.stage_bits    = spirv_stage->stage;
+		buff->bind.register_type = skg_register_constant;
+		buff->var_count          = count;
+		buff->vars               = (skg_shader_var_t*)malloc(count * sizeof(skg_shader_var_t));
+		memset (buff->vars, 0, count * sizeof(skg_shader_var_t));
+		strncpy(buff->name, buffer.name.c_str(), sizeof(buff->name));
 
-			uint32_t dimensions = spvc_type_get_num_array_dimensions(mem_type);
+		for (uint32_t m = 0; m < count; m++) {
+			uint32_t              member_type_id = type.member_types[m];
+			spirv_cross::SPIRType member_type    = compiler->get_type       (member_type_id);
+			std::string           member_name    = compiler->get_member_name(type_id, m);
+			uint32_t              member_offset  = compiler->type_struct_member_offset      (type, m);
+			size_t                member_size    = compiler->get_declared_struct_member_size(type, m);
+			
+			uint32_t dimensions = (uint32_t)member_type.array.size();
 			int32_t  dim_size   = 1;
 			for (uint32_t d = 0; d < dimensions; d++) {
-				dim_size = dim_size * spvc_type_get_array_dimension(mem_type, d);
+				dim_size = dim_size * member_type.array[d];
 			}
 			
-			strncpy(buffer->vars[m].name, name, sizeof(buffer->vars[m].name));
-			buffer->vars[m].offset     = member_offset;
-			buffer->vars[m].size       = (uint32_t)member_size;
-			buffer->vars[m].type_count = dim_size * spvc_type_get_vector_size(mem_type) * spvc_type_get_columns(mem_type);
-
-			if (buffer->vars[m].type_count == 0)
-				buffer->vars[m].type_count = 1;
-
-			switch(spvc_type_get_basetype(mem_type)) {
-				case SPVC_BASETYPE_INT8:
-				case SPVC_BASETYPE_INT16:
-				case SPVC_BASETYPE_INT32:
-				case SPVC_BASETYPE_INT64:  buffer->vars[m].type = skg_shader_var_int;    break;
-				case SPVC_BASETYPE_UINT8:  buffer->vars[m].type = skg_shader_var_uint8;  break;
-				case SPVC_BASETYPE_UINT16:
-				case SPVC_BASETYPE_UINT32:
-				case SPVC_BASETYPE_UINT64: buffer->vars[m].type = skg_shader_var_uint;   break;
-				case SPVC_BASETYPE_FP16:
-				case SPVC_BASETYPE_FP32:   buffer->vars[m].type = skg_shader_var_float;  break;
-				case SPVC_BASETYPE_FP64:   buffer->vars[m].type = skg_shader_var_double; break;
-				default:                   buffer->vars[m].type = skg_shader_var_none;   break;
+			strncpy(buff->vars[m].name, member_name.c_str(), sizeof(buff->vars[m].name));
+			buff->vars[m].offset     = member_offset;
+			buff->vars[m].size       = (uint32_t)member_size;
+			buff->vars[m].type_count = dim_size * member_type.vecsize * member_type.columns;
+			
+			if (buff->vars[m].type_count == 0)
+				buff->vars[m].type_count = 1;
+			
+			switch (member_type.basetype) {
+				case spirv_cross::SPIRType::SByte:
+				case spirv_cross::SPIRType::Short:
+				case spirv_cross::SPIRType::Int:
+				case spirv_cross::SPIRType::Int64:  buff->vars[m].type = skg_shader_var_int;    break;
+				case spirv_cross::SPIRType::UByte:  buff->vars[m].type = skg_shader_var_uint8;  break;
+				case spirv_cross::SPIRType::UShort:
+				case spirv_cross::SPIRType::UInt:
+				case spirv_cross::SPIRType::UInt64: buff->vars[m].type = skg_shader_var_uint;   break;
+				case spirv_cross::SPIRType::Half:
+				case spirv_cross::SPIRType::Float:  buff->vars[m].type = skg_shader_var_float;  break;
+				case spirv_cross::SPIRType::Double: buff->vars[m].type = skg_shader_var_double; break;
+				default:                            buff->vars[m].type = skg_shader_var_none;   break;
 			}
 		}
 		
-		if (strcmp(buffer->name, "$Global") == 0) {
+		if (strcmp(buff->name, "$Global") == 0) {
 			ref_meta->global_buffer_id = (int32_t)id;
 		}
 	}
-	
+
 	// Find textures
-	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_SEPARATE_IMAGE, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-		const char *name = spvc_compiler_get_name(compiler, list[i].id);
+	for (const spirv_cross::Resource& image : resources.separate_images) {
+		std::string name = compiler->get_name(image.id);
 		int64_t     id   = resource_list.index_where([](auto &tex, void *data) { 
 			return strcmp(tex.name, (char*)data) == 0; 
-		}, (void*)name);
+		}, (void*)name.c_str());
 		if (id == -1)
 			id = resource_list.add({});
-		
+
 		skg_shader_resource_t *tex = &resource_list[id]; 
-		tex->bind.slot          = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		tex->bind.slot          = compiler->get_decoration(image.id, spv::DecorationBinding);
 		tex->bind.stage_bits   |= spirv_stage->stage;
 		tex->bind.register_type = skg_register_resource;
-		strncpy(tex->name, name, sizeof(tex->name));
+		strncpy(tex->name, name.c_str(), sizeof(tex->name));
 	}
 
 	// Look for RWTexture2D
-	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_STORAGE_IMAGE, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-		const char *name = spvc_compiler_get_name(compiler, list[i].id);
+	for (auto& image : resources.storage_images) {
+		std::string name = compiler->get_name(image.id);
 		int64_t     id   = resource_list.index_where([](auto &tex, void *data) { 
 			return strcmp(tex.name, (char*)data) == 0; 
-			}, (void*)name);
+		}, (void*)name.c_str());
 		if (id == -1)
 			id = resource_list.add({});
 
 		skg_shader_resource_t *tex = &resource_list[id];
-		tex->bind.slot             = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		tex->bind.slot             = compiler->get_decoration(image.id, spv::DecorationBinding);
 		tex->bind.stage_bits      |= spirv_stage->stage;
 		tex->bind.register_type    = skg_register_readwrite;
-		strncpy(tex->name, name, sizeof(tex->name));
+		strncpy(tex->name, name.c_str(), sizeof(tex->name));
 	}
 
 	// Look for RWStructuredBuffers and StructuredBuffers
-	spvc_resources_get_resource_list_for_type(resources, SPVC_RESOURCE_TYPE_STORAGE_BUFFER, &list, &count);
-	for (size_t i = 0; i < count; i++) {
-		const char *name     = spvc_compiler_get_name             (compiler, list[i].id);
-		bool        readonly = spvc_compiler_has_member_decoration(compiler, list[i].base_type_id, 0, SpvDecorationNonWritable);
-
+	for (auto& buffer : resources.storage_buffers) {
+		std::string name     = compiler->get_name(buffer.id);
+		bool        readonly = compiler->has_member_decoration(buffer.base_type_id, 0, spv::DecorationNonWritable);
+		
 		int64_t id = resource_list.index_where([](auto &tex, void *data) { 
 			return strcmp(tex.name, (char*)data) == 0; 
-			}, (void*)name);
+		}, (void*)name.c_str());
 		if (id == -1)
 			id = resource_list.add({});
 
 		skg_shader_resource_t *tex = &resource_list[id];
-		tex->bind.slot          = spvc_compiler_get_decoration(compiler, list[i].id, SpvDecorationBinding);
+		tex->bind.slot          = compiler->get_decoration(buffer.id, spv::DecorationBinding);
 		tex->bind.stage_bits   |= spirv_stage->stage;
 		tex->bind.register_type = readonly ? skg_register_resource : skg_register_readwrite;
-		strncpy(tex->name, name, sizeof(tex->name));
+		strncpy(tex->name, name.c_str(), sizeof(tex->name));
 	}
 
 	ref_meta->buffers        = buffer_list.data;
@@ -1799,8 +1777,6 @@ bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_
 	ref_meta->resources      = resource_list.data;
 	ref_meta->resource_count = (uint32_t)resource_list.count;
 
-	// Frees all memory we allocated so far.
-	spvc_context_destroy(context);
 	return true;
 }
 

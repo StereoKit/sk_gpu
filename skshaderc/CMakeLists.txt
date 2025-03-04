@@ -48,8 +48,12 @@ CPMAddPackage(
     GIT_TAG vulkan-sdk-1.3.296.0
     OPTIONS 
     "SPIRV_CROSS_CLI OFF" 
-    "SPIRV_CROSS_ENABLE_TESTS OFF" 
+    "SPIRV_CROSS_ENABLE_TESTS OFF"
     "SPIRV_CROSS_ENABLE_MSL OFF"
+    "SPIRV_CROSS_ENABLE_CPP OFF"
+    "SPIRV_CROSS_ENABLE_REFLECT OFF"
+    "SPIRV_CROSS_ENABLE_C_API OFF"
+    "SPIRV_CROSS_ENABLE_UTIL OFF"
 )
 
 # For SPIRV-Tools
@@ -80,7 +84,12 @@ CPMAddPackage(
     GITHUB_REPOSITORY KhronosGroup/glslang
     GIT_TAG vulkan-sdk-1.3.296.0
     OPTIONS 
-    "SKIP_GLSLANG_INSTALL ON"
+    "GLSLANG_ENABLE_INSTALL OFF"
+    "GLSLANG_TESTS OFF"
+    "ENABLE_GLSLANG_BINARIES OFF"
+    "ENABLE_SPVREMAPPER OFF"
+    "ENABLE_GLSLANG_JS OFF"
+    "ENABLE_RTTI OFF"
 )
 
 if (UNIX)
@@ -99,7 +108,9 @@ set_target_properties(skshaderc PROPERTIES OUTPUT_NAME ${SKSHADERC_EXE_NAME})
 
 target_link_libraries(skshaderc
     PRIVATE
-    spirv-cross-c
+    spirv-cross-core
+    spirv-cross-glsl
+    spirv-cross-hlsl
     SPIRV-Tools-opt
     glslang
     SPIRV

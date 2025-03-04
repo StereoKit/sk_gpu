@@ -40,8 +40,8 @@ target_include_directories(skg_flatscreen PRIVATE
 ## Compile shaders
 
 skshaderc_compile_headers(skg_flatscreen
-    ${CMAKE_BINARY_DIR}/shaders_test
-    "-t xge" SKGPU_TEST_SHADERS_H
+    ${CMAKE_BINARY_DIR}/shaders_test/
+    "-e -t xge" SKGPU_TEST_SHADERS_H
     ../common/compute_test.hlsl
     ../common/cubemap.hlsl
     ../common/test.hlsl)

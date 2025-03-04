@@ -1,8 +1,8 @@
 #include "_sksc.h"
 
-#include <glslang/Include/glslang_c_interface.h>
-#include "glslang/Include/ShHandle.h"
+#include <glslang/Public/ShaderLang.h>
 #include "StandAlone/DirStackFileIncluder.h"
+#include "SPIRV/GlslangToSpv.h"
 
 #include <spirv-tools/optimizer.hpp>
 
@@ -76,7 +76,7 @@ const char* parse_glslang_error(const char* at) {
 
 	const char* numbers = curr;
 	// Check for 'col:line:' format line numbers
-	if (parse_readint(numbers, ':', &col, &numbers) &&
+	if (parse_readint(numbers, ':', &col,  &numbers) &&
 		parse_readint(numbers, ':', &line, &numbers)) {
 		has_line = true;
 		curr = numbers + 1;
@@ -96,103 +96,107 @@ const char* parse_glslang_error(const char* at) {
 	if (curr - at > 1) 
 		has_line 
 			? sksc_log_at(level, line, col, "%.*s", curr - start, start)
-			: sksc_log(level, "%.*s", curr - start, start);
+			: sksc_log   (level,            "%.*s", curr - start, start);
 	if (*curr == '\n') curr++;
 	return *curr == '\0' ? nullptr : curr;
 }
 
 ///////////////////////////////////////////
 
+void log_shader_msgs(glslang::TShader *shader) {
+	const char* info_log  = shader->getInfoLog();
+	const char* debug_log = shader->getInfoDebugLog();
+	while (info_log  != nullptr && *info_log  != '\0') { info_log  = parse_glslang_error(info_log ); }
+	while (debug_log != nullptr && *debug_log != '\0') { debug_log = parse_glslang_error(debug_log); }
+}
+
+///////////////////////////////////////////
+
 compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
-	glslang_resource_s default_resource = {};
-	glslang_input_t    input            = {};
-	input.language                = GLSLANG_SOURCE_HLSL;
-	input.code                    = hlsl;
-	input.client                  = GLSLANG_CLIENT_VULKAN;
-	input.client_version          = GLSLANG_TARGET_VULKAN_1_0,
-	input.target_language         = GLSLANG_TARGET_SPV;
-	input.target_language_version = GLSLANG_TARGET_SPV_1_0;
-	input.default_version         = 100;
-	input.default_profile         = GLSLANG_NO_PROFILE;
-	input.messages                = GLSLANG_MSG_DEFAULT_BIT;
-	input.resource                = &default_resource;
-	const char *entry = "na";
+	TBuiltInResource default_resource = {};
+	EShMessages      messages         = EShMsgDefault;
+	EShMessages      messages_link    = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDebugInfo);
+	EShLanguage      stage;
+	const char*      entry = "na";
 	switch(type) {
-		case skg_stage_vertex:  input.stage = GLSLANG_STAGE_VERTEX;   entry = settings->vs_entrypoint; break;
-		case skg_stage_pixel:   input.stage = GLSLANG_STAGE_FRAGMENT; entry = settings->ps_entrypoint; break;
-		case skg_stage_compute: input.stage = GLSLANG_STAGE_COMPUTE;  entry = settings->cs_entrypoint; break;
+		case skg_stage_vertex:  stage = EShLangVertex;   entry = settings->vs_entrypoint; break;
+		case skg_stage_pixel:   stage = EShLangFragment; entry = settings->ps_entrypoint; break;
+		case skg_stage_compute: stage = EShLangCompute;  entry = settings->cs_entrypoint; break;
 	}
 
-	glslang_shader_t *shader = glslang_shader_create(&input);
-	shader->shader->setEntryPoint(entry);
+	// Create the shader and set options
+	glslang::TShader shader(stage);
+	const char* shader_strings[1] = { hlsl };
+	shader.setStrings         (shader_strings, 1);
+	shader.setEntryPoint      (entry);
+	shader.setSourceEntryPoint(entry);
+	shader.setEnvInput        (glslang::EShSourceHlsl, stage, glslang::EShClientVulkan, 100);
+	shader.setEnvClient       (glslang::EShClientVulkan,      glslang::EShTargetVulkan_1_0);
+	shader.setEnvTarget       (glslang::EShTargetSpv,         glslang::EShTargetSpv_1_0);
 
+	// Setup includer
 	SkscIncluder includer;
 	includer.pushExternalLocalDirectory(settings->folder);
 	for (int32_t i = 0; i < settings->include_folder_ct; i++) {
 		includer.pushExternalLocalDirectory(settings->include_folders[i]);
 	}
-	//if (!sksc_glslang_shader_preprocess(shader, &input, includer)) {
-	if (!shader->shader->preprocess(
-			reinterpret_cast<const TBuiltInResource*>(input.resource),
-			input.default_version,
-			(EProfile)input.default_profile,
-			input.force_default_version_and_profile != 0,
-			input.forward_compatible != 0,
-			(EShMessages)input.messages,
-			&shader->preprocessed_glsl,
-			includer )) {
-		const char* curr = glslang_shader_get_info_log(shader);
-		while (curr != nullptr) curr = parse_glslang_error(curr);
-		curr = glslang_shader_get_info_debug_log(shader);
-		while (curr != nullptr) curr = parse_glslang_error(curr);
-		glslang_shader_delete (shader);
+
+	std::string preprocessed_glsl;
+	if (!shader.preprocess(
+		&default_resource,
+		100,                // default version
+		ENoProfile,         // default profile
+		false,              // don't force default version and profile
+		false,              // not forward compatible
+		messages,
+		&preprocessed_glsl,
+		includer)) {
+
+		log_shader_msgs(&shader);
 		return compile_result_fail;
 	}
 
-	if (!glslang_shader_parse(shader, &input)) {
-		const char* curr = glslang_shader_get_info_log(shader);
-		while (curr != nullptr) curr = parse_glslang_error(curr);
-		curr = glslang_shader_get_info_debug_log(shader);
-		while (curr != nullptr) curr = parse_glslang_error(curr);
-		glslang_shader_delete (shader);
+	// Set the preprocessed shader
+	const char* preprocessed_strings[1] = { preprocessed_glsl.c_str() };
+	shader.setStrings(preprocessed_strings, 1);
+
+	// Parse the shader
+	if (!shader.parse(&default_resource, 100, false, messages)) {
+		log_shader_msgs(&shader);
 		return compile_result_fail;
 	}
 
-	glslang_program_t* program = glslang_program_create();
-	glslang_program_add_shader(program, shader);
-
-	if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT | GLSLANG_MSG_DEBUG_INFO_BIT)) {
-		const char* curr = glslang_shader_get_info_log(shader);
-		while (curr != nullptr) curr = parse_glslang_error(curr);
-		curr = glslang_shader_get_info_debug_log(shader);
-		while (curr != nullptr) curr = parse_glslang_error(curr);
-		glslang_shader_delete (shader);
-		glslang_program_delete(program);
+	// Create and link program
+	glslang::TProgram program;
+	program.addShader(&shader);
+	if (!program.link(messages_link)) {
+		log_shader_msgs(&shader);
 		return compile_result_fail;
 	}
 
 	// Check if we found an entry point
-	const char *link_info = glslang_program_get_info_log(program);
+	const char *link_info = program.getInfoLog();
 	if (link_info != nullptr) {
 		if (strstr(link_info, "Entry point not found") != nullptr) {
-			glslang_shader_delete (shader);
-			glslang_program_delete(program);
 			return compile_result_skip;
 		}
 	}
-	
-	glslang_program_SPIRV_generate(program, input.stage);
 
-	if (glslang_program_SPIRV_get_messages(program)) {
-		sksc_log(log_level_info, glslang_program_SPIRV_get_messages(program));
+	// Generate SPIR-V
+	glslang::TIntermediate* intermediate = program.getIntermediate(stage);
+	if (!intermediate) {
+		return compile_result_fail;
 	}
 
-	// Get the generated SPIRV code, and wrap up glslang's responsibilities
-	size_t spirv_size = glslang_program_SPIRV_get_size(program) * sizeof(unsigned int);
-	void  *spirv_code = malloc(spirv_size);
-	glslang_program_SPIRV_get(program, (unsigned int*)spirv_code);
-	glslang_shader_delete (shader);
-	glslang_program_delete(program);
+	std::vector<unsigned int> spirv;
+	spv::SpvBuildLogger logger;
+	glslang::GlslangToSpv(*intermediate, spirv, &logger);
+
+	// Log any SPIR-V generation messages
+	std::string gen_messages = logger.getAllMessages();
+	if (gen_messages.length() > 0) {
+		sksc_log(log_level_info, gen_messages.c_str());
+	}
 
 	// Optimize the SPIRV we just generated
 	spvtools::Optimizer optimizer(SPV_ENV_UNIVERSAL_1_0);
@@ -202,8 +206,7 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 
 	optimizer.RegisterPerformancePasses();
 	std::vector<uint32_t> spirv_optimized;
-	if (!optimizer.Run((uint32_t*)spirv_code, spirv_size/sizeof(uint32_t), &spirv_optimized)) {
-		free(spirv_code);
+	if (!optimizer.Run(spirv.data(), spirv.size(), &spirv_optimized)) {
 		return compile_result_fail;
 	}
 
@@ -212,8 +215,6 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 	out_stage->code_size = (uint32_t)(spirv_optimized.size() * sizeof(unsigned int));
 	out_stage->code      = malloc(out_stage->code_size);
 	memcpy(out_stage->code, spirv_optimized.data(), out_stage->code_size);
-	
-	free(spirv_code);
 
 	return compile_result_success;
 }
@@ -270,10 +271,11 @@ public:
 	{
 		char path_filename[1024];
 		snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->folder, pFileName);
-		FILE *fp = fopen(path_filename, "rb");
+		FILE *fp = nullptr;
+		fopen_s(&fp, path_filename, "rb");
 		for (int32_t i = 0; fp == nullptr && i < settings->include_folder_ct; i++) {
 			snprintf(path_filename, sizeof(path_filename), "%s\\%s", settings->include_folders[i], pFileName);
-			fp = fopen(path_filename, "rb");
+			fopen_s(&fp, path_filename, "rb");
 		}
 		if (fp == nullptr) {
 			return E_FAIL;

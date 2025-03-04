@@ -55,6 +55,7 @@ void            sksc_shutdown   ();
 bool            sksc_compile    (const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file);
 void            sksc_build_file (const skg_shader_file_t *file, void **out_data, size_t *out_size);
 void            sksc_log        (log_level_ level, const char* text, ...);
+void            sksc_log_at     (log_level_ level, int32_t line, int32_t column, const char *text, ...);
 void            sksc_log_print  (const char* file, const sksc_settings_t* settings);
 void            sksc_log_clear  ();
 int32_t         sksc_log_count  ();

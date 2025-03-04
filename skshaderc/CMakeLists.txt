@@ -99,6 +99,7 @@ endif()
 add_executable(skshaderc
     main.cpp
     sksc.cpp
+    sksc_hlsl.cpp
     sksc.h
     miniz.cpp
     miniz.h

@@ -177,9 +177,9 @@ compiler_settings_t check_settings(int32_t argc, char **argv, bool *exit) {
 		         strcmp(argv[i], "-?" ) == 0 ||
 		         strcmp(argv[i], "--help" ) == 0 ||
 		         strcmp(argv[i], "/?" ) == 0 ) *exit = true;
-		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { result.shaderc.cs_entry_require = true; strncpy(result.shaderc.cs_entrypoint, argv[i+1], sizeof(result.shaderc.cs_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { result.shaderc.vs_entry_require = true; strncpy(result.shaderc.vs_entrypoint, argv[i+1], sizeof(result.shaderc.vs_entrypoint)); i++; }
-		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { result.shaderc.ps_entry_require = true; strncpy(result.shaderc.ps_entrypoint, argv[i+1], sizeof(result.shaderc.ps_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-cs") == 0 && i<argc-1) { strncpy(result.shaderc.cs_entrypoint, argv[i+1], sizeof(result.shaderc.cs_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-vs") == 0 && i<argc-1) { strncpy(result.shaderc.vs_entrypoint, argv[i+1], sizeof(result.shaderc.vs_entrypoint)); i++; }
+		else if (strcmp(argv[i], "-ps") == 0 && i<argc-1) { strncpy(result.shaderc.ps_entrypoint, argv[i+1], sizeof(result.shaderc.ps_entrypoint)); i++; }
 		else if (strcmp(argv[i], "-gl") == 0 && i<argc-1) { result.shaderc.gl_version = atoi(argv[i+1]); i++; }
 		else if (strcmp(argv[i], "-m" ) == 0 && i<argc-1) { strncpy(result.shaderc.shader_model,  argv[i+1], sizeof(result.shaderc.shader_model )); i++; }
 		else if (strcmp(argv[i], "-i" ) == 0 && i<argc-1) {

@@ -7,14 +7,19 @@
 #include <spirv-tools/optimizer.hpp>
 
 ///////////////////////////////////////////
-// HLSL to SPIR-V                        //
+
+void sksc_glslang_init() {
+	glslang::InitializeProcess();
+}
+
 ///////////////////////////////////////////
 
-typedef struct glslang_shader_s {
-	glslang::TShader* shader;
-	std::string       preprocessed_glsl;
-} glslang_shader_t;
+void sksc_glslang_shutdown() {
+	glslang::FinalizeProcess();
+}
 
+///////////////////////////////////////////
+// HLSL to SPIR-V                        //
 ///////////////////////////////////////////
 
 class SkscIncluder : public DirStackFileIncluder {

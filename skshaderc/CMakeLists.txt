@@ -100,6 +100,7 @@ add_executable(skshaderc
     main.cpp
     sksc.cpp
     sksc_hlsl.cpp
+    sksc_meta.cpp
     sksc.h
     miniz.cpp
     miniz.h

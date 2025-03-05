@@ -14,7 +14,7 @@ void sksc_line_col(const char *from_text, const char *at, int32_t *out_line, int
 
 ///////////////////////////////////////////
 
-bool sksc_spvc_read_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_meta_t *ref_meta) {
+bool sksc_spirv_to_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_meta_t *ref_meta) {
 	spirv_cross::CompilerHLSL* compiler = nullptr;
 	try                            { compiler = new spirv_cross::CompilerHLSL((const uint32_t*)spirv_stage->code, spirv_stage->code_size/sizeof(uint32_t)); }
 	catch(const std::exception& e) { sksc_log(log_level_err, "[SPIRV-Cross] Failed to create compiler: %s", e.what()); }

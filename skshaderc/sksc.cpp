@@ -8,42 +8,10 @@
 
 #include "array.h"
 
-#include <spirv_glsl.hpp>
-#include <spirv_hlsl.hpp>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
-
-///////////////////////////////////////////
-
-array_t<sksc_log_item_t> sksc_log_list = {};
-
-///////////////////////////////////////////
-
-bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta, array_t<sksc_meta_item_t> var_meta);
-
-///////////////////////////////////////////
-
-struct file_data_t {
-	array_t<uint8_t> data;
-
-	void write_fixed_str(const char *item, int32_t _Size) {
-		size_t len = strlen(item);
-		data.add_range((uint8_t*)item, (int32_t)(sizeof(char) * len));
-
-		int32_t count = (int32_t)(_Size - len);
-		if (_Size - len > 0) {
-			while (data.count + count > data.capacity) { data.resize(data.capacity * 2 < 4 ? 4 : data.capacity * 2); }
-		}
-		memset(&data.data[data.count], 0, count);
-		data.count += count;
-	}
-	template <typename T> 
-	void write(T &item) { data.add_range((uint8_t*)&item, sizeof(T)); }
-	void write(void *item, size_t size) { data.add_range((uint8_t*)item, (int32_t)size); }
-};
 
 ///////////////////////////////////////////
 
@@ -60,7 +28,6 @@ void sksc_shutdown() {
 ///////////////////////////////////////////
 
 bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_shader_file_t *out_file) {
-
 	*out_file = {};
 	 out_file->meta = (skg_shader_meta_t*)malloc(sizeof(skg_shader_meta_t));
 	*out_file->meta = {};
@@ -77,7 +44,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 			continue;
 
 		skg_shader_file_stage_t spirv_stage  = {};
-		compile_result_         spirv_result = sksc_glslang_compile_shader(hlsl_text, settings, compile_stages[i], skg_shader_lang_spirv, &spirv_stage, nullptr);
+		compile_result_         spirv_result = sksc_hlsl_to_spirv(hlsl_text, settings, compile_stages[i], &spirv_stage);
 		if (spirv_result == compile_result_fail || (spirv_result == compile_result_skip && entrypoint_req[i])) {
 			sksc_log(log_level_err, "SPIRV compile failed");
 			return false;
@@ -88,13 +55,12 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (settings->target_langs[skg_shader_lang_spirv]) {
 			stages.add(spirv_stage);
 		}
-		sksc_spvc_read_meta(&spirv_stage, out_file->meta);
+		sksc_spirv_to_meta(&spirv_stage, out_file->meta);
 
 #if defined(SKSC_D3D11)
-		
 		if (settings->target_langs[skg_shader_lang_hlsl]) {
 			stages.add({});
-			if (!sksc_d3d11_compile_shader(filename, hlsl_text, settings, compile_stages[i], &stages.last(), out_file->meta)) {
+			if (!sksc_hlsl_to_bytecode(filename, hlsl_text, settings, compile_stages[i], &stages.last(), out_file->meta)) {
 				sksc_log(log_level_err, "HLSL shader compile failed");
 				return false;
 			}
@@ -115,7 +81,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (settings->target_langs[skg_shader_lang_glsl]) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta, var_meta)) {
+			if (!sksc_spirv_to_glsl(&spirv_stage, settings, skg_shader_lang_glsl, &stages.last(), out_file->meta, var_meta)) {
 				sksc_log(log_level_err, "GLSL shader compile failed");
 				return false;
 			}
@@ -123,7 +89,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute && settings->target_langs[skg_shader_lang_glsl_es]) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta, var_meta)) {
+			if (!sksc_spirv_to_glsl(&spirv_stage, settings, skg_shader_lang_glsl_es, &stages.last(), out_file->meta, var_meta)) {
 				sksc_log(log_level_err, "GLES shader compile failed");
 				return false;
 			}
@@ -131,13 +97,12 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		if (compile_stages[i] != skg_stage_compute && settings->target_langs[skg_shader_lang_glsl_web]) {
 			stages.add({});
-			if (!sksc_spvc_compile_stage(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta, var_meta)) {
+			if (!sksc_spirv_to_glsl(&spirv_stage, settings, skg_shader_lang_glsl_web, &stages.last(), out_file->meta, var_meta)) {
 				sksc_log(log_level_err, "GLSL web shader compile failed");
 				return false;
 			}
 		}
 
-		//free(d3d12_hlsl_stage.code);
 		if (!settings->target_langs[skg_shader_lang_spirv])
 			free(spirv_stage.code);
 	}
@@ -250,16 +215,29 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		return false;
 	}
 
-	for (size_t i = 0; i < out_file->stage_count; i++) {
-		if (out_file->stages[i].language == skg_shader_lang_glsl_es && 
-			(out_file->stages[i].stage == skg_stage_pixel ||
-			 out_file->stages[i].stage == skg_stage_vertex)) {
-			//sksc_log(log_level_info, "OpenGL pixel shader stage:\n%s", out_file->stages[i].code);
-		}
-	}
-
 	return true;
 }
+
+///////////////////////////////////////////
+
+struct file_data_t {
+	array_t<uint8_t> data;
+
+	void write_fixed_str(const char *item, int32_t _Size) {
+		size_t len = strlen(item);
+		data.add_range((uint8_t*)item, (int32_t)(sizeof(char) * len));
+
+		int32_t count = (int32_t)(_Size - len);
+		if (_Size - len > 0) {
+			while (data.count + count > data.capacity) { data.resize(data.capacity * 2 < 4 ? 4 : data.capacity * 2); }
+		}
+		memset(&data.data[data.count], 0, count);
+		data.count += count;
+	}
+	template <typename T> 
+	void write(T &item) { data.add_range((uint8_t*)&item, sizeof(T)); }
+	void write(void *item, size_t size) { data.add_range((uint8_t*)item, (int32_t)size); }
+};
 
 ///////////////////////////////////////////
 
@@ -334,242 +312,4 @@ void sksc_build_file(const skg_shader_file_t *file, void **out_data, size_t *out
 
 	*out_data = data.data.data;
 	*out_size = data.data.count;
-}
-
-///////////////////////////////////////////
-
-bool sksc_check_tags(const char *tag_list, const char *tag) {
-	const char *start = tag_list;
-	const char *end   = tag_list;
-	while (*end != '\0') {
-		if (*end == ',' || *end == ' ') {
-			size_t length = end - start;
-			if (length > 0 && strncmp(start, tag, length) == 0) {
-				return true;
-			}
-			start = end + 1;
-		}
-		end++;
-	}
-	size_t length = end - start;
-	if (length > 0 && strncmp(start, tag, length) == 0) {
-		return true;
-	}
-	return false;
-}
-
-///////////////////////////////////////////
-
-bool sksc_spvc_compile_stage(const skg_shader_file_stage_t *src_stage, const sksc_settings_t *settings, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, const skg_shader_meta_t *meta, array_t<sksc_meta_item_t> var_meta) {
-	try {
-		// Create compiler instance
-		spirv_cross::CompilerGLSL glsl((uint32_t*)src_stage->code, src_stage->code_size/ sizeof(uint32_t));
-
-		// Set up compiler options
-		spirv_cross::CompilerGLSL::Options options;
-		if (lang == skg_shader_lang_glsl_web) {
-			options.version = 300;
-			options.es      = true;
-			options.vertex.support_nonzero_base_instance = false;
-		} else if (lang == skg_shader_lang_glsl_es) {
-			options.version = 320;
-			options.es      = true;
-			options.vertex.support_nonzero_base_instance = false;
-		} else if (lang == skg_shader_lang_glsl) {
-			options.version = settings->gl_version;
-			options.es = false;
-		}
-		//if (src_stage->stage == skg_stage_vertex)
-		//	options.ovr_multiview_view_count = 2;
-		glsl.set_common_options(options);
-
-		// Reflect shader resources
-		spirv_cross::ShaderResources resources = glsl.get_shader_resources();
-
-		// Ensure buffer ids stay the same
-		for (spirv_cross::Resource &resource : resources.uniform_buffers) {
-			const std::string &name = glsl.get_name(resource.id);
-			for (size_t b = 0; b < meta->buffer_count; b++) {
-				if (strcmp(name.c_str(), meta->buffers[b].name) == 0 || (strcmp(name.c_str(), "_Global") == 0 && strcmp(meta->buffers[b].name, "$Global") == 0)) {
-					glsl.set_decoration(resource.id, spv::DecorationBinding, meta->buffers[b].bind.slot);
-					break;
-				}
-			}
-		}
-
-		// Convert tagged textures to use OES samplers
-		glsl.set_variable_type_remap_callback([&](const spirv_cross::SPIRType& type, const std::string& var_name, std::string& name_of_type) {
-			for (size_t i = 0; i < var_meta.count; i++) {
-				if (strcmp(var_meta[i].name, var_name.c_str()) != 0) continue;
-				if (sksc_check_tags(var_meta[i].tag, "external")) {
-					name_of_type = "samplerExternalOES";
-				}
-				break;
-			}
-		});
-		
-		// Check if we had an external texture. We need to know this now, but
-		// the callback above doesn't happen until later.
-		bool use_external = false;
-		for (spirv_cross::Resource &image : resources.separate_images) {
-			const std::string &name = glsl.get_name(image.id);
-
-			for (size_t i = 0; i < var_meta.count; i++) {
-				if (strcmp(var_meta[i].name, name.c_str()) != 0) continue;
-				if (sksc_check_tags(var_meta[i].tag, "external")) {
-					use_external = true;
-				}
-				break;
-			}
-		}
-
-		glsl.add_header_line("#extension GL_EXT_gpu_shader5 : enable");
-		//glsl.add_header_line("#extension GL_OES_sample_variables : enable");
-		if (use_external == true && lang == skg_shader_lang_glsl_es) {
-			glsl.add_header_line("#extension GL_OES_EGL_image_external_essl3 : enable");
-		}
-		// Add custom header lines for vertex shaders
-		if (src_stage->stage == skg_stage_vertex) {
-			//glsl.add_header_line("#extension GL_OVR_multiview2 : require");
-			//glsl.add_header_line("layout(num_views = 2) in;");
-			glsl.add_header_line("#define gl_Layer int _dummy_gl_layer_var");
-		}
-
-		// Build dummy sampler for combined images
-		spirv_cross::VariableID dummy_sampler_id = glsl.build_dummy_sampler_for_combined_images();
-		if (dummy_sampler_id) {
-			glsl.set_decoration(dummy_sampler_id, spv::DecorationDescriptorSet, 0);
-			glsl.set_decoration(dummy_sampler_id, spv::DecorationBinding,       0);
-		}
-
-		// Combine samplers and textures
-		glsl.build_combined_image_samplers();
-
-		// Make sure sampler names stay the same in GLSL
-		for (const spirv_cross::CombinedImageSampler &remap : glsl.get_combined_image_samplers()) {
-			const std::string &name    = glsl.get_name      (remap.image_id);
-			uint32_t           binding = glsl.get_decoration(remap.image_id, spv::DecorationBinding);
-			glsl.set_name      (remap.combined_id, name);
-			glsl.set_decoration(remap.combined_id, spv::DecorationBinding, binding);
-		}
-
-		// Rename stage inputs/outputs for vertex/pixel shaders
-		if (src_stage->stage == skg_stage_vertex || src_stage->stage == skg_stage_pixel) {
-			size_t      off = src_stage->stage == skg_stage_vertex ? sizeof("@entryPointOutput.")-1 : sizeof("input.")-1;
-			spirv_cross::SmallVector<spirv_cross::Resource> &stage_resources = src_stage->stage == skg_stage_vertex ? resources.stage_outputs : resources.stage_inputs;
-			for (spirv_cross::Resource &resource : stage_resources) {
-				char fs_name[64];
-				snprintf(fs_name, sizeof(fs_name), "fs_%s", glsl.get_name(resource.id).c_str()+off);
-				glsl.set_name(resource.id, fs_name);
-			}
-		}
-
-		// Compile to GLSL
-		std::string source = glsl.compile();
-
-		// Set output stage details
-		out_stage->stage     = src_stage->stage;
-		out_stage->language  = lang;
-		out_stage->code_size = static_cast<uint32_t>(source.size()) + 1;
-		out_stage->code      = malloc(out_stage->code_size);
-		strncpy(static_cast<char*>(out_stage->code), source.c_str(), out_stage->code_size);
-
-		return true;
-	} catch (const spirv_cross::CompilerError &e) {
-		sksc_log(log_level_err, "[SPIRV-Cross] %s", e.what());
-		return false;
-	}
-}
-
-///////////////////////////////////////////
-
-void sksc_log(log_level_ level, const char *text, ...) {
-	sksc_log_item_t item = {};
-	item.level  = level;
-	item.line   = -1;
-	item.column = -1;
-
-	va_list args;
-	va_start(args, text);
-	va_list copy;
-	va_copy(copy, args);
-	size_t length = vsnprintf(nullptr, 0, text, args);
-	item.text = (char*)malloc(length + 2);
-	vsnprintf((char*)item.text, length + 2, text, copy);
-	va_end(copy);
-	va_end(args);
-
-	sksc_log_list.add(item);
-}
-
-///////////////////////////////////////////
-
-void sksc_log_at(log_level_ level, int32_t line, int32_t column, const char *text, ...) {
-	sksc_log_item_t item = {};
-	item.level  = level;
-	item.line   = line;
-	item.column = column;
-
-	va_list args;
-	va_start(args, text);
-	va_list copy;
-	va_copy(copy, args);
-	size_t length = vsnprintf(nullptr, 0, text, args);
-	item.text = (char*)malloc(length + 2);
-	vsnprintf((char*)item.text, length + 2, text, copy);
-	va_end(copy);
-	va_end(args);
-
-	sksc_log_list.add(item);
-}
-
-///////////////////////////////////////////
-
-void sksc_log_print(const char *file, const sksc_settings_t *settings) {
-	for (size_t i = 0; i < sksc_log_list.count; i++) {
-		if (sksc_log_list[i].level == log_level_info && !settings->silent_info) {
-			printf("%s\n", sksc_log_list[i].text);
-		}
-	}
-	for (size_t i = 0; i < sksc_log_list.count; i++) {
-		if ((sksc_log_list[i].level == log_level_err_pre && !settings->silent_err)) {
-			printf("%s", sksc_log_list[i].text);
-		}
-	}
-	for (size_t i = 0; i < sksc_log_list.count; i++) {
-		if ((sksc_log_list[i].level == log_level_warn && !settings->silent_warn) ||
-			(sksc_log_list[i].level == log_level_err  && !settings->silent_err )) {
-
-			const char* level = sksc_log_list[i].level == log_level_warn
-				? "warning"
-				: "error";
-
-			if (sksc_log_list[i].line < 0) {
-				printf("%s: %s: %s\n", file, level, sksc_log_list[i].text);
-			} else {
-				printf("%s(%d,%d): %s: %s\n", file, sksc_log_list[i].line, sksc_log_list[i].column, level, sksc_log_list[i].text);
-			}
-		}
-	}
-}
-
-///////////////////////////////////////////
-
-void sksc_log_clear() {
-	sksc_log_list.each([](sksc_log_item_t &i) {free((void*)i.text); });
-	sksc_log_list.clear();
-}
-
-///////////////////////////////////////////
-
-int32_t sksc_log_count() {
-	return (int32_t)sksc_log_list.count;
-}
-
-///////////////////////////////////////////
-
-sksc_log_item_t sksc_log_get(int32_t index) {
-	if (index < 0 || index >= sksc_log_list.count)
-		return {};
-	return sksc_log_list[index];
 }

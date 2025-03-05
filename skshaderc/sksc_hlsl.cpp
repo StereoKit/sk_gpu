@@ -117,7 +117,7 @@ void log_shader_msgs(glslang::TShader *shader) {
 
 ///////////////////////////////////////////
 
-compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *settings, skg_stage_ type, skg_shader_lang_ lang, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *out_meta) {
+compile_result_ sksc_hlsl_to_spirv(const char *hlsl, const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
 	TBuiltInResource default_resource = {};
 	EShMessages      messages         = EShMsgDefault;
 	EShMessages      messages_link    = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDebugInfo);
@@ -215,7 +215,7 @@ compile_result_ sksc_glslang_compile_shader(const char *hlsl, sksc_settings_t *s
 		return compile_result_fail;
 	}
 
-	out_stage->language  = lang;
+	out_stage->language  = skg_shader_lang_spirv;
 	out_stage->stage     = type;
 	out_stage->code_size = (uint32_t)(spirv_optimized.size() * sizeof(unsigned int));
 	out_stage->code      = malloc(out_stage->code_size);
@@ -309,7 +309,7 @@ public:
 
 ///////////////////////////////////////////
 
-bool sksc_d3d11_compile_shader(const char *filename, const char *hlsl_text, sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *ref_meta) {
+bool sksc_hlsl_to_bytecode(const char *filename, const char *hlsl_text, const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *ref_meta) {
 	DWORD flags = sksc_d3d11_build_flags(settings);
 
 	const char *entrypoint = nullptr;

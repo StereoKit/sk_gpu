@@ -29,8 +29,8 @@ bool sksc_spirv_to_glsl(const skg_shader_file_stage_t *src_stage, const sksc_set
 			options.version = settings->gl_version;
 			options.es      = false;
 		}
-		//if (src_stage->stage == skg_stage_vertex)
-		//	options.ovr_multiview_view_count = 2;
+		if (src_stage->stage == skg_stage_vertex)
+			options.ovr_multiview_view_count = 2;
 		glsl.set_common_options(options);
 
 		// Reflect shader resources

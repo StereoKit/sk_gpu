@@ -29,6 +29,40 @@ SamplerState sk_cubemap_s : register(s11);
 
 ///////////////////////////////////////////
 
+struct sk_input {
+	uint id : SV_InstanceID;
+#ifdef SK_OPENGL
+	uint view_id : SV_ViewID;
+#endif
+};
+
+#ifdef SK_OPENGL
+#define sk_set_view(output, id) output.view_id = id;
+#define SK_VIEW uint view_id : SV_RenderTargetArrayIndex;
+#else
+#define sk_set_view(output, id)
+#define SK_VIEW
+#endif
+
+
+uint sk_view_id(sk_input input) {
+	#ifdef SK_OPENGL
+	return input.view_id;
+	#else
+	return input.id % sk_view_count;
+	#endif
+}
+
+uint sk_inst_id(sk_input input) {
+#ifdef SK_OPENGL
+	return input.id;
+#else
+	return input.id % sk_view_count;
+#endif
+}
+
+///////////////////////////////////////////
+
 // A spherical harmonics lighting lookup!
 // Some calculations have been offloaded to 'sh_to_fast'
 // in StereoKitC

@@ -10,7 +10,9 @@
 
 ///////////////////////////////////////////
 
-void sksc_line_col(const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
+void sksc_line_col (const char *from_text, const char *at, int32_t *out_line, int32_t *out_column);
+int  strcmp_nocase (char const *a, char const *b);
+void parse_semantic(const char* str, char* out_str, int32_t* out_idx);
 
 ///////////////////////////////////////////
 
@@ -150,12 +152,94 @@ bool sksc_spirv_to_meta(const skg_shader_file_stage_t *spirv_stage, skg_shader_m
 		strncpy(tex->name, name.c_str(), sizeof(tex->name));
 	}
 
+	// Get vertex input info
+	if (spirv_stage->stage == skg_stage_vertex) {
+		spirv_cross::SmallVector<spirv_cross::Resource>& inputs = resources.stage_inputs;
+		ref_meta->vertex_input_count = (int32_t)inputs.size();
+		ref_meta->vertex_inputs      = (skg_vert_component_t*)malloc(sizeof(skg_vert_component_t) * ref_meta->vertex_input_count);
+
+		int32_t curr = 0;
+		for (int32_t i = 0; i < inputs.size(); i++) {
+			const spirv_cross::Resource& input = inputs[i];
+			const spirv_cross::SPIRType& type  = compiler->get_type(input.type_id);
+			
+			// Get semantic name and index from location decoration
+			uint32_t    location = compiler->get_decoration       (input.id, spv::DecorationLocation);
+			std::string deco_str = compiler->get_decoration_string(input.id, spv::DecorationHlslSemanticGOOGLE);
+
+			char    semantic[64];
+			int32_t semantic_idx = 0;
+			parse_semantic(deco_str.c_str(), semantic, &semantic_idx);
+
+			if (strlen(semantic)>3 &&
+				tolower(semantic[0]) == 's' &&
+				tolower(semantic[1]) == 'v' &&
+				tolower(semantic[2]) == '_' &&
+				strcmp_nocase(semantic, "sv_position") != 0)
+			{
+				ref_meta->vertex_input_count--;
+				continue;
+			}
+
+			ref_meta->vertex_inputs[curr].semantic_slot = semantic_idx;
+			if      (strcmp_nocase(semantic, "sv_position" ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_position;     }
+			else if (strcmp_nocase(semantic, "binormal"    ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_binormal;     }
+			else if (strcmp_nocase(semantic, "blendindices") == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_blendindices; }
+			else if (strcmp_nocase(semantic, "blendweight" ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_blendweight;  }
+			else if (strcmp_nocase(semantic, "color"       ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_color;        }
+			else if (strcmp_nocase(semantic, "normal"      ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_normal;       }
+			else if (strcmp_nocase(semantic, "position"    ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_position;     }
+			else if (strcmp_nocase(semantic, "psize"       ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_psize;        }
+			else if (strcmp_nocase(semantic, "tangent"     ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_tangent;      }
+			else if (strcmp_nocase(semantic, "texcoord"    ) == 0) { ref_meta->vertex_inputs[curr].semantic = skg_semantic_texcoord;     }
+
+			ref_meta->vertex_inputs[i].count = type.vecsize;
+			switch (type.basetype) {
+				case spirv_cross::SPIRType::Float: ref_meta->vertex_inputs[curr].format = skg_fmt_f32; break;
+				case spirv_cross::SPIRType::Int:   ref_meta->vertex_inputs[curr].format = skg_fmt_i32; break;
+				case spirv_cross::SPIRType::UInt:  ref_meta->vertex_inputs[curr].format = skg_fmt_ui32;break;
+				default: ref_meta->vertex_inputs[curr].format = skg_fmt_none; break;
+			}
+			curr += 1;
+		}
+	}
+
 	ref_meta->buffers        = buffer_list.data;
 	ref_meta->buffer_count   = (uint32_t)buffer_list.count;
 	ref_meta->resources      = resource_list.data;
 	ref_meta->resource_count = (uint32_t)resource_list.count;
 
 	return true;
+}
+
+///////////////////////////////////////////
+
+void parse_semantic(const char* str, char* out_str, int32_t* out_idx) {
+	const char *curr  = str;
+	char*       write = out_str;
+	int         idx   = 0;
+	while (*curr != 0) {
+		if (*curr>='0' && *curr<='9') {
+			idx  = idx * 10;
+			idx += (*curr) - '0';
+		} else {
+			*write = *curr;
+			write++;
+		}
+		curr++;
+	}
+	*write   = '\0';
+	*out_idx = idx;
+}
+
+///////////////////////////////////////////
+
+int strcmp_nocase(char const *a, char const *b) {
+	for (;; a++, b++) {
+		int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
+		if (d != 0 || !*a)
+			return d;
+	}
 }
 
 ///////////////////////////////////////////

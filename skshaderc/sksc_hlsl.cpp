@@ -1,5 +1,7 @@
 #include "_sksc.h"
 
+#define ENABLE_HLSL
+
 #include <glslang/Public/ShaderLang.h>
 #include "StandAlone/DirStackFileIncluder.h"
 #include "SPIRV/GlslangToSpv.h"
@@ -28,16 +30,6 @@ public:
 		return readLocalPath(header_name, includer_name, (int)inclusion_depth);
 	}
 };
-
-///////////////////////////////////////////
-
-int strcmp_nocase(char const *a, char const *b) {
-	for (;; a++, b++) {
-		int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
-		if (d != 0 || !*a)
-			return d;
-	}
-}
 
 ///////////////////////////////////////////
 
@@ -117,7 +109,7 @@ void log_shader_msgs(glslang::TShader *shader) {
 
 ///////////////////////////////////////////
 
-compile_result_ sksc_hlsl_to_spirv(const char *hlsl, const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
+compile_result_ sksc_hlsl_to_spirv(const char *hlsl, const sksc_settings_t *settings, skg_stage_ type, const char** defines, int32_t define_count, skg_shader_file_stage_t *out_stage) {
 	TBuiltInResource default_resource = {};
 	EShMessages      messages         = EShMsgDefault;
 	EShMessages      messages_link    = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDebugInfo);
@@ -138,6 +130,15 @@ compile_result_ sksc_hlsl_to_spirv(const char *hlsl, const sksc_settings_t *sett
 	shader.setEnvInput        (glslang::EShSourceHlsl, stage, glslang::EShClientVulkan, 100);
 	shader.setEnvClient       (glslang::EShClientVulkan,      glslang::EShTargetVulkan_1_0);
 	shader.setEnvTarget       (glslang::EShTargetSpv,         glslang::EShTargetSpv_1_0);
+	shader.setEnvTargetHlslFunctionality1();
+
+	std::string preamble;
+	if (define_count > 0) {
+		for (int32_t i = 0; i < define_count; i++) {
+			preamble += "#define " + std::string(defines[i]) + "\n";
+		}
+		shader.setPreamble(preamble.c_str());
+	}
 
 	// Setup includer
 	SkscIncluder includer;
@@ -309,7 +310,7 @@ public:
 
 ///////////////////////////////////////////
 
-bool sksc_hlsl_to_bytecode(const char *filename, const char *hlsl_text, const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *ref_meta) {
+bool sksc_hlsl_to_bytecode(const char *filename, const char *hlsl_text, const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage) {
 	DWORD flags = sksc_d3d11_build_flags(settings);
 
 	const char *entrypoint = nullptr;
@@ -344,90 +345,6 @@ bool sksc_hlsl_to_bytecode(const char *filename, const char *hlsl_text, const sk
 	out_stage->code_size = (uint32_t)compiled->GetBufferSize();
 	out_stage->code       = malloc(out_stage->code_size);
 	memcpy(out_stage->code, compiled->GetBufferPointer(), out_stage->code_size);
-
-	// Get some info about the shader!
-	ID3D11ShaderReflection* reflector = nullptr; 
-	const GUID IID_ID3D11ShaderReflection = { 0x8d536ca1, 0x0cca, 0x4956, { 0xa8, 0x37, 0x78, 0x69, 0x63, 0x75, 0x55, 0x84 } };
-	if (FAILED(D3DReflect( out_stage->code, out_stage->code_size, IID_ID3D11ShaderReflection, (void**)&reflector))) {
-		sksc_log(log_level_err_pre, "Shader reflection failed!");
-		return false;
-	}
-
-	D3D11_SHADER_DESC shader_desc = {};
-	reflector->GetDesc(&shader_desc);
-
-	// Snag some perf related to data
-	skg_shader_ops_t *ops = nullptr;
-	if (type == skg_stage_vertex) ops = &ref_meta->ops_vertex;
-	if (type == skg_stage_pixel)  ops = &ref_meta->ops_pixel;
-	if (ops) {
-		ops->total        = shader_desc.InstructionCount;
-		ops->tex_read     = shader_desc.TextureLoadInstructions + shader_desc.TextureNormalInstructions;
-		ops->dynamic_flow = shader_desc.DynamicFlowControlCount;
-	}
-
-	// Get information about the vertex input data
-	if (type == skg_stage_vertex) {
-		ref_meta->vertex_input_count = shader_desc.InputParameters;
-		ref_meta->vertex_inputs = (skg_vert_component_t*)malloc(sizeof(skg_vert_component_t) * ref_meta->vertex_input_count);
-
-		int32_t curr = 0;
-		for (int32_t i = 0; i < (int32_t)shader_desc.InputParameters; i++) {
-			D3D11_SIGNATURE_PARAMETER_DESC param_desc = {};
-			reflector->GetInputParameterDesc(i, &param_desc);
-
-			// Ignore SV_ inputs, unless they're SV_Position
-			if (strlen(param_desc.SemanticName)>3 &&
-				tolower(param_desc.SemanticName[0]) == 's' &&
-				tolower(param_desc.SemanticName[1]) == 'v' &&
-				tolower(param_desc.SemanticName[2]) == '_' &&
-				strcmp_nocase(param_desc.SemanticName, "sv_position") != 0)
-			{
-				ref_meta->vertex_input_count--;
-				continue;
-			}
-			
-			ref_meta->vertex_inputs[curr].count         = 0;
-			ref_meta->vertex_inputs[curr].semantic_slot = param_desc.SemanticIndex;
-			if      (strcmp_nocase(param_desc.SemanticName, "binormal")     == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_binormal;
-			else if (strcmp_nocase(param_desc.SemanticName, "blendindices") == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_blendindices;
-			else if (strcmp_nocase(param_desc.SemanticName, "blendweight")  == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_blendweight;
-			else if (strcmp_nocase(param_desc.SemanticName, "color")        == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_color;
-			else if (strcmp_nocase(param_desc.SemanticName, "normal")       == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_normal;
-			else if (strcmp_nocase(param_desc.SemanticName, "sv_position")  == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_position;
-			else if (strcmp_nocase(param_desc.SemanticName, "position")     == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_position;
-			else if (strcmp_nocase(param_desc.SemanticName, "psize")        == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_psize;
-			else if (strcmp_nocase(param_desc.SemanticName, "tangent")      == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_tangent;
-			else if (strcmp_nocase(param_desc.SemanticName, "texcoord")     == 0) ref_meta->vertex_inputs[curr].semantic = skg_semantic_texcoord;
-			switch(param_desc.ComponentType) {
-				case D3D_REGISTER_COMPONENT_FLOAT32: ref_meta->vertex_inputs[curr].format = skg_fmt_f32;  break;
-				case D3D_REGISTER_COMPONENT_SINT32:  ref_meta->vertex_inputs[curr].format = skg_fmt_i32;  break;
-				case D3D_REGISTER_COMPONENT_UINT32:  ref_meta->vertex_inputs[curr].format = skg_fmt_ui32; break;
-				default: ref_meta->vertex_inputs[curr].format = skg_fmt_none; break;
-			}
-			curr += 1;
-		}
-	}
-	
-	/*char text[256];
-	for (uint32_t i = 0; i < shader_desc.ConstantBuffers; i++) {
-		ID3D11ShaderReflectionConstantBuffer *buff = reflector->GetConstantBufferByIndex(i);
-		D3D11_SHADER_BUFFER_DESC buff_desc = {};
-		buff->GetDesc(&buff_desc);
-
-		snprintf(text, sizeof(text), "Buffer: %s", buff_desc.Name);
-		sksc_log(log_level_info, text);
-		for (uint32_t v = 0; v < buff_desc.Variables; v++) {
-			ID3D11ShaderReflectionVariable *var = buff->GetVariableByIndex(v);
-			D3D11_SHADER_VARIABLE_DESC var_desc = {};
-			var->GetDesc(&var_desc);
-
-			snprintf(text, sizeof(text), "  %s", var_desc.Name);
-			sksc_log(log_level_info, text);
-		}
-	}*/
-	
-	reflector->Release();
 
 	compiled->Release();
 	return true;

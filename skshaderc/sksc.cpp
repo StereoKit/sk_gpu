@@ -48,7 +48,8 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 
 		// SPIRV is needed regardless, since we use it for reflection!
 		skg_shader_file_stage_t spirv_stage  = {};
-		compile_result_         spirv_result = sksc_hlsl_to_spirv(hlsl_text, settings, compile_stages[i], &spirv_stage);
+		const char*             defines[1]   = {"SK_OPENGL"};
+		compile_result_         spirv_result = sksc_hlsl_to_spirv(hlsl_text, settings, compile_stages[i], defines, 1, &spirv_stage);
 		if (spirv_result == compile_result_fail) {
 			sksc_log(log_level_err, "SPIRV compile failed");
 			return false;
@@ -67,7 +68,7 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (settings->target_langs[skg_shader_lang_hlsl]) {
 			stages.add({});
 #if defined(SKSC_D3D11)
-			if (!sksc_hlsl_to_bytecode(filename, hlsl_text, settings, compile_stages[i], &stages.last(), out_file->meta)) {
+			if (!sksc_hlsl_to_bytecode(filename, hlsl_text, settings, compile_stages[i], &stages.last())) {
 				sksc_log(log_level_err, "HLSL shader compile failed");
 				return false;
 			}
@@ -116,8 +117,9 @@ bool sksc_compile(const char *filename, const char *hlsl_text, sksc_settings_t *
 		if (!settings->target_langs[skg_shader_lang_spirv])
 			free(spirv_stage.code);
 	}
-	
+
 	sksc_meta_assign_defaults(var_meta, out_file->meta);
+	var_meta.free();
 	out_file->stage_count = (uint32_t)stages.count;
 	out_file->stages      = stages.data;
 
@@ -173,7 +175,7 @@ void sksc_log_shader_info(const skg_shader_file_t *file) {
 			case skg_shader_var_uint:   type_name = "uint";  break;
 			case skg_shader_var_uint8:  type_name = "uint8"; break;
 			}
-			sksc_log(log_level_info, "|    %-15s: +%-4u [%5u] - %s%u", var->name, var->offset, var->size, type_name, var->type_count);
+			sksc_log(log_level_info, "|    %-15s: +%-4u %5ub - %s[%u]", var->name, var->offset, var->size, type_name, var->type_count);
 		}
 	}
 
@@ -199,7 +201,7 @@ void sksc_log_shader_info(const skg_shader_file_t *file) {
 				case skg_semantic_tangent:      semantic = "Tangent";      break;
 				case skg_semantic_texcoord:     semantic = "TexCoord";     break;
 			}
-			sksc_log(log_level_info, "|  %s : %s%d", format, semantic, meta->vertex_inputs[i].semantic_slot);
+			sksc_log(log_level_info, "|  %s%d : %s%d", format, meta->vertex_inputs[i].count, semantic, meta->vertex_inputs[i].semantic_slot);
 		}
 	} 
 

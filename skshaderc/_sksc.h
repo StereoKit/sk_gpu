@@ -19,8 +19,8 @@ struct sksc_meta_item_t {
 
 void                      sksc_glslang_init          ();
 void                      sksc_glslang_shutdown      ();
-compile_result_           sksc_hlsl_to_spirv         (const char *hlsl,                            const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage);
-bool                      sksc_hlsl_to_bytecode      (const char *filename, const char *hlsl_text, const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage, skg_shader_meta_t *ref_meta);
+compile_result_           sksc_hlsl_to_spirv         (const char *hlsl, const sksc_settings_t *settings, skg_stage_ type, const char** defines, int32_t define_count, skg_shader_file_stage_t *out_stage);
+bool                      sksc_hlsl_to_bytecode      (const char *filename, const char *hlsl_text, const sksc_settings_t *settings, skg_stage_ type, skg_shader_file_stage_t *out_stage);
 
 array_t<sksc_meta_item_t> sksc_meta_find_defaults    (const char *hlsl_text);
 void                      sksc_meta_assign_defaults  (array_t<sksc_meta_item_t> items, skg_shader_meta_t *ref_meta);

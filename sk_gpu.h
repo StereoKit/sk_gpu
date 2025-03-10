@@ -261,6 +261,8 @@ typedef enum skg_cap_ {
 	skg_cap_fmt_pvrtc2,
 	skg_cap_fmt_astc,
 	skg_cap_fmt_atc,
+	skg_cap_multiview,
+	skg_cap_multiview_tiled_multisample,
 	skg_cap_max,
 } skg_cap_;
 
@@ -3460,7 +3462,9 @@ GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) 
 GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
-GLE(void,     glFramebufferTexture2DMultisampleEXT, uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level, int32_t multisample) \
+GLE(void,     glFramebufferTexture2DMultisampleEXT,        uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level, int32_t multisample) \
+GLE(void,     glFramebufferTextureMultiviewOVR,            uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t baseViewIndex, int32_t numViews) \
+GLE(void,     glFramebufferTextureMultisampleMultiviewOVR, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t samples, int32_t baseViewIndex, int32_t numViews) \
 GLE(uint32_t, glCheckFramebufferStatus,  uint32_t target) \
 GLE(void,     glBlitFramebuffer,         int32_t srcX0, int32_t srcY0, int32_t srcX1, int32_t srcY1, int32_t dstX0, int32_t dstY0, int32_t dstX1, int32_t dstY1, uint32_t mask, uint32_t filter) \
 GLE(void,     glDeleteTextures,          int32_t n, const uint32_t *textures) \
@@ -3575,6 +3579,7 @@ uint32_t    gl_current_framebuffer = 0;
 char*       gl_adapter_name        = nullptr;
 
 const uint32_t skg_settings_tex_slot = GL_TEXTURE0+33;
+const uint32_t skg_multiview_ct = 2;
 
 bool gl_caps             [skg_cap_max    ] = {};
 bool gl_tex_fmt_supported[skg_tex_fmt_max] = {};
@@ -3696,7 +3701,7 @@ int32_t gl_init_wgl() {
 
 	// Create an OpenGL context
 	int attributes[] = {
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 3, 
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
 		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
 #if !defined(NDEBUG)
 		WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
@@ -3883,12 +3888,14 @@ void gl_check_exts() {
 	glGetIntegerv(GL_NUM_EXTENSIONS, &ct);
 	for (int32_t i = 0; i < ct; i++) {
 		const char* ext = (const char *)glGetStringi(GL_EXTENSIONS, i);
-		if (strcmp(ext, "GL_AMD_vertex_shader_layer"            ) == 0) gl_caps[skg_cap_tex_layer_select] = true;
-		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2") == 0) gl_caps[skg_cap_tiled_multisample] = true;
-		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc"      ) == 0) gl_caps[skg_cap_fmt_pvrtc1] = true;
-		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc2"     ) == 0) gl_caps[skg_cap_fmt_pvrtc2] = true;
-		if (strcmp(ext, "GL_KHR_texture_compression_astc_ldr"   ) == 0) gl_caps[skg_cap_fmt_astc] = true;
-		if (strcmp(ext, "GL_AMD_compressed_ATC_texture"         ) == 0) gl_caps[skg_cap_fmt_atc] = true;
+		if (strcmp(ext, "GL_AMD_vertex_shader_layer"                     ) == 0) gl_caps[skg_cap_tex_layer_select] = true;
+		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2"         ) == 0) gl_caps[skg_cap_tiled_multisample] = true;
+		if (strcmp(ext, "GL_OVR_multiview2"                              ) == 0) gl_caps[skg_cap_multiview] = true;
+		if (strcmp(ext, "GL_OVR_multiview_multisampled_render_to_texture") == 0) gl_caps[skg_cap_multiview_tiled_multisample] = true;
+		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc"               ) == 0) gl_caps[skg_cap_fmt_pvrtc1] = true;
+		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc2"              ) == 0) gl_caps[skg_cap_fmt_pvrtc2] = true;
+		if (strcmp(ext, "GL_KHR_texture_compression_astc_ldr"            ) == 0) gl_caps[skg_cap_fmt_astc] = true;
+		if (strcmp(ext, "GL_AMD_compressed_ATC_texture"                  ) == 0) gl_caps[skg_cap_fmt_atc] = true;
 	}
 	
 #ifndef _SKG_GL_WEB
@@ -5022,15 +5029,19 @@ uint32_t gl_tex_target(skg_tex_type_ type, int32_t array_count, int32_t multisam
 
 ///////////////////////////////////////////
 
-void gl_framebuffer_attach(uint32_t texture, uint32_t target, skg_tex_fmt_ format, int32_t physical_multisample, int32_t multisample, int32_t array_count, uint32_t layer, uint32_t mip_level) {
+void gl_framebuffer_attach(uint32_t texture, uint32_t target, skg_tex_fmt_ format, int32_t physical_multisample, int32_t multisample, int32_t array_count, uint32_t layer, uint32_t mip_level, bool multiview) {
 	uint32_t attach = GL_COLOR_ATTACHMENT0;
 	if      (format == skg_tex_fmt_depthstencil)                             attach = GL_DEPTH_STENCIL_ATTACHMENT;
 	else if (format == skg_tex_fmt_depth16 || format == skg_tex_fmt_depth32) attach = GL_DEPTH_ATTACHMENT;
 
 	bool is_framebuffer_msaa = multisample > physical_multisample;
-	if      (array_count > 1)                                                   glFramebufferTextureLayer           (GL_FRAMEBUFFER, attach,         texture, mip_level, layer);
-	else if (gl_caps[skg_cap_tiled_multisample] == true && is_framebuffer_msaa) glFramebufferTexture2DMultisampleEXT(GL_FRAMEBUFFER, attach, target, texture, mip_level, multisample);
-	else                                                                        glFramebufferTexture                (GL_FRAMEBUFFER, attach,         texture, mip_level);
+	if      (multiview && array_count == skg_multiview_ct && gl_caps[skg_cap_multiview_tiled_multisample] == true && is_framebuffer_msaa)
+	                                                                            glFramebufferTextureMultisampleMultiviewOVR(GL_FRAMEBUFFER, attach,         texture, mip_level, multisample, layer, skg_multiview_ct);
+	else if (multiview && array_count == skg_multiview_ct && gl_caps[skg_cap_multiview] == true)
+	                                                                            glFramebufferTextureMultiviewOVR           (GL_FRAMEBUFFER, attach,         texture, mip_level, layer, skg_multiview_ct);
+	else if (array_count > 1)                                                   glFramebufferTextureLayer                  (GL_FRAMEBUFFER, attach,         texture, mip_level, layer);
+	else if (gl_caps[skg_cap_tiled_multisample] == true && is_framebuffer_msaa) glFramebufferTexture2DMultisampleEXT       (GL_FRAMEBUFFER, attach, target, texture, mip_level, multisample);
+	else                                                                        glFramebufferTexture                       (GL_FRAMEBUFFER, attach,         texture, mip_level);
 	
 	uint32_t status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -5066,8 +5077,10 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 
 		for (int32_t i = 0; i < result.array_count; i++) {
+			bool multiview = i == 0 && array_count == skg_multiview_ct && skg_capability(skg_cap_multiview);
+
 			glBindFramebuffer(GL_FRAMEBUFFER, result._framebuffer_layers[i]);
-			gl_framebuffer_attach(result._texture, result._target, result.format, result._physical_multisample, result.multisample, result.array_count, i, 0);
+			gl_framebuffer_attach(result._texture, result._target, result.format, result._physical_multisample, result.multisample, result.array_count, i, 0, multiview);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
@@ -5105,7 +5118,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 		glGenFramebuffers(1, result._framebuffer_layers);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, result._framebuffer_layers[0]);
-		gl_framebuffer_attach(result._texture, result._target, result.format, result._physical_multisample, result.multisample, result.array_count, array_layer, 0);
+		gl_framebuffer_attach(result._texture, result._target, result.format, result._physical_multisample, result.multisample, result.array_count, array_layer, 0, false);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);
 	}
@@ -5195,13 +5208,13 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 			src_destroy = true;
 			glGenFramebuffers(1, &src_buffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, src_buffer);
-			gl_framebuffer_attach(tex->_texture, tex->_target, tex->format, tex->_physical_multisample, tex->multisample, 0, 0, 0);
+			gl_framebuffer_attach(tex->_texture, tex->_target, tex->format, tex->_physical_multisample, tex->multisample, 0, 0, 0, false);
 		}
 		if (dest_buffer == 0) {
 			dest_destroy = true;
 			glGenFramebuffers(1, &dest_buffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, dest_buffer);
-			gl_framebuffer_attach(destination->_texture, destination->_target, destination->format, destination->_physical_multisample, destination->multisample, 0, 0, 0);
+			gl_framebuffer_attach(destination->_texture, destination->_target, destination->format, destination->_physical_multisample, destination->multisample, 0, 0, 0, false);
 		}
 
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, src_buffer);
@@ -5248,8 +5261,10 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 	}
 	
 	for (int32_t i = 0; i < tex->array_count; i++) {
+		bool multiview = i == 0 && tex->array_count == skg_multiview_ct && skg_capability(skg_cap_multiview);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer_layers[i]);
-		gl_framebuffer_attach(depth->_texture, depth->_target, depth->format, depth->_physical_multisample, depth->multisample, depth->array_count, i, 0);
+		gl_framebuffer_attach(depth->_texture, depth->_target, depth->format, depth->_physical_multisample, depth->multisample, depth->array_count, i, 0, multiview);
 	}
 
 	err = glGetError();
@@ -5410,7 +5425,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 
 		for (int32_t i = 0; i < tex->array_count; i++) {
 			glBindFramebuffer(GL_FRAMEBUFFER, tex->_framebuffer_layers[i]);
-			gl_framebuffer_attach(tex->_texture, tex->_target, tex->format, tex->_physical_multisample, tex->multisample, tex->array_count, i, 0);
+			gl_framebuffer_attach(tex->_texture, tex->_target, tex->format, tex->_physical_multisample, tex->multisample, tex->array_count, i, 0, false);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, gl_current_framebuffer);

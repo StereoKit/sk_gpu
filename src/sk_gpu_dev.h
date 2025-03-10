@@ -261,6 +261,8 @@ typedef enum skg_cap_ {
 	skg_cap_fmt_pvrtc2,
 	skg_cap_fmt_astc,
 	skg_cap_fmt_atc,
+	skg_cap_multiview,
+	skg_cap_multiview_tiled_multisample,
 	skg_cap_max,
 } skg_cap_;
 

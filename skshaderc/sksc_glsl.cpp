@@ -80,8 +80,6 @@ bool sksc_spirv_to_glsl(const skg_shader_file_stage_t *src_stage, const sksc_set
 		}
 		// Add custom header lines for vertex shaders
 		if (src_stage->stage == skg_stage_vertex) {
-			//glsl.add_header_line("#extension GL_OVR_multiview2 : require");
-			//glsl.add_header_line("layout(num_views = 2) in;");
 			glsl.add_header_line("#define gl_Layer int _dummy_gl_layer_var");
 		}
 
@@ -116,6 +114,29 @@ bool sksc_spirv_to_glsl(const skg_shader_file_stage_t *src_stage, const sksc_set
 
 		// Compile to GLSL
 		std::string source = glsl.compile();
+
+		// Spirv cross adds the multiview extension as a require, but this then
+		// breaks the shader for platforms that don't support it. Instead, we
+		// `enable` it, and guard usage of the extension with defines that
+		// provide an alternative route to functionality.
+		if (src_stage->stage == skg_stage_vertex) {
+			std::string ext_str = "#extension GL_OVR_multiview2 : require";
+			size_t ext_pos = source.find(ext_str);
+			if (ext_pos != std::string::npos)
+				source.replace(ext_pos, ext_str.length(), "#extension GL_OVR_multiview2 : enable");
+
+			std::string views_str = "layout(num_views = 2) in;";
+			size_t view_pos = source.find(views_str);
+			if (view_pos != std::string::npos)
+				source.replace(view_pos, views_str.length(), "#ifdef GL_OVR_multiview2\nlayout(num_views = 2) in;\n#else\n#define gl_ViewID_OVR 0\n#endif");
+		}
+
+		// Spaces to tabs
+		size_t pos = 0;
+		while ((pos = source.find("    ", pos)) != std::string::npos) {
+			source.replace(pos, 4, "\t");
+			pos += 1;
+		}
 
 		// Set output stage details
 		out_stage->stage     = src_stage->stage;

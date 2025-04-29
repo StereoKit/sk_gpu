@@ -114,7 +114,7 @@ jobs:
     - name: Install Arm64 Prerequisites
       run: |
         sudo cp ./cmake/arm-cross-compile-sources-jammy.list /etc/apt/sources.list.d/
-        sudo sed -i "s/deb mirror/deb [arch=amd64] mirror/g" /etc/apt/sources.list
+        sudo sed -i "s/^deb mirror/deb [arch=amd64] mirror/g" /etc/apt/sources.list
         sudo dpkg --add-architecture arm64
         sudo apt-get update
         sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld:arm64

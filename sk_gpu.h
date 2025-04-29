@@ -3094,11 +3094,6 @@ DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
 #elif defined(_SKG_GL_LOAD_EGL)
 	#include <EGL/egl.h>
 	#include <EGL/eglext.h>
-	#if defined(SKG_LINUX_EGL)
-	#include <fcntl.h>
-	#include <gbm.h>
-	bool       egl_dri     = false;
-	#endif
 
 	EGLDisplay egl_display = EGL_NO_DISPLAY;
 	EGLContext egl_context;

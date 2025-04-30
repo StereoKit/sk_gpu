@@ -3754,10 +3754,13 @@ int32_t gl_init_egl() {
 		EGL_NONE };
 	EGLint format;
 	EGLint numConfigs;
+	
 	// No display means no overrides
 	if (egl_display == EGL_NO_DISPLAY) {
 		#if defined(SKG_LINUX_EGL)
-		const int MAX_DEVICES = 10;
+		const char* display = getenv("DISPLAY");
+		if (!display || display[0] == '\0') {
+			const int MAX_DEVICES = 10;
 			EGLDeviceEXT eglDevs[MAX_DEVICES];
 			EGLint numDevices = 0;
 
@@ -3777,12 +3780,16 @@ int32_t gl_init_egl() {
 					break;
 				}
 			}
+		} else {
+			egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+		}
 		#else
 		egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 		#endif
+		
 		if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglGetDisplay"); return 0; }
 	}
-
+	
 	int32_t major=0, minor=0;
 	eglInitialize(egl_display, &major, &minor);
 

@@ -3094,11 +3094,6 @@ DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
 #elif defined(_SKG_GL_LOAD_EGL)
 	#include <EGL/egl.h>
 	#include <EGL/eglext.h>
-	#if defined(SKG_LINUX_EGL)
-	#include <fcntl.h>
-	#include <gbm.h>
-	bool       egl_dri     = false;
-	#endif
 
 	EGLDisplay egl_display = EGL_NO_DISPLAY;
 	EGLContext egl_context;
@@ -3759,40 +3754,44 @@ int32_t gl_init_egl() {
 		EGL_NONE };
 	EGLint format;
 	EGLint numConfigs;
-
+	
 	// No display means no overrides
 	if (egl_display == EGL_NO_DISPLAY) {
+		#if defined(SKG_LINUX_EGL)
+		const char* display = getenv("DISPLAY");
+		if (!display || display[0] == '\0') {
+			const int MAX_DEVICES = 10;
+			EGLDeviceEXT eglDevs[MAX_DEVICES];
+			EGLint numDevices = 0;
+
+			PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT = 
+				(PFNEGLQUERYDEVICESEXTPROC)eglGetProcAddress("eglQueryDevicesEXT");
+			if (!eglQueryDevicesEXT) {
+				skg_log(skg_log_critical, "Failed to get eglQueryDevicesEXT");
+				return 0;
+			}
+
+			eglQueryDevicesEXT(MAX_DEVICES, eglDevs, &numDevices);
+			skg_logf(skg_log_info, "Found %d EGL devices.", numDevices);
+			for (int idx = 0; idx < numDevices; idx++) {
+				EGLDisplay disp = eglGetPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, eglDevs[idx], 0);
+				if (disp != EGL_NO_DISPLAY) {
+					egl_display = disp;
+					break;
+				}
+			}
+		} else {
+			egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+		}
+		#else
 		egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+		#endif
+		
 		if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglGetDisplay"); return 0; }
 	}
-
+	
 	int32_t major=0, minor=0;
 	eglInitialize(egl_display, &major, &minor);
-	
-	#if defined(SKG_LINUX_EGL)
-	if (egl_display == EGL_NO_DISPLAY || eglGetError() != EGL_SUCCESS) {
-		skg_log(skg_log_info, "Trying EGL direct rendering from /dev/dri/renderD128");
-		int32_t fd = open ("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
-		if (fd <= 0) {
-			skg_log(skg_log_critical, "Could not find direct rendering interface at /dev/dri/renderD128");
-			return 0;
-		}
-
-		struct gbm_device *gbm = gbm_create_device (fd);
-		if (gbm == NULL) {
-			skg_log(skg_log_critical, "Could not create a GBM device");
-			return 0;
-		}
-
-		egl_display = eglGetPlatformDisplay (EGL_PLATFORM_GBM_MESA, gbm, NULL);
-		if (eglGetError() != EGL_SUCCESS) {
-			skg_log(skg_log_critical, "Could not get a platform display");
-			return 0;
-		}
-		egl_dri = true;
-		eglInitialize(egl_display, &major, &minor);
-	}
-	#endif
 
 	if (eglGetError() != EGL_SUCCESS) { skg_log(skg_log_critical, "Err eglInitialize"); return 0; }
 	char version[128];

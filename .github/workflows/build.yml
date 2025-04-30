@@ -113,10 +113,21 @@ jobs:
 
     - name: Install Arm64 Prerequisites
       run: |
+        sudo tee /etc/apt/preferences.d/arm64-preferences << EOF
+        Package: *
+        Pin: release l=Ubuntu*
+        Pin: release a=arm64
+        Pin-Priority: -1
+
+        Package: *
+        Pin: origin ports.ubuntu.com
+        Pin: release a=arm64
+        Pin-Priority: 500
+        EOF
         sudo cp ./cmake/arm-cross-compile-sources-jammy.list /etc/apt/sources.list.d/
         sudo dpkg --add-architecture arm64
         sudo find /etc/apt/sources.list /etc/apt/sources.list.d/ -type f -name "*.list" ! -name "arm-cross-compile-sources-jammy.list" -exec sed -i 's/^deb http/deb [arch=amd64] http/g' {} \;
-        sudo apt-get update
+        sudo apt-get update -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true
         sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu lld:arm64
 
     - name: Build Linux Arm64

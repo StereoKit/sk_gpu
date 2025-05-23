@@ -34,7 +34,7 @@ CPMAddPackage(
 )
 
 # For optimizing SPIR-V shaders, a baseline amount of
-# optimization is crucial for meta compatability with
+# optimization is crucial for meta compatibility with
 # HLSL compilers.
 CPMAddPackage(
     NAME SPIRV-Tools

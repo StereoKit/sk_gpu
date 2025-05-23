@@ -96,6 +96,6 @@ add_dependencies(skshader_editor
     skshaderc)
 
 skshaderc_compile_headers(skshader_editor
-    ${CMAKE_BINARY_DIR}/shaders_editor
-    "-t xge"
+    ${CMAKE_BINARY_DIR}/shaders_editor/
+    "-e -t xge"
     imgui_shader.hlsl )

@@ -20,7 +20,7 @@ add_executable(sk_gpu_test
   src/main.cpp )
 
 skshaderc_compile_headers(sk_gpu_test
-  ${CMAKE_BINARY_DIR}/shaders
+  ${CMAKE_BINARY_DIR}/shaders/
   "-O3 -t xge"
   src/test.hlsl
   src/test2.hlsl )

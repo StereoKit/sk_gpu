@@ -80,7 +80,7 @@ void window_preview_render() {
 	app_shader_set_engine_val(engine_val_matrix_view_projection, &viewproj);
 
 	float clear[4] = { 0,0,0,0 };
-	skg_tex_target_bind(&surface);
+	skg_tex_target_bind(&surface, -1, 0);
 	skg_target_clear(true, clear);
 
 	skg_pipeline_t *pipeline = app_shader_get_pipeline();
@@ -91,7 +91,7 @@ void window_preview_render() {
 		skg_draw         (0, 0, preview_meshes[preview_mesh_active].faces, 1);
 	}
 
-	skg_tex_target_bind(nullptr);
+	skg_tex_target_bind(nullptr, -1, 0);
 }
 
 void window_preview() {

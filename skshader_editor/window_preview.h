@@ -102,34 +102,35 @@ void window_preview() {
 	}
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0,0 });
-	ImGui::Begin("Preview");
 
-	/*if (ImGui::BeginMenuBar()) {
-		if (ImGui::BeginMenu("Mesh")) {
-			ImGui::EndMenu();
+	// Return false when window is collapsed, so you can early out in your code.
+	// You always need to call ImGui::End() even if false is returned.
+	if (ImGui::Begin("Preview")) {
+		/*if (ImGui::BeginMenuBar()) {
+			if (ImGui::BeginMenu("Mesh")) {
+				ImGui::EndMenu();
+			}
+			ImGui::EndMenuBar();
+		}*/
+
+		camera_arc_dist -= ImGui::GetIO().MouseWheel * .2f;
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && ImGui::IsWindowHovered()) {
+			ImVec2 delta = ImGui::GetMouseDragDelta();
+			ImGui::ResetMouseDragDelta();
+			camera_arc_x -= delta.x * 0.005f;
+			camera_arc_y += delta.y * 0.005f;
+			if (camera_arc_y < -3.14159f / 2.0f)
+				camera_arc_y = -3.14159f / 2.0f;
+			if (camera_arc_y > 3.14159f / 2.0f)
+				camera_arc_y = 3.14159f / 2.0f;
 		}
-		ImGui::EndMenuBar();
-	}*/
 
-	camera_arc_dist -= ImGui::GetIO().MouseWheel * .2f;
-	if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && ImGui::IsWindowHovered()) {
-		ImVec2 delta = ImGui::GetMouseDragDelta();
-		ImGui::ResetMouseDragDelta();
-		camera_arc_x -= delta.x * 0.005f;
-		camera_arc_y += delta.y * 0.005f;
-		if (camera_arc_y < -3.14159f/2.0f)
-			camera_arc_y = -3.14159f/2.0f;
-		if (camera_arc_y >  3.14159f/2.0f)
-			camera_arc_y =  3.14159f/2.0f;
-	}
-
-	ImVec2 min  = ImGui::GetWindowContentRegionMin();
-	ImVec2 max  = ImGui::GetWindowContentRegionMax();
-	ImVec2 size = {max.x-min.x, max.y-min.y};
-	ImGui::SetCursorPos(min);
-	if (ImGui::IsRectVisible(size)) {
+		ImVec2 min = ImGui::GetWindowContentRegionMin();
+		ImVec2 max = ImGui::GetWindowContentRegionMax();
+		ImVec2 size = { max.x - min.x, max.y - min.y };
 		window_preview_resize((int32_t)size.x, (int32_t)size.y);
 		window_preview_render();
+		ImGui::SetCursorPos(min);
 		ImGui::Image((ImTextureID)&surface, size);
 	}
 	

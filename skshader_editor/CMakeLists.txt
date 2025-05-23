@@ -69,6 +69,10 @@ add_executable(skshader_editor
     imgui/imgui_widgets.cpp
     imgui/imgui.cpp
     ../skshaderc/sksc.cpp
+    ../skshaderc/sksc_glsl.cpp
+    ../skshaderc/sksc_hlsl.cpp
+    ../skshaderc/sksc_log.cpp
+    ../skshaderc/sksc_meta.cpp
     TextEditor.cpp)
 
 add_custom_command(TARGET skshader_editor POST_BUILD
@@ -88,7 +92,7 @@ endif()
 
 target_link_libraries(skshader_editor
     PRIVATE
-    spirv-cross-c
+    spirv-cross-hlsl
     SPIRV-Tools-opt
     glslang
     SPIRV

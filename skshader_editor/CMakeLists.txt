@@ -76,9 +76,9 @@ add_executable(skshader_editor
     TextEditor.cpp)
 
 add_custom_command(TARGET skshader_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/CascadiaMono.ttf ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/CascadiaMono.ttf
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/CascadiaMono.ttf ${CMAKE_BINARY_DIR}/$<CONFIG>/CascadiaMono.ttf
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/CascadiaMono.ttf ${CMAKE_BINARY_DIR}/${PROJECT_NAME}/CascadiaMono.ttf
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/test.png ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/test.png
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/test.png ${CMAKE_BINARY_DIR}/$<CONFIG>/test.png
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/test.png ${CMAKE_BINARY_DIR}/${PROJECT_NAME}/test.png
 )
 

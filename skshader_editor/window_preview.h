@@ -126,10 +126,12 @@ void window_preview() {
 	ImVec2 min  = ImGui::GetWindowContentRegionMin();
 	ImVec2 max  = ImGui::GetWindowContentRegionMax();
 	ImVec2 size = {max.x-min.x, max.y-min.y};
-	window_preview_resize((int32_t)size.x, (int32_t)size.y);
-	window_preview_render();
 	ImGui::SetCursorPos(min);
-	ImGui::Image((ImTextureID)&surface, size);
+	if (ImGui::IsRectVisible(size)) {
+		window_preview_resize((int32_t)size.x, (int32_t)size.y);
+		window_preview_render();
+		ImGui::Image((ImTextureID)&surface, size);
+	}
 	
 	ImGui::End();
 	ImGui::PopStyleVar();

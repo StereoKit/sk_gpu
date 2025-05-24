@@ -35,8 +35,8 @@ skg_tex_t    cube_tex   = {};
 
 void window_preview_resize(int32_t width, int32_t height) {
 	if (width != surface.width || height != surface.height) {
-		skg_tex_destroy(&surface);
-		skg_tex_destroy(&zbuffer);
+		if (skg_tex_is_valid(&surface)) skg_tex_destroy(&surface);
+		if (skg_tex_is_valid(&zbuffer)) skg_tex_destroy(&zbuffer);
 		surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
 		zbuffer = skg_tex_create(skg_tex_type_depth, skg_use_static, skg_tex_fmt_depth32, skg_mip_none);
 		skg_tex_set_contents(&surface, nullptr, width, height);
@@ -80,7 +80,7 @@ void window_preview_render() {
 	app_shader_set_engine_val(engine_val_matrix_view_projection, &viewproj);
 
 	float clear[4] = { 0,0,0,0 };
-	skg_tex_target_bind(&surface);
+	skg_tex_target_bind(&surface, -1, 0);
 	skg_target_clear(true, clear);
 
 	skg_pipeline_t *pipeline = app_shader_get_pipeline();
@@ -91,7 +91,7 @@ void window_preview_render() {
 		skg_draw         (0, 0, preview_meshes[preview_mesh_active].faces, 1);
 	}
 
-	skg_tex_target_bind(nullptr);
+	skg_tex_target_bind(nullptr, -1, 0);
 }
 
 void window_preview() {
@@ -102,34 +102,39 @@ void window_preview() {
 	}
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0,0 });
-	ImGui::Begin("Preview");
 
-	/*if (ImGui::BeginMenuBar()) {
-		if (ImGui::BeginMenu("Mesh")) {
-			ImGui::EndMenu();
+	// Return false when window is collapsed, so you can early out in your code.
+	// You always need to call ImGui::End() even if false is returned.
+	if (ImGui::Begin("Preview")) {
+		/*if (ImGui::BeginMenuBar()) {
+			if (ImGui::BeginMenu("Mesh")) {
+				ImGui::EndMenu();
+			}
+			ImGui::EndMenuBar();
+		}*/
+
+		camera_arc_dist -= ImGui::GetIO().MouseWheel * .2f;
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && ImGui::IsWindowHovered()) {
+			ImVec2 delta = ImGui::GetMouseDragDelta();
+			ImGui::ResetMouseDragDelta();
+			camera_arc_x -= delta.x * 0.005f;
+			camera_arc_y += delta.y * 0.005f;
+			if (camera_arc_y < -3.14159f / 2.0f)
+				camera_arc_y = -3.14159f / 2.0f;
+			if (camera_arc_y > 3.14159f / 2.0f)
+				camera_arc_y = 3.14159f / 2.0f;
 		}
-		ImGui::EndMenuBar();
-	}*/
 
-	camera_arc_dist -= ImGui::GetIO().MouseWheel * .2f;
-	if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && ImGui::IsWindowHovered()) {
-		ImVec2 delta = ImGui::GetMouseDragDelta();
-		ImGui::ResetMouseDragDelta();
-		camera_arc_x -= delta.x * 0.005f;
-		camera_arc_y += delta.y * 0.005f;
-		if (camera_arc_y < -3.14159f/2.0f)
-			camera_arc_y = -3.14159f/2.0f;
-		if (camera_arc_y >  3.14159f/2.0f)
-			camera_arc_y =  3.14159f/2.0f;
+		ImVec2 min = ImGui::GetWindowContentRegionMin();
+		ImVec2 max = ImGui::GetWindowContentRegionMax();
+		ImVec2 size = { max.x - min.x, max.y - min.y };
+		ImGui::SetCursorPos(min);
+		if (ImGui::IsRectVisible(size)) {
+			window_preview_resize((int32_t)size.x, (int32_t)size.y);
+			window_preview_render();
+			ImGui::Image((ImTextureID)&surface, size);
+		}
 	}
-
-	ImVec2 min  = ImGui::GetWindowContentRegionMin();
-	ImVec2 max  = ImGui::GetWindowContentRegionMax();
-	ImVec2 size = {max.x-min.x, max.y-min.y};
-	window_preview_resize((int32_t)size.x, (int32_t)size.y);
-	window_preview_render();
-	ImGui::SetCursorPos(min);
-	ImGui::Image((ImTextureID)&surface, size);
 	
 	ImGui::End();
 	ImGui::PopStyleVar();

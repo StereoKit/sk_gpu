@@ -314,7 +314,7 @@ void compile_file(const char *src_filename, compiler_settings_t *settings) {
 
 	const char *dest_folder    = settings->out_folder ? settings->out_folder : dir;
 	char        trailing_char  = dest_folder[strlen(dest_folder) - 1];
-	const char *trailing_slash = trailing_char == '/' ? "/" : (trailing_char == '\\' ? "\\" : "");
+	const char *trailing_slash = trailing_char == '/' || trailing_char == '\\' ? "" : "/";
 	const char *name_ext_mod   = settings->replace_ext ? name : name_ext;
 	bool        make_sks       = settings->force_sks || (
 		settings->output_header      == false && 

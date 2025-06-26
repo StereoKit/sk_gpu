@@ -34,6 +34,10 @@ project(skshaderc VERSION 1.0
 
 set(CMAKE_CXX_STANDARD 17)
 
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "")
+endif()
+
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
     add_compile_options(-fcolor-diagnostics)
 endif()

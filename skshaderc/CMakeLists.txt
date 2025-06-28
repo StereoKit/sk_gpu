@@ -34,17 +34,6 @@ project(skshaderc VERSION 1.0
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Static link with the vcruntime, otherwise we'll need to ship the vcruntime
-# installer anywhere skshaderc needs to run (Windows). This costs ~3-400kb.
-# Usually this is easier to do with CMAKE_MSVC_RUNTIME_LIBRARY, but something
-# here was not liking that method. UWP can't do this.
-set(CompilerFlags
-    CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO
-    CMAKE_C_FLAGS   CMAKE_C_FLAGS_DEBUG   CMAKE_C_FLAGS_RELEASE   CMAKE_C_FLAGS_MINSIZEREL   CMAKE_C_FLAGS_RELWITHDEBINFO )
-foreach(CompilerFlag ${CompilerFlags})
-    string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
-endforeach()
-
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
     add_compile_options(-fcolor-diagnostics)
 endif()

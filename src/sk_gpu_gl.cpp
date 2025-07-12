@@ -173,6 +173,7 @@
 #define GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0x8518
 #define GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0x8519
 #define GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0x851A
+#define GL_TEXTURE_EXTERNAL_OES 0x8D65
 #define GL_NEAREST 0x2600
 #define GL_LINEAR 0x2601
 #define GL_NEAREST_MIPMAP_NEAREST 0x2700
@@ -1993,6 +1994,13 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target     = gl_tex_target(type, array_count, physical_multisample);
+
+	// Check if this is an external texture
+	gl_pipeline.tex_bind[0] = result._texture; // Similar to a PIPELINE_CHECK
+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, result._texture);
+	if (!glGetError()) {
+		result._target = GL_TEXTURE_EXTERNAL_OES;
+	}
 
 	if (type == skg_tex_type_rendertarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);

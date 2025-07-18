@@ -379,6 +379,7 @@ GLE(void,     glGenTextures,             int32_t n, uint32_t *textures) \
 GLE(void,     glGenFramebuffers,         int32_t n, uint32_t *ids) \
 GLE(void,     glDeleteFramebuffers,      int32_t n, uint32_t *ids) \
 GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) \
+GLE(void,     glDiscardFramebufferEXT,   uint32_t target, uint32_t numAttachments, const uint32_t* attachments) \
 GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
@@ -815,6 +816,7 @@ void gl_check_exts() {
 		const char* ext = (const char *)glGetStringi(GL_EXTENSIONS, i);
 		if (strcmp(ext, "GL_AMD_vertex_shader_layer"                     ) == 0) gl_caps[skg_cap_tex_layer_select] = true;
 		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2"         ) == 0) gl_caps[skg_cap_tiled_multisample] = true;
+		if (strcmp(ext, "GL_EXT_discard_framebuffer"                     ) == 0) gl_caps[skg_cap_discard_framebuffer] = true;
 		if (strcmp(ext, "GL_OVR_multiview2"                              ) == 0) gl_caps[skg_cap_multiview] = true;
 		if (strcmp(ext, "GL_OVR_multiview_multisampled_render_to_texture") == 0) gl_caps[skg_cap_multiview_tiled_multisample] = true;
 		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc"               ) == 0) gl_caps[skg_cap_fmt_pvrtc1] = true;
@@ -994,6 +996,13 @@ void skg_draw_begin() {
 
 ///////////////////////////////////////////
 
+void skg_tex_target_discard(skg_tex_t *render_target) {
+	if (render_target->type != skg_tex_type_zbuffer || !skg_capability(skg_cap_discard_framebuffer)) return;
+	glDiscardFramebufferEXT(render_target->_target, render_target->array_count, render_target->_framebuffer_layers);
+}
+
+///////////////////////////////////////////
+
 void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	gl_active_rendertarget = render_target;
 	gl_current_framebuffer = render_target == nullptr
@@ -1021,7 +1030,7 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 void skg_target_clear(bool depth, const float *clear_color_4) {
 	uint32_t clear_mask = 0;
 	if (depth) {
-		clear_mask = GL_DEPTH_BUFFER_BIT;
+		clear_mask = GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
 		// If DepthMask is false, glClear won't clear depth
 		
 		PIPELINE_CHECK(gl_pipeline.depth_write, true)
@@ -2027,7 +2036,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 		result._target = GL_TEXTURE_EXTERNAL_OES;
 	}
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 
@@ -2068,7 +2077,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target     = gl_tex_target(type, 2, result._physical_multisample);
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * 1);
 		glGenFramebuffers(1, result._framebuffer_layers);
 
@@ -2099,7 +2108,7 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	glGenTextures(1, &result._texture);
 	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, 1);
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 	}
@@ -2374,7 +2383,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 		}
 	}
 
-	if (tex->type == skg_tex_type_rendertarget) {
+	if (tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget) {
 		tex->_framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * tex->array_count);
 		glGenFramebuffers(tex->array_count, tex->_framebuffer_layers);
 
@@ -2523,13 +2532,15 @@ void skg_tex_clear(skg_bind_t bind) {
 
 void skg_tex_destroy(skg_tex_t *tex) {
 	// Make sure it's not bound or cached in our pipeline state
-	int32_t slot_count = sizeof(gl_pipeline.tex_bind) / sizeof(gl_pipeline.tex_bind[0]);
-	for (int32_t i = 0; i < slot_count; i++) {
-		if (gl_pipeline.tex_bind[i] != tex->_texture) continue;
+	if (tex->_target) {
+		int32_t slot_count = sizeof(gl_pipeline.tex_bind) / sizeof(gl_pipeline.tex_bind[0]);
+		for (int32_t i = 0; i < slot_count; i++) {
+			if (gl_pipeline.tex_bind[i] != tex->_texture) continue;
 
-		glActiveTexture(GL_TEXTURE0 + i);
-		glBindTexture  (tex->_target, 0);
-		gl_pipeline.tex_bind[i] = 0;
+			glActiveTexture(GL_TEXTURE0 + i);
+			glBindTexture  (tex->_target, 0);
+			gl_pipeline.tex_bind[i] = 0;
+		}
 	}
 	
 	uint32_t tex_list[] = { tex->_texture };

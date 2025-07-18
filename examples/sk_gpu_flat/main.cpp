@@ -95,7 +95,7 @@ void resize_swapchain(int width, int height) {
 	if (skg_tex_is_valid(&app_surface      )) skg_tex_destroy(&app_surface);
 	if (skg_tex_is_valid(&app_surface_depth)) skg_tex_destroy(&app_surface_depth);
 	app_surface       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32,        skg_mip_none);
-	app_surface_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depthstencil,  skg_mip_none);
+	app_surface_depth = skg_tex_create(skg_tex_type_zbuffer,      skg_use_static, skg_tex_fmt_depthstencil,  skg_mip_none);
 	skg_tex_set_contents_arr(&app_surface,       nullptr, 1, 1, width, height, 8);
 	skg_tex_set_contents_arr(&app_surface_depth, nullptr, 1, 1, width, height, 8);
 	skg_tex_attach_depth(&app_surface, &app_surface_depth);
@@ -244,6 +244,7 @@ int main_step(double t, void *) {
 	hmm_mat4 proj = HMM_Perspective(90, app_swapchain.width / (float)app_swapchain.height, 0.01f, 1000);
 
 	app_render((float)t, view, proj);
+	skg_tex_target_discard(&app_surface_depth);
 
 	skg_tex_copy_to_swapchain(&app_surface, &app_swapchain);
 	skg_swapchain_present(&app_swapchain);

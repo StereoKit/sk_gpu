@@ -303,6 +303,11 @@ void skg_event_end () {
 
 ///////////////////////////////////////////
 
+void skg_tex_target_discard(skg_tex_t *render_target) {
+}
+
+///////////////////////////////////////////
+
 void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	d3d_active_rendertarget = render_target;
 
@@ -310,7 +315,9 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 		d3d_context->OMSetRenderTargets(0, nullptr, nullptr);
 		return;
 	}
-	if (render_target->type != skg_tex_type_rendertarget)
+	if (render_target->type != skg_tex_type_rendertarget &&
+		render_target->type != skg_tex_type_zbuffer      &&
+		render_target->type != skg_tex_type_depthtarget)
 		return;
 
 	D3D11_VIEWPORT viewport = {};
@@ -333,7 +340,7 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 
 void skg_target_clear(bool depth, const float *clear_color_4) {
 	if (!d3d_active_rendertarget) return;
-	if (clear_color_4)
+	if (clear_color_4 && d3d_active_rendertarget->_target_view)
 		d3d_context->ClearRenderTargetView(d3d_active_rendertarget->_target_view, clear_color_4);
 	if (depth && d3d_active_rendertarget->_depth_view) {
 		UINT clear_flags = D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL;
@@ -1124,7 +1131,7 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	result._target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, result.width, result.height, 1, 1, 1);
 	if (depth_format != skg_tex_fmt_none) {
-		result._depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
+		result._depth = skg_tex_create(skg_tex_type_zbuffer, skg_use_static, depth_format, skg_mip_none);
 		skg_tex_set_contents(&result._depth, nullptr, result.width, result.height);
 		skg_tex_attach_depth(&result._target, &result._depth);
 	}
@@ -1163,7 +1170,7 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	swapchain->_target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, width, height, 1, 1, 1);
 	if (depth_fmt != skg_tex_fmt_none) {
-		swapchain->_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_fmt, skg_mip_none);
+		swapchain->_depth = skg_tex_create(skg_tex_type_zbuffer, skg_use_static, depth_fmt, skg_mip_none);
 		skg_tex_set_contents(&swapchain->_depth, nullptr, width, height);
 		skg_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
 	}
@@ -1297,11 +1304,11 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 	}
 
 	if (tex_surface != -1 && dest_surface != -1) {
-		d3d_context->ResolveSubresource(destination->_texture, tex_surface, tex->_texture, dest_surface, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable));
+		d3d_context->ResolveSubresource(destination->_texture, tex_surface, tex->_texture, dest_surface, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget));
 	} else {
 		if (tex->multisample > 1) {
 			for (int32_t i = 0; i < tex->array_count; i++)
-				d3d_context->ResolveSubresource(destination->_texture, i, tex->_texture, i, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable));
+				d3d_context->ResolveSubresource(destination->_texture, i, tex->_texture, i, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget));
 		} else {
 			d3d_context->CopyResource(destination->_texture, tex->_texture);
 		}
@@ -1323,7 +1330,7 @@ bool skg_tex_is_valid(const skg_tex_t *tex) {
 ///////////////////////////////////////////
 
 void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
-	if (depth->type == skg_tex_type_depth || depth->type == skg_tex_type_depth_readable) {
+	if (depth->type == skg_tex_type_zbuffer || depth->type == skg_tex_type_depthtarget) {
 		if (tex->_depth_view) tex->_depth_view->Release();
 		tex->_depth_view = depth->_depth_view;
 		tex->_depth_view->AddRef();
@@ -1441,13 +1448,13 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 ///////////////////////////////////////////
 
 bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader) {
-	DXGI_FORMAT format = d3d_tex_fmt_to_view(d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable));
+	DXGI_FORMAT format = d3d_tex_fmt_to_view(d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget));
 	HRESULT     hr     = E_FAIL;
 	
 	int32_t start = array_start == -1 ? 0 : array_start;
 	int32_t count = array_start == -1 ? tex->array_count : 1;
 
-	if (tex->type != skg_tex_type_depth) {
+	if (tex->type != skg_tex_type_zbuffer) {
 		D3D11_SHADER_RESOURCE_VIEW_DESC res_desc = {};
 		res_desc.Format = format;
 		// This struct is a union, but all elements follow the same order in
@@ -1490,7 +1497,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 			}
 		}
 	} 
-	if (tex->type == skg_tex_type_depth || tex->type == skg_tex_type_depth_readable) {
+	if (tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget) {
 		D3D11_DEPTH_STENCIL_VIEW_DESC stencil_desc = {};
 		stencil_desc.Format = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, false);
 		stencil_desc.Texture2DArray.FirstArraySlice = start;
@@ -1815,9 +1822,9 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 		desc.Height           = height;
 		desc.ArraySize        = array_count;
 		desc.SampleDesc.Count = multisample;
-		desc.Format           = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depth_readable);
-		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : tex->type == skg_tex_type_depth_readable ? D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE : D3D11_BIND_SHADER_RESOURCE;
-		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || tex->type == skg_tex_type_depth_readable || array_data == nullptr || array_data[0] == nullptr || generate_mips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+		desc.Format           = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget);
+		desc.BindFlags        = tex->type == skg_tex_type_zbuffer ? D3D11_BIND_DEPTH_STENCIL : tex->type == skg_tex_type_depthtarget ? D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE : D3D11_BIND_SHADER_RESOURCE;
+		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget || array_data == nullptr || array_data[0] == nullptr || generate_mips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
 		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;

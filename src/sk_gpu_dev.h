@@ -18,7 +18,7 @@ sk_gpu.h
 // an API appropriate for the platform it's being compiled for!
 //
 //#define SKG_FORCE_DIRECT3D11
-//#define SKG_FORCE_OPENGL
+#define SKG_FORCE_OPENGL
 
 // You can disable use of D3DCompile to make building this easier sometimes,
 // since D3DCompile is primarily used to catch .sks shader files built from
@@ -100,8 +100,8 @@ typedef enum skg_tex_type_ {
 	skg_tex_type_image,
 	skg_tex_type_cubemap,
 	skg_tex_type_rendertarget,
-	skg_tex_type_depth,
-	skg_tex_type_depth_readable,
+	skg_tex_type_zbuffer,
+	skg_tex_type_depthtarget,
 } skg_tex_type_;
 
 typedef enum skg_use_ {
@@ -265,6 +265,7 @@ typedef enum skg_cap_ {
 	skg_cap_tex_layer_select = 1,
 	skg_cap_wireframe,
 	skg_cap_tiled_multisample,
+	skg_cap_discard_framebuffer,
 	skg_cap_fmt_pvrtc1,
 	skg_cap_fmt_pvrtc2,
 	skg_cap_fmt_astc,
@@ -493,6 +494,7 @@ SKG_API bool                skg_tex_gen_mips             (      skg_tex_t *tex);
 SKG_API void*               skg_tex_get_native           (const skg_tex_t *tex);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 SKG_API void                skg_tex_clear                (skg_bind_t bind);
+SKG_API void                skg_tex_target_discard       (      skg_tex_t *render_target);
 SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level);
 SKG_API skg_tex_t          *skg_tex_target_get           ();
 SKG_API void                skg_tex_destroy              (      skg_tex_t *tex);
@@ -504,6 +506,7 @@ SKG_API uint32_t            skg_tex_fmt_block_size       (skg_tex_fmt_ format);
 SKG_API uint32_t            skg_tex_fmt_pitch            (skg_tex_fmt_ format, int32_t width);
 SKG_API bool                skg_tex_fmt_supported        (skg_tex_fmt_ format);
 SKG_API bool                skg_tex_fmt_is_compressed    (skg_tex_fmt_ format);
+SKG_API bool                skg_tex_fmt_is_depth         (skg_tex_fmt_ format);
 
 #include "sk_gpu_common.h"
 ///////////////////////////////////////////

@@ -37,8 +37,8 @@ void window_preview_resize(int32_t width, int32_t height) {
 	if (width != surface.width || height != surface.height) {
 		if (skg_tex_is_valid(&surface)) skg_tex_destroy(&surface);
 		if (skg_tex_is_valid(&zbuffer)) skg_tex_destroy(&zbuffer);
-		surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
-		zbuffer = skg_tex_create(skg_tex_type_depth, skg_use_static, skg_tex_fmt_depth32, skg_mip_none);
+		surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32,  skg_mip_none);
+		zbuffer = skg_tex_create(skg_tex_type_zbuffer,      skg_use_static, skg_tex_fmt_depth32, skg_mip_none);
 		skg_tex_set_contents(&surface, nullptr, width, height);
 		skg_tex_set_contents(&zbuffer, nullptr, width, height);
 		skg_tex_attach_depth(&surface, &zbuffer);

@@ -815,7 +815,12 @@ void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 	D3D11_BLEND_DESC desc_blend = {};
 	desc_blend.AlphaToCoverageEnable  = false;
 	desc_blend.IndependentBlendEnable = false;
-	desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	switch(pipeline->color_write) {
+		case skg_color_write_rgba: desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL; break;
+		case skg_color_write_rgb:  desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE; break;
+		case skg_color_write_a:    desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALPHA; break;
+		case skg_color_write_none: desc_blend.RenderTarget[0].RenderTargetWriteMask = 0; break;
+	}
 	switch (pipeline->transparency) {
 	case skg_transparency_alpha_to_coverage:
 		desc_blend.AlphaToCoverageEnable = true;
@@ -986,6 +991,15 @@ void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_color_write(skg_pipeline_t *pipeline, skg_color_write_ write) {
+	if (pipeline->color_write != write) {
+		pipeline->color_write = write;
+		skg_pipeline_update_blend(pipeline);
+	}
+}
+
+///////////////////////////////////////////
+
 void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test) {
 	if (pipeline->depth_test != test) {
 		pipeline->depth_test = test;
@@ -1033,6 +1047,12 @@ bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
+}
+
+///////////////////////////////////////////
+
+skg_color_write_ skg_pipeline_get_color_write(const skg_pipeline_t *pipeline) {
+	return pipeline->color_write;
 }
 
 ///////////////////////////////////////////

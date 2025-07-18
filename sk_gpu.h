@@ -230,6 +230,13 @@ typedef enum skg_transparency_ {
 	skg_transparency_add,
 } skg_transparency_;
 
+typedef enum skg_color_write_ {
+	skg_color_write_rgba,
+	skg_color_write_rgb,
+	skg_color_write_a,
+	skg_color_write_none,
+} skg_color_write_;
+
 typedef enum skg_cull_ {
 	skg_cull_back = 0,
 	skg_cull_front,
@@ -440,6 +447,7 @@ typedef struct skg_pipeline_t {
 	skg_cull_                cull;
 	bool                     wireframe;
 	bool                     depth_write;
+	skg_color_write_         color_write;
 	bool                     scissor;
 	skg_depth_test_          depth_test;
 	skg_shader_meta_t       *meta;
@@ -527,6 +535,7 @@ typedef struct skg_pipeline_t {
 	skg_cull_         cull;
 	bool              wireframe;
 	bool              depth_write;
+	skg_color_write_  color_write;
 	bool              scissor;
 	skg_depth_test_   depth_test;
 	skg_shader_meta_t*meta;
@@ -717,6 +726,8 @@ SKG_API void                skg_pipeline_set_wireframe   (      skg_pipeline_t *
 SKG_API bool                skg_pipeline_get_wireframe   (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_write (      skg_pipeline_t *pipeline, bool write);
 SKG_API bool                skg_pipeline_get_depth_write (const skg_pipeline_t *pipeline);
+SKG_API void                skg_pipeline_set_color_write (      skg_pipeline_t *pipeline, skg_color_write_ write);
+SKG_API skg_color_write_    skg_pipeline_get_color_write (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline, skg_depth_test_ test);
 SKG_API skg_depth_test_     skg_pipeline_get_depth_test  (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_scissor     (      skg_pipeline_t *pipeline, bool enable);
@@ -1651,7 +1662,12 @@ void skg_pipeline_update_blend(skg_pipeline_t *pipeline) {
 	D3D11_BLEND_DESC desc_blend = {};
 	desc_blend.AlphaToCoverageEnable  = false;
 	desc_blend.IndependentBlendEnable = false;
-	desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	switch(pipeline->color_write) {
+		case skg_color_write_rgba: desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL; break;
+		case skg_color_write_rgb:  desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE; break;
+		case skg_color_write_a:    desc_blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALPHA; break;
+		case skg_color_write_none: desc_blend.RenderTarget[0].RenderTargetWriteMask = 0; break;
+	}
 	switch (pipeline->transparency) {
 	case skg_transparency_alpha_to_coverage:
 		desc_blend.AlphaToCoverageEnable = true;
@@ -1822,6 +1838,15 @@ void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_color_write(skg_pipeline_t *pipeline, skg_color_write_ write) {
+	if (pipeline->color_write != write) {
+		pipeline->color_write = write;
+		skg_pipeline_update_blend(pipeline);
+	}
+}
+
+///////////////////////////////////////////
+
 void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test) {
 	if (pipeline->depth_test != test) {
 		pipeline->depth_test = test;
@@ -1869,6 +1894,12 @@ bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
+}
+
+///////////////////////////////////////////
+
+skg_color_write_ skg_pipeline_get_color_write(const skg_pipeline_t *pipeline) {
+	return pipeline->color_write;
 }
 
 ///////////////////////////////////////////
@@ -3428,6 +3459,7 @@ GLE(void,     glDisable,                 uint32_t cap) \
 GLE(void,     glPolygonMode,             uint32_t face, uint32_t mode) \
 GLE(void,     glDepthMask,               uint8_t flag) \
 GLE(void,     glDepthFunc,               uint32_t func) \
+GLE(void,     glColorMask,               uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) \
 GLE(uint32_t, glGetError,                ) \
 GLE(void,     glGetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
 GLE(uint32_t, glCreateShader,            uint32_t type) \
@@ -3554,6 +3586,7 @@ typedef struct gl_pipeline_state_t {
 	skg_depth_test_   depth_test_type;
 	bool              depth_test;
 	bool              depth_write;
+	skg_color_write_  color_write;
 	bool              scissor;
 	bool              wireframe;
 	uint32_t          tex_bind[32];
@@ -4698,11 +4731,18 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 		else                   glDisable(GL_SCISSOR_TEST);
 	PIPELINE_CHECK_END
 
-
+	PIPELINE_CHECK(gl_pipeline.color_write, pipeline->color_write)
+		switch(pipeline->color_write) {
+			case skg_color_write_rgba: glColorMask(true,  true,  true,  true ); break;
+			case skg_color_write_rgb:  glColorMask(true,  true,  true,  false); break;
+			case skg_color_write_a:    glColorMask(false, false, false, true ); break;
+			case skg_color_write_none: glColorMask(false, false, false, false); break;
+		}
+	PIPELINE_CHECK_END
+	
 	PIPELINE_CHECK(gl_pipeline.depth_write, pipeline->depth_write)
 		glDepthMask(pipeline->depth_write);
 	PIPELINE_CHECK_END
-
 
 	bool depth_test = pipeline->depth_test != skg_depth_test_always;
 	PIPELINE_CHECK(gl_pipeline.depth_test, depth_test)
@@ -4757,6 +4797,12 @@ void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_color_write(skg_pipeline_t *pipeline, skg_color_write_ write) {
+	pipeline->color_write = write;
+}
+
+///////////////////////////////////////////
+
 void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test) {
 	pipeline->depth_test = test;
 }
@@ -4790,6 +4836,12 @@ bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
+}
+
+///////////////////////////////////////////
+
+skg_color_write_ skg_pipeline_get_color_write(const skg_pipeline_t *pipeline) {
+	return pipeline->color_write;
 }
 
 ///////////////////////////////////////////

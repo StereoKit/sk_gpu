@@ -350,6 +350,7 @@ GLE(void,     glDisable,                 uint32_t cap) \
 GLE(void,     glPolygonMode,             uint32_t face, uint32_t mode) \
 GLE(void,     glDepthMask,               uint8_t flag) \
 GLE(void,     glDepthFunc,               uint32_t func) \
+GLE(void,     glColorMask,               uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) \
 GLE(uint32_t, glGetError,                ) \
 GLE(void,     glGetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
 GLE(uint32_t, glCreateShader,            uint32_t type) \
@@ -476,6 +477,7 @@ typedef struct gl_pipeline_state_t {
 	skg_depth_test_   depth_test_type;
 	bool              depth_test;
 	bool              depth_write;
+	skg_color_write_  color_write;
 	bool              scissor;
 	bool              wireframe;
 	uint32_t          tex_bind[32];
@@ -1620,11 +1622,18 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 		else                   glDisable(GL_SCISSOR_TEST);
 	PIPELINE_CHECK_END
 
-
+	PIPELINE_CHECK(gl_pipeline.color_write, pipeline->color_write)
+		switch(pipeline->color_write) {
+			case skg_color_write_rgba: glColorMask(true,  true,  true,  true ); break;
+			case skg_color_write_rgb:  glColorMask(true,  true,  true,  false); break;
+			case skg_color_write_a:    glColorMask(false, false, false, true ); break;
+			case skg_color_write_none: glColorMask(false, false, false, false); break;
+		}
+	PIPELINE_CHECK_END
+	
 	PIPELINE_CHECK(gl_pipeline.depth_write, pipeline->depth_write)
 		glDepthMask(pipeline->depth_write);
 	PIPELINE_CHECK_END
-
 
 	bool depth_test = pipeline->depth_test != skg_depth_test_always;
 	PIPELINE_CHECK(gl_pipeline.depth_test, depth_test)
@@ -1679,6 +1688,12 @@ void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_color_write(skg_pipeline_t *pipeline, skg_color_write_ write) {
+	pipeline->color_write = write;
+}
+
+///////////////////////////////////////////
+
 void skg_pipeline_set_depth_test (skg_pipeline_t *pipeline, skg_depth_test_ test) {
 	pipeline->depth_test = test;
 }
@@ -1712,6 +1727,12 @@ bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
+}
+
+///////////////////////////////////////////
+
+skg_color_write_ skg_pipeline_get_color_write(const skg_pipeline_t *pipeline) {
+	return pipeline->color_write;
 }
 
 ///////////////////////////////////////////

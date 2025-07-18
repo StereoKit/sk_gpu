@@ -230,6 +230,13 @@ typedef enum skg_transparency_ {
 	skg_transparency_add,
 } skg_transparency_;
 
+typedef enum skg_color_write_ {
+	skg_color_write_rgba,
+	skg_color_write_rgb,
+	skg_color_write_a,
+	skg_color_write_none,
+} skg_color_write_;
+
 typedef enum skg_cull_ {
 	skg_cull_back = 0,
 	skg_cull_front,
@@ -453,6 +460,8 @@ SKG_API void                skg_pipeline_set_wireframe   (      skg_pipeline_t *
 SKG_API bool                skg_pipeline_get_wireframe   (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_write (      skg_pipeline_t *pipeline, bool write);
 SKG_API bool                skg_pipeline_get_depth_write (const skg_pipeline_t *pipeline);
+SKG_API void                skg_pipeline_set_color_write (      skg_pipeline_t *pipeline, skg_color_write_ write);
+SKG_API skg_color_write_    skg_pipeline_get_color_write (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline, skg_depth_test_ test);
 SKG_API skg_depth_test_     skg_pipeline_get_depth_test  (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_scissor     (      skg_pipeline_t *pipeline, bool enable);

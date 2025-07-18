@@ -840,6 +840,7 @@ void gl_check_exts() {
 	while (glGetError() != 0) {}
 
 	// Create a texture of each format to check compatibility
+	skg_log_enable(false); // Intentional errors, don't scare the users
 	glActiveTexture(skg_settings_tex_slot);
 	for (int32_t i=0; i<skg_tex_fmt_max; i+=1) {
 		int64_t internal_format = (int64_t)skg_tex_fmt_to_native((skg_tex_fmt_)i);
@@ -857,6 +858,7 @@ void gl_check_exts() {
 
 		glDeleteTextures(1, &texture);
 	}
+	skg_log_enable(true);
 };
 
 ///////////////////////////////////////////
@@ -1997,7 +1999,9 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 
 	// Check if this is an external texture
 	gl_pipeline.tex_bind[0] = result._texture; // Similar to a PIPELINE_CHECK
+	skg_log_enable(false); // Intentional error, don't scare the users.
 	glBindTexture(GL_TEXTURE_EXTERNAL_OES, result._texture);
+	skg_log_enable(true);
 	if (!glGetError()) {
 		result._target = GL_TEXTURE_EXTERNAL_OES;
 	}

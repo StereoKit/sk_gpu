@@ -28,6 +28,7 @@ typedef struct {
 
 SKG_API void                    skg_log                        (skg_log_ level, const char *text);
 SKG_API void                    skg_logf                       (skg_log_ level, const char *text, ...);
+SKG_API void                    skg_log_enable                 (bool enabled);
 SKG_API bool                    skg_read_file                  (const char *filename, void **out_data, size_t *out_size);
 SKG_API uint64_t                skg_hash                       (const char *string);
 SKG_API uint32_t                skg_mip_count                  (int32_t width, int32_t height);

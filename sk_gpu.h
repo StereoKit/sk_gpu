@@ -789,6 +789,7 @@ typedef struct {
 
 SKG_API void                    skg_log                        (skg_log_ level, const char *text);
 SKG_API void                    skg_logf                       (skg_log_ level, const char *text, ...);
+SKG_API void                    skg_log_enable                 (bool enabled);
 SKG_API bool                    skg_read_file                  (const char *filename, void **out_data, size_t *out_size);
 SKG_API uint64_t                skg_hash                       (const char *string);
 SKG_API uint32_t                skg_mip_count                  (int32_t width, int32_t height);
@@ -3917,6 +3918,7 @@ void gl_check_exts() {
 	while (glGetError() != 0) {}
 
 	// Create a texture of each format to check compatibility
+	skg_log_enable(false); // Intentional errors, don't scare the users
 	glActiveTexture(skg_settings_tex_slot);
 	for (int32_t i=0; i<skg_tex_fmt_max; i+=1) {
 		int64_t internal_format = (int64_t)skg_tex_fmt_to_native((skg_tex_fmt_)i);
@@ -3934,6 +3936,7 @@ void gl_check_exts() {
 
 		glDeleteTextures(1, &texture);
 	}
+	skg_log_enable(true);
 };
 
 ///////////////////////////////////////////
@@ -5074,7 +5077,9 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 
 	// Check if this is an external texture
 	gl_pipeline.tex_bind[0] = result._texture; // Similar to a PIPELINE_CHECK
+	skg_log_enable(false); // Intentional error, don't scare the users.
 	glBindTexture(GL_TEXTURE_EXTERNAL_OES, result._texture);
+	skg_log_enable(true);
 	if (!glGetError()) {
 		result._target = GL_TEXTURE_EXTERNAL_OES;
 	}
@@ -5829,14 +5834,18 @@ skg_shader_t skg_shader_create_manual(skg_shader_meta_t *meta, skg_shader_stage_
 #include <android/asset_manager.h>
 #endif
 
+bool _skg_log_disabled = false;
+
 void (*_skg_log)(skg_log_ level, const char *text);
 void skg_callback_log(void (*callback)(skg_log_ level, const char *text)) {
 	_skg_log = callback;
 }
 void skg_log(skg_log_ level, const char *text) {
+	if (_skg_log_disabled) return;
 	if (_skg_log) _skg_log(level, text);
 }
 void skg_logf (skg_log_ level, const char *text, ...) {
+	if (_skg_log_disabled) return;
 	if (!_skg_log) return;
 
 	va_list args, copy;
@@ -5851,6 +5860,9 @@ void skg_logf (skg_log_ level, const char *text, ...) {
 	free(buffer);
 	va_end(args);
 	va_end(copy);
+}
+void skg_log_enable(bool enabled) {
+	_skg_log_disabled = !enabled;
 }
 
 ///////////////////////////////////////////

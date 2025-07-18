@@ -1,4 +1,4 @@
-set(CPM_DOWNLOAD_VERSION 0.32.2)
+set(CPM_DOWNLOAD_VERSION 0.40.4)
 
 if(CPM_SOURCE_CACHE)
   # Expand relative path. This is important if the provided path contains a tilde (~)

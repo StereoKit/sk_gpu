@@ -13,14 +13,18 @@
 #include <android/asset_manager.h>
 #endif
 
+bool _skg_log_disabled = false;
+
 void (*_skg_log)(skg_log_ level, const char *text);
 void skg_callback_log(void (*callback)(skg_log_ level, const char *text)) {
 	_skg_log = callback;
 }
 void skg_log(skg_log_ level, const char *text) {
+	if (_skg_log_disabled) return;
 	if (_skg_log) _skg_log(level, text);
 }
 void skg_logf (skg_log_ level, const char *text, ...) {
+	if (_skg_log_disabled) return;
 	if (!_skg_log) return;
 
 	va_list args, copy;
@@ -35,6 +39,9 @@ void skg_logf (skg_log_ level, const char *text, ...) {
 	free(buffer);
 	va_end(args);
 	va_end(copy);
+}
+void skg_log_enable(bool enabled) {
+	_skg_log_disabled = !enabled;
 }
 
 ///////////////////////////////////////////

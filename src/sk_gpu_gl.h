@@ -35,6 +35,7 @@ typedef struct skg_pipeline_t {
 	skg_cull_         cull;
 	bool              wireframe;
 	bool              depth_write;
+	skg_color_write_  color_write;
 	bool              scissor;
 	skg_depth_test_   depth_test;
 	skg_shader_meta_t*meta;
@@ -52,7 +53,6 @@ typedef struct skg_tex_t {
 	skg_tex_fmt_  format;
 	skg_mip_      mips;
 	uint32_t      _texture;
-	uint32_t      _framebuffer;
 	uint32_t     *_framebuffer_layers;
 	uint32_t      _physical_multisample;
 	uint32_t      _target;

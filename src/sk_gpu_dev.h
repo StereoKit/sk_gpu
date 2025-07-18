@@ -231,6 +231,13 @@ typedef enum skg_transparency_ {
 	skg_transparency_add,
 } skg_transparency_;
 
+typedef enum skg_color_write_ {
+	skg_color_write_rgba,
+	skg_color_write_rgb,
+	skg_color_write_a,
+	skg_color_write_none,
+} skg_color_write_;
+
 typedef enum skg_cull_ {
 	skg_cull_back = 0,
 	skg_cull_front,
@@ -262,6 +269,8 @@ typedef enum skg_cap_ {
 	skg_cap_fmt_pvrtc2,
 	skg_cap_fmt_astc,
 	skg_cap_fmt_atc,
+	skg_cap_multiview,
+	skg_cap_multiview_tiled_multisample,
 	skg_cap_max,
 } skg_cap_;
 
@@ -452,6 +461,8 @@ SKG_API void                skg_pipeline_set_wireframe   (      skg_pipeline_t *
 SKG_API bool                skg_pipeline_get_wireframe   (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_write (      skg_pipeline_t *pipeline, bool write);
 SKG_API bool                skg_pipeline_get_depth_write (const skg_pipeline_t *pipeline);
+SKG_API void                skg_pipeline_set_color_write (      skg_pipeline_t *pipeline, skg_color_write_ write);
+SKG_API skg_color_write_    skg_pipeline_get_color_write (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline, skg_depth_test_ test);
 SKG_API skg_depth_test_     skg_pipeline_get_depth_test  (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_scissor     (      skg_pipeline_t *pipeline, bool enable);
@@ -478,6 +489,7 @@ SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, 
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
 SKG_API bool                skg_tex_get_mip_contents     (      skg_tex_t *tex, int32_t mip_level, void *ref_data, size_t data_size);
 SKG_API bool                skg_tex_get_mip_contents_arr (      skg_tex_t *tex, int32_t mip_level, int32_t arr_index, void *ref_data, size_t data_size);
+SKG_API bool                skg_tex_gen_mips             (      skg_tex_t *tex);
 SKG_API void*               skg_tex_get_native           (const skg_tex_t *tex);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 SKG_API void                skg_tex_clear                (skg_bind_t bind);

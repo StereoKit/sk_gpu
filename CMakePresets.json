@@ -11,8 +11,8 @@
             "hidden": true,
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_FLAGS_RELEASE": "/O1 /GL /Gy",
-                "CMAKE_C_FLAGS_RELEASE": "/O1 /GL /Gy",
+                "CMAKE_CXX_FLAGS_RELEASE": "/MT /O1 /GL /Gy /MP16",
+                "CMAKE_C_FLAGS_RELEASE": "/MT /O1 /GL /Gy /MP16",
                 "CMAKE_EXE_LINKER_FLAGS": "/LTCG /INCREMENTAL:NO",
                 "CMAKE_SHARED_LINKER_FLAGS": "/LTCG /INCREMENTAL:NO",
                 "CMAKE_STATIC_LINKER_FLAGS": "/LTCG",
@@ -30,6 +30,13 @@
             "description": "test build for Win32 x64",
             "hidden":      false,
             "binaryDir":   "${sourceDir}/bin/intermediate/Win32_x64"
+        },
+        {
+            "name":        "test_Win32_ARM64",
+            "inherits":    "Win32",
+            "description": "test build for Win32 ARM64",
+            "hidden":      false,
+            "binaryDir":   "${sourceDir}/bin/intermediate/Win32_Arm64"
         },
         {
             "name":        "skshaderc_Win32_x64_Release",
@@ -126,6 +133,8 @@
     "buildPresets": [
         { "name":"test_Win32_x64_Debug",          "targets": ["skg_flatscreen", "skshader_editor"],  "configuration":"Debug",   "configurePreset":"test_Win32_x64",   "jobs":24},
         { "name":"test_Win32_x64_Release",        "targets": ["skg_flatscreen", "skshader_editor"],  "configuration":"Release", "configurePreset":"test_Win32_x64",   "jobs":24},
+        { "name":"test_Win32_Arm64_Debug",        "targets": ["skg_flatscreen", "skshader_editor"],  "configuration":"Debug",   "configurePreset":"test_Win32_ARM64", "jobs":24},
+        { "name":"test_Win32_Arm64_Release",      "targets": ["skg_flatscreen", "skshader_editor"],  "configuration":"Release", "configurePreset":"test_Win32_ARM64", "jobs":24},
         { "name":"skshaderc_Win32_x64_Release",   "targets": ["skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_x64_Release",   "jobs":24},
         { "name":"skshaderc_Win32_Arm64_Release", "targets": ["skshaderc"], "configuration":"Release", "configurePreset":"skshaderc_Win32_Arm64_Release", "jobs":24},
         { "name":"skshaderc_Linux_x64_Release",   "targets": ["skshaderc"], "configuration":"MinSizeRelease", "configurePreset":"skshaderc_Linux_x64_Release",   "jobs":24},

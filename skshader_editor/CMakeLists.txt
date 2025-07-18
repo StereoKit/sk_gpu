@@ -34,7 +34,7 @@ CPMAddPackage(
 )
 
 # For optimizing SPIR-V shaders, a baseline amount of
-# optimization is crucial for meta compatability with
+# optimization is crucial for meta compatibility with
 # HLSL compilers.
 CPMAddPackage(
     NAME SPIRV-Tools
@@ -69,12 +69,18 @@ add_executable(skshader_editor
     imgui/imgui_widgets.cpp
     imgui/imgui.cpp
     ../skshaderc/sksc.cpp
+    ../skshaderc/sksc_glsl.cpp
+    ../skshaderc/sksc_hlsl.cpp
+    ../skshaderc/sksc_log.cpp
+    ../skshaderc/sksc_meta.cpp
     TextEditor.cpp)
 
 add_custom_command(TARGET skshader_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/CascadiaMono.ttf ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/CascadiaMono.ttf
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/test.png ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/test.png
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/CascadiaMono.ttf $<TARGET_FILE_DIR:${PROJECT_NAME}>/CascadiaMono.ttf
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/test.png $<TARGET_FILE_DIR:${PROJECT_NAME}>/test.png
 )
+
+set_property(TARGET skshader_editor PROPERTY VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${PROJECT_NAME}>)
 
 if (UNIX)
     set( GL_LIBRARIES
@@ -86,7 +92,7 @@ endif()
 
 target_link_libraries(skshader_editor
     PRIVATE
-    spirv-cross-c
+    spirv-cross-hlsl
     SPIRV-Tools-opt
     glslang
     SPIRV
@@ -96,6 +102,6 @@ add_dependencies(skshader_editor
     skshaderc)
 
 skshaderc_compile_headers(skshader_editor
-    ${CMAKE_BINARY_DIR}/shaders_editor
-    "-t xge"
+    ${CMAKE_BINARY_DIR}/shaders_editor/
+    "-e -t xge"
     imgui_shader.hlsl )

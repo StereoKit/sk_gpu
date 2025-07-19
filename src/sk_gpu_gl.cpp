@@ -205,6 +205,7 @@
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
+#define GL_DEPTH_EXT 0x1801
 #define GL_BUFFER  0x82E0
 #define GL_SHADER  0x82E1
 #define GL_PROGRAM 0x82E2
@@ -350,6 +351,7 @@ GLE(void,     glDisable,                 uint32_t cap) \
 GLE(void,     glPolygonMode,             uint32_t face, uint32_t mode) \
 GLE(void,     glDepthMask,               uint8_t flag) \
 GLE(void,     glDepthFunc,               uint32_t func) \
+GLE(void,     glDepthRangef,             float n, float f) \
 GLE(void,     glColorMask,               uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) \
 GLE(uint32_t, glGetError,                ) \
 GLE(void,     glGetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
@@ -951,6 +953,8 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 #ifdef _SKG_GL_DESKTOP
 	glEnable   (GL_TEXTURE_CUBE_MAP_SEAMLESS);
 #endif
+
+	glDepthRangef(0,1);
 
 	return 1;
 }

@@ -1224,7 +1224,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result.mips        = color_desc.MipLevels > 1 ? skg_mip_generate : skg_mip_none;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, -1, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
-	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 0);
 
 	return result;
 }
@@ -1248,7 +1248,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, array_layer, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
-	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 0);
 
 	return result;
 }
@@ -1341,7 +1341,7 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 
 ///////////////////////////////////////////
 
-void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
+void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy) {
 	if (tex->_sampler)
 		tex->_sampler->Release();
 
@@ -1354,13 +1354,36 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 	}
 
 	D3D11_FILTER filter;
-	switch (sample) {
-	case skg_tex_sample_linear:     filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; break; // Technically trilinear
-	case skg_tex_sample_point:      filter = D3D11_FILTER_MIN_MAG_MIP_POINT;  break;
-	case skg_tex_sample_anisotropic:filter = D3D11_FILTER_ANISOTROPIC;        break;
-	default: filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	D3D11_COMPARISON_FUNC comparison;
+	if (compare == skg_sample_compare_none) {
+		comparison = D3D11_COMPARISON_LESS;
+		switch (sample) {
+			case skg_tex_sample_linear:     filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; break; // Technically trilinear
+			case skg_tex_sample_point:      filter = D3D11_FILTER_MIN_MAG_MIP_POINT;  break;
+			case skg_tex_sample_anisotropic:filter = D3D11_FILTER_ANISOTROPIC;        break;
+			default: filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		}
+	} else {
+		switch (compare) {
+			case skg_sample_compare_none:          comparison = D3D11_COMPARISON_LESS;          break; // Shouldn't matter, but this is what we've been using
+			case skg_sample_compare_less:          comparison = D3D11_COMPARISON_LESS;          break;
+			case skg_sample_compare_less_or_eq:    comparison = D3D11_COMPARISON_LESS_EQUAL;    break;
+			case skg_sample_compare_greater:       comparison = D3D11_COMPARISON_GREATER;       break;
+			case skg_sample_compare_greater_or_eq: comparison = D3D11_COMPARISON_GREATER_EQUAL; break;
+			case skg_sample_compare_equal:         comparison = D3D11_COMPARISON_EQUAL;         break;
+			case skg_sample_compare_not_equal:     comparison = D3D11_COMPARISON_NOT_EQUAL;     break;
+			case skg_sample_compare_always:        comparison = D3D11_COMPARISON_ALWAYS;        break;
+			case skg_sample_compare_never:         comparison = D3D11_COMPARISON_NEVER;         break;
+			default: comparison = D3D11_COMPARISON_LESS;
+		}
+		switch (sample) {
+			case skg_tex_sample_linear:     filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR; break; // Technically trilinear
+			case skg_tex_sample_point:      filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT;  break;
+			case skg_tex_sample_anisotropic:filter = D3D11_FILTER_COMPARISON_ANISOTROPIC;        break;
+			default: filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+		}
 	}
-
+	
 	D3D11_SAMPLER_DESC desc_sampler = {};
 	desc_sampler.AddressU = mode;
 	desc_sampler.AddressV = mode;
@@ -1368,7 +1391,7 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 	desc_sampler.Filter   = filter;
 	desc_sampler.MaxAnisotropy  = anisotropy;
 	desc_sampler.MaxLOD         = D3D11_FLOAT32_MAX;
-	desc_sampler.ComparisonFunc = D3D11_COMPARISON_LESS;
+	desc_sampler.ComparisonFunc = comparison;
 
 	// D3D will already return the same sampler when provided the same 
 	// settings, so we can just lean on that to prevent sampler duplicates :)
@@ -1905,7 +1928,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 
 	// If the sampler has not been set up yet, we'll make a default one real quick.
 	if (tex->_sampler == nullptr) {
-		skg_tex_settings(tex, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+		skg_tex_settings(tex, skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 0);
 	}
 }
 

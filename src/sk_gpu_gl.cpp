@@ -192,6 +192,9 @@
 #define GL_TEXTURE_WIDTH 0x1000
 #define GL_TEXTURE_HEIGHT 0x1001
 #define GL_TEXTURE_INTERNAL_FORMAT 0x1003
+#define GL_TEXTURE_COMPARE_MODE 0x884C
+#define GL_TEXTURE_COMPARE_FUNC 0x884D
+#define GL_COMPARE_REF_TO_TEXTURE 0x884E
 #define GL_REPEAT 0x2901
 #define GL_CLAMP_TO_EDGE 0x812F
 #define GL_MIRRORED_REPEAT 0x8370
@@ -1002,7 +1005,17 @@ void skg_draw_begin() {
 
 void skg_tex_target_discard(skg_tex_t *render_target) {
 	if (render_target->type != skg_tex_type_zbuffer || !skg_capability(skg_cap_discard_framebuffer)) return;
-	glDiscardFramebufferEXT(render_target->_target, render_target->array_count, render_target->_framebuffer_layers);
+
+	uint32_t attachments[] = { GL_DEPTH_EXT };
+	for (size_t i = 0; i < render_target->array_count; i++) {
+		glBindFramebuffer      (GL_FRAMEBUFFER, render_target->_framebuffer_layers[i]);
+		glDiscardFramebufferEXT(GL_FRAMEBUFFER, 1, attachments);
+	}
+
+	uint32_t err = glGetError();
+	if (err) {
+		skg_logf(skg_log_warning, "skg_tex_target_discard err: %x", err);
+	}
 }
 
 ///////////////////////////////////////////
@@ -2110,7 +2123,7 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 
 	glGenTextures(1, &result._texture);
-	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, 1);
+	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 1);
 
 	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
@@ -2244,10 +2257,11 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 
 ///////////////////////////////////////////
 
-void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
+void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy) {
 	tex->_address    = address;
 	tex->_sample     = sample;
 	tex->_anisotropy = anisotropy;
+	tex->_compare    = compare;
 
 	uint32_t mode;
 	switch (address) {
@@ -2282,6 +2296,24 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 #ifdef _SKG_GL_DESKTOP
 	glTexParameterf(tex->_target, GL_TEXTURE_MAX_ANISOTROPY_EXT, sample == skg_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
+	
+	if (compare != skg_sample_compare_none) {
+		uint32_t comparison;
+		switch (compare) {
+			case skg_sample_compare_none:          comparison = GL_LESS;    break; // Shouldn't matter, but this is what we've been using
+			case skg_sample_compare_less:          comparison = GL_LESS;    break;
+			case skg_sample_compare_less_or_eq:    comparison = GL_LEQUAL;  break;
+			case skg_sample_compare_greater:       comparison = GL_GREATER; break;
+			case skg_sample_compare_greater_or_eq: comparison = GL_GEQUAL;  break;
+			case skg_sample_compare_equal:         comparison = GL_EQUAL;   break;
+			case skg_sample_compare_not_equal:     comparison = GL_NOTEQUAL;break;
+			case skg_sample_compare_always:        comparison = GL_ALWAYS;  break;
+			case skg_sample_compare_never:         comparison = GL_NEVER;   break;
+			default: comparison = GL_LESS;
+		}
+		glTexParameteri(tex->_target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(tex->_target, GL_TEXTURE_COMPARE_FUNC, comparison);
+	}
 
 	int32_t err = glGetError();
 	while (err != 0) {
@@ -2405,7 +2437,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 		}
 	}
 
-	skg_tex_settings(tex, tex->_address, tex->_sample, tex->_anisotropy);
+	skg_tex_settings(tex, tex->_address, tex->_sample, tex->_compare, tex->_anisotropy);
 }
 
 ///////////////////////////////////////////

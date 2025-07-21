@@ -18,7 +18,7 @@ sk_gpu.h
 // an API appropriate for the platform it's being compiled for!
 //
 //#define SKG_FORCE_DIRECT3D11
-#define SKG_FORCE_OPENGL
+//#define SKG_FORCE_OPENGL
 
 // You can disable use of D3DCompile to make building this easier sometimes,
 // since D3DCompile is primarily used to catch .sks shader files built from
@@ -133,6 +133,18 @@ typedef enum skg_tex_sample_ {
 	skg_tex_sample_point,
 	skg_tex_sample_anisotropic
 } skg_tex_sample_;
+
+typedef enum skg_sample_compare_ {
+	skg_sample_compare_none = 0,
+	skg_sample_compare_less,
+	skg_sample_compare_less_or_eq,
+	skg_sample_compare_greater,
+	skg_sample_compare_greater_or_eq,
+	skg_sample_compare_equal,
+	skg_sample_compare_not_equal,
+	skg_sample_compare_always,
+	skg_sample_compare_never,
+} skg_sample_compare_;
 
 typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_none = 0,
@@ -484,7 +496,7 @@ SKG_API bool                skg_tex_is_valid             (const skg_tex_t *tex);
 SKG_API void                skg_tex_copy_to              (const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface);
 SKG_API void                skg_tex_copy_to_swapchain    (const skg_tex_t *tex, skg_swapchain_t *destination);
 SKG_API void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
-SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
+SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy);
 SKG_API void                skg_tex_set_contents         (      skg_tex_t *tex, const void *data, int32_t width, int32_t height);
 SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void**array_data, int32_t array_count, int32_t mip_count, int32_t width, int32_t height, int32_t multisample);
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);

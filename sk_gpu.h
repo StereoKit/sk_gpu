@@ -490,6 +490,7 @@ typedef struct skg_tex_t {
 	ID3D11RenderTargetView    *_target_view;
 	ID3D11RenderTargetView   **_target_array_view;
 	ID3D11DepthStencilView    *_depth_view;
+	ID3D11DepthStencilView   **_depth_array_view;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {
@@ -1193,7 +1194,10 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 		int32_t mip_count = render_target->mips == skg_mip_generate
 			? skg_mip_count(render_target->width, render_target->height)
 			: 1;
-		d3d_context->OMSetRenderTargets(1, &render_target->_target_array_view[layer_idx * mip_count + mip_level], render_target->_depth_view);
+		int32_t                 idx   = layer_idx * mip_count + mip_level;
+		ID3D11DepthStencilView* depth = render_target->_depth_array_view ? render_target->_depth_array_view[idx] : nullptr;
+		if (render_target->_target_array_view) d3d_context->OMSetRenderTargets(1, &render_target->_target_array_view[idx], depth);
+		else                                   d3d_context->OMSetRenderTargets(0, nullptr, depth);
 	} else {
 		d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
 	}
@@ -2198,6 +2202,22 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 		if (tex->_depth_view) tex->_depth_view->Release();
 		tex->_depth_view = depth->_depth_view;
 		tex->_depth_view->AddRef();
+		
+		int32_t mip_count = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+		if (tex->_depth_array_view) {
+			for (int32_t i=0; i<mip_count*tex->array_count; i+=1)
+				if (tex->_depth_array_view[i]) tex->_depth_array_view[i]->Release();
+		}
+		
+		if (depth->_depth_array_view) {
+			if (tex->_depth_array_view == nullptr)
+				tex->_depth_array_view = (ID3D11DepthStencilView**)malloc(sizeof(ID3D11DepthStencilView*) * mip_count * depth->array_count);
+				
+			for (int32_t i=0; i<mip_count*depth->array_count; i+=1) {
+				tex->_depth_array_view[i] = depth->_depth_array_view[i];
+				tex->_depth_array_view[i]->AddRef();
+			}
+		}
 	} else {
 		skg_log(skg_log_warning, "Can't bind a depth texture to a non-rendertarget");
 	}
@@ -2413,6 +2433,28 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		if (FAILED(hr)) {
 			skg_logf(skg_log_critical, "Create Depth Stencil View error: 0x%08X", hr);
 			return false;
+		}
+		
+		// Pre-create a view for each array/mip layer, just in case
+		tex->_depth_array_view = (ID3D11DepthStencilView**)malloc(sizeof(ID3D11DepthStencilView*)*tex->array_count*mip_count);
+		for (int32_t i = 0; i < tex->array_count; i++) {
+			for (uint32_t m = 0; m < mip_count; m++) {
+				if (tex->multisample > 1) {
+					stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
+					stencil_desc.Texture2DMSArray.ArraySize       = 1;
+					stencil_desc.Texture2DMSArray.FirstArraySlice = i;
+				} else {
+					stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+					stencil_desc.Texture2DArray.ArraySize       = 1;
+					stencil_desc.Texture2DArray.FirstArraySlice = i;
+					stencil_desc.Texture2DArray.MipSlice        = m;
+				}
+				hr = d3d_device->CreateDepthStencilView(tex->_texture, &stencil_desc, &tex->_depth_array_view[i*mip_count+m]);
+				if (FAILED(hr)) {
+					skg_logf(skg_log_critical, "Create Depth Stencil View error: 0x%08X", hr);
+					return false;
+				}
+			}
 		}
 	}
 
@@ -2983,13 +3025,18 @@ void skg_tex_destroy(skg_tex_t *tex) {
 	if (tex->_texture    ) tex->_texture    ->Release();
 
 	if (tex->_target_array_view) {
-		int mip_count = tex->mips == skg_mip_generate
-			? skg_mip_count(tex->width, tex->height)
-			: 1;
+		int32_t mip_count = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
 		for (int32_t i = 0; i < tex->array_count * mip_count; i++) {
 			if (tex->_target_array_view[i]) tex->_target_array_view[i]->Release();
 		}
-		if (tex->_target_array_view) free(tex->_target_array_view);
+		free(tex->_target_array_view);
+	}
+	if (tex->_depth_array_view) {
+		int32_t mip_count = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+		for (int32_t i = 0; i < tex->array_count * mip_count; i++) {
+			if (tex->_depth_array_view[i]) tex->_depth_array_view[i]->Release();
+		}
+		free(tex->_depth_array_view);
 	}
 	
 	*tex = {};

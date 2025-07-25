@@ -5130,7 +5130,8 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	// Check if this is an external texture
 	gl_pipeline.tex_bind[0] = result._texture; // Similar to a PIPELINE_CHECK
 	skg_log_enable(false); // Intentional error, don't scare the users.
-	glBindTexture(GL_TEXTURE_EXTERNAL_OES, result._texture);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture  (GL_TEXTURE_EXTERNAL_OES, result._texture);
 	skg_log_enable(true);
 	if (!glGetError()) {
 		result._target = GL_TEXTURE_EXTERNAL_OES;

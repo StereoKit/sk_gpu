@@ -5612,8 +5612,8 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 			if        (tex->_target == GL_TEXTURE_2D_MULTISAMPLE) {
 			} else if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) {
 			} else if (tex->_target == GL_TEXTURE_2D_ARRAY) {
-				if (is_compressed) glCompressedTexSubImage3D(tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, mip_bytes, mip_data);
-				else               glTexSubImage3D          (tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, type,      mip_data);
+				if (is_compressed) glCompressedTexSubImage3D(tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, layout, mip_bytes, mip_data);
+				else               glTexSubImage3D          (tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, layout, type,      mip_data);
 			} else if (tex->_target == GL_TEXTURE_CUBE_MAP) {
 				if (is_compressed) glCompressedTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, mip_bytes,    mip_data);
 				else               glTexImage2D          (GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, layout, type, mip_data);

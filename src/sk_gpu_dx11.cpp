@@ -33,6 +33,7 @@ ID3D11InfoQueue         *d3d_info        = nullptr;
 ID3D11RasterizerState   *d3d_rasterstate = nullptr;
 ID3D11DepthStencilState *d3d_depthstate  = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
+int32_t                  d3d_active_rendertarget_layer = 0;
 char                    *d3d_adapter_name = nullptr;
 
 ID3D11DeviceContext     *d3d_deferred    = nullptr;
@@ -310,6 +311,7 @@ void skg_tex_target_discard(skg_tex_t *render_target) {
 
 void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	d3d_active_rendertarget = render_target;
+	d3d_active_rendertarget_layer = layer_idx;
 
 	if (render_target == nullptr) {
 		d3d_context->OMSetRenderTargets(0, nullptr, nullptr);
@@ -336,18 +338,29 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 	} else {
 		d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
 	}
-	
 }
 
 ///////////////////////////////////////////
 
 void skg_target_clear(bool depth, const float *clear_color_4) {
 	if (!d3d_active_rendertarget) return;
-	if (clear_color_4 && d3d_active_rendertarget->_target_view)
-		d3d_context->ClearRenderTargetView(d3d_active_rendertarget->_target_view, clear_color_4);
+
+	if (clear_color_4 && d3d_active_rendertarget->_target_view) {
+		d3d_context->ClearRenderTargetView(
+			d3d_active_rendertarget_layer >= 0 
+				? d3d_active_rendertarget->_target_array_view[d3d_active_rendertarget_layer] 
+				: d3d_active_rendertarget->_target_view, 
+			clear_color_4);
+	}
 	if (depth && d3d_active_rendertarget->_depth_view) {
 		UINT clear_flags = D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL;
-		d3d_context->ClearDepthStencilView(d3d_active_rendertarget->_depth_view, clear_flags, 1.0f, 0);
+		d3d_context->ClearDepthStencilView(
+			d3d_active_rendertarget_layer >= 0
+				? d3d_active_rendertarget->_depth_array_view[d3d_active_rendertarget_layer]
+				: d3d_active_rendertarget->_depth_view, 
+			clear_flags,
+			1.0f,
+			0);
 	}
 }
 

@@ -98,9 +98,9 @@ typedef enum skg_buffer_type_ {
 
 typedef enum skg_tex_type_ {
 	skg_tex_type_image,
-	skg_tex_type_cubemap,
 	skg_tex_type_rendertarget,
-	skg_tex_type_depth,
+	skg_tex_type_zbuffer,
+	skg_tex_type_depthtarget,
 } skg_tex_type_;
 
 typedef enum skg_use_ {
@@ -108,6 +108,7 @@ typedef enum skg_use_ {
 	skg_use_dynamic       = 1 << 2,
 	skg_use_compute_read  = 1 << 3,
 	skg_use_compute_write = 1 << 4,
+	skg_use_cubemap       = 1 << 5,
 	skg_use_compute_readwrite = skg_use_compute_read | skg_use_compute_write
 } skg_use_;
 
@@ -132,6 +133,18 @@ typedef enum skg_tex_sample_ {
 	skg_tex_sample_point,
 	skg_tex_sample_anisotropic
 } skg_tex_sample_;
+
+typedef enum skg_sample_compare_ {
+	skg_sample_compare_none = 0,
+	skg_sample_compare_less,
+	skg_sample_compare_less_or_eq,
+	skg_sample_compare_greater,
+	skg_sample_compare_greater_or_eq,
+	skg_sample_compare_equal,
+	skg_sample_compare_not_equal,
+	skg_sample_compare_always,
+	skg_sample_compare_never,
+} skg_sample_compare_;
 
 typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_none = 0,
@@ -264,6 +277,7 @@ typedef enum skg_cap_ {
 	skg_cap_tex_layer_select = 1,
 	skg_cap_wireframe,
 	skg_cap_tiled_multisample,
+	skg_cap_discard_framebuffer,
 	skg_cap_fmt_pvrtc1,
 	skg_cap_fmt_pvrtc2,
 	skg_cap_fmt_astc,
@@ -476,6 +490,7 @@ typedef struct skg_tex_t {
 	ID3D11RenderTargetView    *_target_view;
 	ID3D11RenderTargetView   **_target_array_view;
 	ID3D11DepthStencilView    *_depth_view;
+	ID3D11DepthStencilView   **_depth_array_view;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {
@@ -558,9 +573,10 @@ typedef struct skg_tex_t {
 	uint32_t      _target;
 	uint32_t      _access;
 	uint32_t      _format;
-	skg_tex_address_ _address;
-	skg_tex_sample_  _sample;
-	int32_t          _anisotropy;
+	skg_tex_address_    _address;
+	skg_tex_sample_     _sample;
+	skg_sample_compare_ _compare;
+	int32_t             _anisotropy;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {
@@ -748,7 +764,7 @@ SKG_API bool                skg_tex_is_valid             (const skg_tex_t *tex);
 SKG_API void                skg_tex_copy_to              (const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface);
 SKG_API void                skg_tex_copy_to_swapchain    (const skg_tex_t *tex, skg_swapchain_t *destination);
 SKG_API void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
-SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
+SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy);
 SKG_API void                skg_tex_set_contents         (      skg_tex_t *tex, const void *data, int32_t width, int32_t height);
 SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void**array_data, int32_t array_count, int32_t mip_count, int32_t width, int32_t height, int32_t multisample);
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
@@ -758,6 +774,7 @@ SKG_API bool                skg_tex_gen_mips             (      skg_tex_t *tex);
 SKG_API void*               skg_tex_get_native           (const skg_tex_t *tex);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 SKG_API void                skg_tex_clear                (skg_bind_t bind);
+SKG_API void                skg_tex_target_discard       (      skg_tex_t *render_target);
 SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level);
 SKG_API skg_tex_t          *skg_tex_target_get           ();
 SKG_API void                skg_tex_destroy              (      skg_tex_t *tex);
@@ -769,6 +786,7 @@ SKG_API uint32_t            skg_tex_fmt_block_size       (skg_tex_fmt_ format);
 SKG_API uint32_t            skg_tex_fmt_pitch            (skg_tex_fmt_ format, int32_t width);
 SKG_API bool                skg_tex_fmt_supported        (skg_tex_fmt_ format);
 SKG_API bool                skg_tex_fmt_is_compressed    (skg_tex_fmt_ format);
+SKG_API bool                skg_tex_fmt_is_depth         (skg_tex_fmt_ format);
 
 
 ///////////////////////////////////////////
@@ -880,6 +898,7 @@ ID3D11InfoQueue         *d3d_info        = nullptr;
 ID3D11RasterizerState   *d3d_rasterstate = nullptr;
 ID3D11DepthStencilState *d3d_depthstate  = nullptr;
 skg_tex_t               *d3d_active_rendertarget = nullptr;
+int32_t                  d3d_active_rendertarget_layer = 0;
 char                    *d3d_adapter_name = nullptr;
 
 ID3D11DeviceContext     *d3d_deferred    = nullptr;
@@ -893,8 +912,10 @@ ID3DUserDefinedAnnotation *d3d_annotate = nullptr;
 
 ///////////////////////////////////////////
 
-bool        skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
-DXGI_FORMAT skg_ind_to_dxgi  (skg_ind_fmt_ format);
+bool        skg_tex_make_view    (skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader);
+DXGI_FORMAT skg_ind_to_dxgi      (skg_ind_fmt_ format);
+int64_t     d3d_tex_fmt_to_native(skg_tex_fmt_ format, bool depth_readable);
+DXGI_FORMAT d3d_tex_fmt_to_view  (int64_t format);
 
 template <typename T>
 void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int32_t *out_width, int32_t *out_height);
@@ -1148,14 +1169,22 @@ void skg_event_end () {
 
 ///////////////////////////////////////////
 
+void skg_tex_target_discard(skg_tex_t *render_target) {
+}
+
+///////////////////////////////////////////
+
 void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	d3d_active_rendertarget = render_target;
+	d3d_active_rendertarget_layer = layer_idx;
 
 	if (render_target == nullptr) {
 		d3d_context->OMSetRenderTargets(0, nullptr, nullptr);
 		return;
 	}
-	if (render_target->type != skg_tex_type_rendertarget)
+	if (render_target->type != skg_tex_type_rendertarget &&
+		render_target->type != skg_tex_type_zbuffer      &&
+		render_target->type != skg_tex_type_depthtarget)
 		return;
 
 	D3D11_VIEWPORT viewport = {};
@@ -1167,22 +1196,36 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 		int32_t mip_count = render_target->mips == skg_mip_generate
 			? skg_mip_count(render_target->width, render_target->height)
 			: 1;
-		d3d_context->OMSetRenderTargets(1, &render_target->_target_array_view[layer_idx * mip_count + mip_level], render_target->_depth_view);
+		int32_t                 idx   = layer_idx * mip_count + mip_level;
+		ID3D11DepthStencilView* depth = render_target->_depth_array_view ? render_target->_depth_array_view[idx] : nullptr;
+		if (render_target->_target_array_view) d3d_context->OMSetRenderTargets(1, &render_target->_target_array_view[idx], depth);
+		else                                   d3d_context->OMSetRenderTargets(0, nullptr, depth);
 	} else {
 		d3d_context->OMSetRenderTargets(1, &render_target->_target_view, render_target->_depth_view);
 	}
-	
 }
 
 ///////////////////////////////////////////
 
 void skg_target_clear(bool depth, const float *clear_color_4) {
 	if (!d3d_active_rendertarget) return;
-	if (clear_color_4)
-		d3d_context->ClearRenderTargetView(d3d_active_rendertarget->_target_view, clear_color_4);
+
+	if (clear_color_4 && d3d_active_rendertarget->_target_view) {
+		d3d_context->ClearRenderTargetView(
+			d3d_active_rendertarget_layer >= 0 
+				? d3d_active_rendertarget->_target_array_view[d3d_active_rendertarget_layer] 
+				: d3d_active_rendertarget->_target_view, 
+			clear_color_4);
+	}
 	if (depth && d3d_active_rendertarget->_depth_view) {
 		UINT clear_flags = D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL;
-		d3d_context->ClearDepthStencilView(d3d_active_rendertarget->_depth_view, clear_flags, 1.0f, 0);
+		d3d_context->ClearDepthStencilView(
+			d3d_active_rendertarget_layer >= 0
+				? d3d_active_rendertarget->_depth_array_view[d3d_active_rendertarget_layer]
+				: d3d_active_rendertarget->_depth_view, 
+			clear_flags,
+			1.0f,
+			0);
 	}
 }
 
@@ -1969,7 +2012,7 @@ skg_swapchain_t skg_swapchain_create(void *hwnd, skg_tex_fmt_ format, skg_tex_fm
 	result._swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	result._target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, result.width, result.height, 1, 1, 1);
 	if (depth_format != skg_tex_fmt_none) {
-		result._depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
+		result._depth = skg_tex_create(skg_tex_type_zbuffer, skg_use_static, depth_format, skg_mip_none);
 		skg_tex_set_contents(&result._depth, nullptr, result.width, result.height);
 		skg_tex_attach_depth(&result._target, &result._depth);
 	}
@@ -2008,7 +2051,7 @@ void skg_swapchain_resize(skg_swapchain_t *swapchain, int32_t width, int32_t hei
 	swapchain->_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 	swapchain->_target = skg_tex_create_from_existing(back_buffer, skg_tex_type_rendertarget, target_fmt, width, height, 1, 1, 1);
 	if (depth_fmt != skg_tex_fmt_none) {
-		swapchain->_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_fmt, skg_mip_none);
+		swapchain->_depth = skg_tex_create(skg_tex_type_zbuffer, skg_use_static, depth_fmt, skg_mip_none);
 		skg_tex_set_contents(&swapchain->_depth, nullptr, width, height);
 		skg_tex_attach_depth(&swapchain->_target, &swapchain->_depth);
 	}
@@ -2062,7 +2105,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result.mips        = color_desc.MipLevels > 1 ? skg_mip_generate : skg_mip_none;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, -1, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
-	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 0);
 
 	return result;
 }
@@ -2086,7 +2129,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result.multisample = color_desc.SampleDesc.Count;
 	result.format      = override_format != 0 ? override_format : skg_tex_fmt_from_native(color_desc.Format);
 	skg_tex_make_view(&result, color_desc.MipLevels, array_layer, color_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE);
-	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+	skg_tex_settings (&result, skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 0);
 
 	return result;
 }
@@ -2142,11 +2185,11 @@ void skg_tex_copy_to(const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *desti
 	}
 
 	if (tex_surface != -1 && dest_surface != -1) {
-		d3d_context->ResolveSubresource(destination->_texture, tex_surface, tex->_texture, dest_surface, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
+		d3d_context->ResolveSubresource(destination->_texture, tex_surface, tex->_texture, dest_surface, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget));
 	} else {
 		if (tex->multisample > 1) {
 			for (int32_t i = 0; i < tex->array_count; i++)
-				d3d_context->ResolveSubresource(destination->_texture, i, tex->_texture, i, (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format));
+				d3d_context->ResolveSubresource(destination->_texture, i, tex->_texture, i, (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget));
 		} else {
 			d3d_context->CopyResource(destination->_texture, tex->_texture);
 		}
@@ -2168,10 +2211,26 @@ bool skg_tex_is_valid(const skg_tex_t *tex) {
 ///////////////////////////////////////////
 
 void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
-	if (depth->type == skg_tex_type_depth) {
+	if (depth->type == skg_tex_type_zbuffer || depth->type == skg_tex_type_depthtarget) {
 		if (tex->_depth_view) tex->_depth_view->Release();
 		tex->_depth_view = depth->_depth_view;
 		tex->_depth_view->AddRef();
+		
+		int32_t mip_count = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+		if (tex->_depth_array_view) {
+			for (int32_t i=0; i<mip_count*tex->array_count; i+=1)
+				if (tex->_depth_array_view[i]) tex->_depth_array_view[i]->Release();
+		}
+		
+		if (depth->_depth_array_view) {
+			if (tex->_depth_array_view == nullptr)
+				tex->_depth_array_view = (ID3D11DepthStencilView**)malloc(sizeof(ID3D11DepthStencilView*) * mip_count * depth->array_count);
+				
+			for (int32_t i=0; i<mip_count*depth->array_count; i+=1) {
+				tex->_depth_array_view[i] = depth->_depth_array_view[i];
+				tex->_depth_array_view[i]->AddRef();
+			}
+		}
 	} else {
 		skg_log(skg_log_warning, "Can't bind a depth texture to a non-rendertarget");
 	}
@@ -2179,7 +2238,7 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 
 ///////////////////////////////////////////
 
-void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
+void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy) {
 	if (tex->_sampler)
 		tex->_sampler->Release();
 
@@ -2192,13 +2251,36 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 	}
 
 	D3D11_FILTER filter;
-	switch (sample) {
-	case skg_tex_sample_linear:     filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; break; // Technically trilinear
-	case skg_tex_sample_point:      filter = D3D11_FILTER_MIN_MAG_MIP_POINT;  break;
-	case skg_tex_sample_anisotropic:filter = D3D11_FILTER_ANISOTROPIC;        break;
-	default: filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	D3D11_COMPARISON_FUNC comparison;
+	if (compare == skg_sample_compare_none) {
+		comparison = D3D11_COMPARISON_LESS;
+		switch (sample) {
+			case skg_tex_sample_linear:     filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; break; // Technically trilinear
+			case skg_tex_sample_point:      filter = D3D11_FILTER_MIN_MAG_MIP_POINT;  break;
+			case skg_tex_sample_anisotropic:filter = D3D11_FILTER_ANISOTROPIC;        break;
+			default: filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		}
+	} else {
+		switch (compare) {
+			case skg_sample_compare_none:          comparison = D3D11_COMPARISON_LESS;          break; // Shouldn't matter, but this is what we've been using
+			case skg_sample_compare_less:          comparison = D3D11_COMPARISON_LESS;          break;
+			case skg_sample_compare_less_or_eq:    comparison = D3D11_COMPARISON_LESS_EQUAL;    break;
+			case skg_sample_compare_greater:       comparison = D3D11_COMPARISON_GREATER;       break;
+			case skg_sample_compare_greater_or_eq: comparison = D3D11_COMPARISON_GREATER_EQUAL; break;
+			case skg_sample_compare_equal:         comparison = D3D11_COMPARISON_EQUAL;         break;
+			case skg_sample_compare_not_equal:     comparison = D3D11_COMPARISON_NOT_EQUAL;     break;
+			case skg_sample_compare_always:        comparison = D3D11_COMPARISON_ALWAYS;        break;
+			case skg_sample_compare_never:         comparison = D3D11_COMPARISON_NEVER;         break;
+			default: comparison = D3D11_COMPARISON_LESS;
+		}
+		switch (sample) {
+			case skg_tex_sample_linear:     filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR; break; // Technically trilinear
+			case skg_tex_sample_point:      filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT;  break;
+			case skg_tex_sample_anisotropic:filter = D3D11_FILTER_COMPARISON_ANISOTROPIC;        break;
+			default: filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+		}
 	}
-
+	
 	D3D11_SAMPLER_DESC desc_sampler = {};
 	desc_sampler.AddressU = mode;
 	desc_sampler.AddressV = mode;
@@ -2206,7 +2288,7 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 	desc_sampler.Filter   = filter;
 	desc_sampler.MaxAnisotropy  = anisotropy;
 	desc_sampler.MaxLOD         = D3D11_FLOAT32_MAX;
-	desc_sampler.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	desc_sampler.ComparisonFunc = comparison;
 
 	// D3D will already return the same sampler when provided the same 
 	// settings, so we can just lean on that to prevent sampler duplicates :)
@@ -2286,13 +2368,13 @@ void skg_make_mips(D3D11_SUBRESOURCE_DATA *tex_mem, const void *curr_data, skg_t
 ///////////////////////////////////////////
 
 bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start, bool use_in_shader) {
-	DXGI_FORMAT format = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
+	DXGI_FORMAT format = d3d_tex_fmt_to_view(d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget));
 	HRESULT     hr     = E_FAIL;
 	
 	int32_t start = array_start == -1 ? 0 : array_start;
 	int32_t count = array_start == -1 ? tex->array_count : 1;
 
-	if (tex->type != skg_tex_type_depth) {
+	if (tex->type != skg_tex_type_zbuffer) {
 		D3D11_SHADER_RESOURCE_VIEW_DESC res_desc = {};
 		res_desc.Format = format;
 		// This struct is a union, but all elements follow the same order in
@@ -2303,7 +2385,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		res_desc.Texture2DArray.ArraySize       = count;
 		res_desc.Texture2DArray.MipLevels       = mip_count;
 
-		if (tex->type == skg_tex_type_cubemap) {
+		if ((tex->use & skg_use_cubemap) > 0) {
 			res_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
 		} else if (tex->array_count > 1) {
 			if (tex->multisample > 1) {
@@ -2334,12 +2416,13 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 				return false;
 			}
 		}
-	} else {
+	} 
+	if (tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget) {
 		D3D11_DEPTH_STENCIL_VIEW_DESC stencil_desc = {};
-		stencil_desc.Format = format;
+		stencil_desc.Format = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, false);
 		stencil_desc.Texture2DArray.FirstArraySlice = start;
 		stencil_desc.Texture2DArray.ArraySize       = count;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
 				stencil_desc.Texture2DMSArray.ArraySize       = count;
@@ -2364,6 +2447,28 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 			skg_logf(skg_log_critical, "Create Depth Stencil View error: 0x%08X", hr);
 			return false;
 		}
+		
+		// Pre-create a view for each array/mip layer, just in case
+		tex->_depth_array_view = (ID3D11DepthStencilView**)malloc(sizeof(ID3D11DepthStencilView*)*tex->array_count*mip_count);
+		for (int32_t i = 0; i < tex->array_count; i++) {
+			for (uint32_t m = 0; m < mip_count; m++) {
+				if (tex->multisample > 1) {
+					stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
+					stencil_desc.Texture2DMSArray.ArraySize       = 1;
+					stencil_desc.Texture2DMSArray.FirstArraySlice = i;
+				} else {
+					stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+					stencil_desc.Texture2DArray.ArraySize       = 1;
+					stencil_desc.Texture2DArray.FirstArraySlice = i;
+					stencil_desc.Texture2DArray.MipSlice        = m;
+				}
+				hr = d3d_device->CreateDepthStencilView(tex->_texture, &stencil_desc, &tex->_depth_array_view[i*mip_count+m]);
+				if (FAILED(hr)) {
+					skg_logf(skg_log_critical, "Create Depth Stencil View error: 0x%08X", hr);
+					return false;
+				}
+			}
+		}
 	}
 
 	if (tex->type == skg_tex_type_rendertarget) {
@@ -2371,7 +2476,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		target_desc.Format = format;
 		target_desc.Texture2DArray.FirstArraySlice = start;
 		target_desc.Texture2DArray.ArraySize       = count;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY;
 				target_desc.Texture2DMSArray.ArraySize       = count;
@@ -2424,7 +2529,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 	if (tex->use & skg_use_compute_write) {
 		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
 		view.Format = DXGI_FORMAT_UNKNOWN;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			view.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
 			view.Texture2DArray.FirstArraySlice = start;
 			view.Texture2DArray.ArraySize       = count;
@@ -2553,7 +2658,7 @@ ID3D11Texture2D *d3d_gen_mips_data(ID3D11DeviceContext *context, D3D11_TEXTURE2D
 	skg_tex_fmt_ mem_fmt   = skg_tex_fmt_from_native(desc.Format);
 	uint32_t     mem_pitch = skg_tex_fmt_pitch(mem_fmt, desc.Width);
 	int32_t      mips      = skg_mip_count(desc.Width, desc.Height);
-	for (int32_t i = 0; i < desc.ArraySize; i++) {
+	for (uint32_t i = 0; i < desc.ArraySize; i++) {
 		context->UpdateSubresource(tex_intermediate, i*mips, nullptr, array_data[i], mem_pitch, 0);
 	}
 
@@ -2659,13 +2764,13 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 		desc.Height           = height;
 		desc.ArraySize        = array_count;
 		desc.SampleDesc.Count = multisample;
-		desc.Format           = (DXGI_FORMAT)skg_tex_fmt_to_native(tex->format);
-		desc.BindFlags        = tex->type == skg_tex_type_depth ? D3D11_BIND_DEPTH_STENCIL : D3D11_BIND_SHADER_RESOURCE;
-		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depth || array_data == nullptr || array_data[0] == nullptr || generate_mips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+		desc.Format           = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, tex->type == skg_tex_type_depthtarget);
+		desc.BindFlags        = tex->type == skg_tex_type_zbuffer ? D3D11_BIND_DEPTH_STENCIL : tex->type == skg_tex_type_depthtarget ? D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE : D3D11_BIND_SHADER_RESOURCE;
+		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget || array_data == nullptr || array_data[0] == nullptr || generate_mips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
-		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+		if ((tex->use & skg_use_cubemap)       > 0) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+		if ((tex->use & skg_use_compute_write) > 0) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 		if (tex->type == skg_tex_type_rendertarget && tex->mips == skg_mip_generate ) desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
 		if (generate_mips) {
@@ -2742,7 +2847,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 
 	// If the sampler has not been set up yet, we'll make a default one real quick.
 	if (tex->_sampler == nullptr) {
-		skg_tex_settings(tex, skg_tex_address_repeat, skg_tex_sample_linear, 0);
+		skg_tex_settings(tex, skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 0);
 	}
 }
 
@@ -2933,13 +3038,18 @@ void skg_tex_destroy(skg_tex_t *tex) {
 	if (tex->_texture    ) tex->_texture    ->Release();
 
 	if (tex->_target_array_view) {
-		int mip_count = tex->mips == skg_mip_generate
-			? skg_mip_count(tex->width, tex->height)
-			: 1;
+		int32_t mip_count = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
 		for (int32_t i = 0; i < tex->array_count * mip_count; i++) {
 			if (tex->_target_array_view[i]) tex->_target_array_view[i]->Release();
 		}
-		if (tex->_target_array_view) free(tex->_target_array_view);
+		free(tex->_target_array_view);
+	}
+	if (tex->_depth_array_view) {
+		int32_t mip_count = tex->mips == skg_mip_generate ? skg_mip_count(tex->width, tex->height) : 1;
+		for (int32_t i = 0; i < tex->array_count * mip_count; i++) {
+			if (tex->_depth_array_view[i]) tex->_depth_array_view[i]->Release();
+		}
+		free(tex->_depth_array_view);
 	}
 	
 	*tex = {};
@@ -3000,7 +3110,7 @@ void skg_downsample_1(T *data, int32_t width, int32_t height, T **out_data, int3
 
 ///////////////////////////////////////////
 
-int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
+int64_t d3d_tex_fmt_to_native(skg_tex_fmt_ format, bool depth_readable) {
 	switch (format) {
 	case skg_tex_fmt_rgba32:        return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	case skg_tex_fmt_rgba32_linear: return DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -3012,9 +3122,9 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	case skg_tex_fmt_rgba64s:       return DXGI_FORMAT_R16G16B16A16_SNORM;
 	case skg_tex_fmt_rgba64f:       return DXGI_FORMAT_R16G16B16A16_FLOAT;
 	case skg_tex_fmt_rgba128:       return DXGI_FORMAT_R32G32B32A32_FLOAT;
-	case skg_tex_fmt_depth16:       return DXGI_FORMAT_D16_UNORM;
-	case skg_tex_fmt_depth32:       return DXGI_FORMAT_D32_FLOAT;
-	case skg_tex_fmt_depthstencil:  return DXGI_FORMAT_D24_UNORM_S8_UINT;
+	case skg_tex_fmt_depth16:       return depth_readable ? DXGI_FORMAT_R16_TYPELESS   : DXGI_FORMAT_D16_UNORM;
+	case skg_tex_fmt_depth32:       return depth_readable ? DXGI_FORMAT_R32_TYPELESS   : DXGI_FORMAT_D32_FLOAT;
+	case skg_tex_fmt_depthstencil:  return depth_readable ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_D24_UNORM_S8_UINT;
 	case skg_tex_fmt_r8:            return DXGI_FORMAT_R8_UNORM;
 	case skg_tex_fmt_r16u:          return DXGI_FORMAT_R16_UNORM;
 	case skg_tex_fmt_r16s:          return DXGI_FORMAT_R16_SNORM;
@@ -3032,6 +3142,23 @@ int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
 	case skg_tex_fmt_bc7_rgba:      return DXGI_FORMAT_BC7_UNORM;
 	default: return DXGI_FORMAT_UNKNOWN;
 	}
+}
+
+///////////////////////////////////////////
+
+DXGI_FORMAT d3d_tex_fmt_to_view(int64_t format) {
+	switch (format) {
+	case DXGI_FORMAT_R16_TYPELESS:   return DXGI_FORMAT_R16_UNORM;
+	case DXGI_FORMAT_R32_TYPELESS:   return DXGI_FORMAT_R32_FLOAT;
+	case DXGI_FORMAT_R24G8_TYPELESS: return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	default: return (DXGI_FORMAT)format;
+	}
+}
+
+///////////////////////////////////////////
+
+int64_t skg_tex_fmt_to_native(skg_tex_fmt_ format){
+	return d3d_tex_fmt_to_native(format, false);
 }
 
 ///////////////////////////////////////////
@@ -3301,6 +3428,9 @@ DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
 #define GL_TEXTURE_WIDTH 0x1000
 #define GL_TEXTURE_HEIGHT 0x1001
 #define GL_TEXTURE_INTERNAL_FORMAT 0x1003
+#define GL_TEXTURE_COMPARE_MODE 0x884C
+#define GL_TEXTURE_COMPARE_FUNC 0x884D
+#define GL_COMPARE_REF_TO_TEXTURE 0x884E
 #define GL_REPEAT 0x2901
 #define GL_CLAMP_TO_EDGE 0x812F
 #define GL_MIRRORED_REPEAT 0x8370
@@ -3314,6 +3444,7 @@ DXGI_FORMAT skg_ind_to_dxgi(skg_ind_fmt_ format) {
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
+#define GL_DEPTH_EXT 0x1801
 #define GL_BUFFER  0x82E0
 #define GL_SHADER  0x82E1
 #define GL_PROGRAM 0x82E2
@@ -3459,6 +3590,7 @@ GLE(void,     glDisable,                 uint32_t cap) \
 GLE(void,     glPolygonMode,             uint32_t face, uint32_t mode) \
 GLE(void,     glDepthMask,               uint8_t flag) \
 GLE(void,     glDepthFunc,               uint32_t func) \
+GLE(void,     glDepthRangef,             float n, float f) \
 GLE(void,     glColorMask,               uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) \
 GLE(uint32_t, glGetError,                ) \
 GLE(void,     glGetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
@@ -3488,6 +3620,7 @@ GLE(void,     glGenTextures,             int32_t n, uint32_t *textures) \
 GLE(void,     glGenFramebuffers,         int32_t n, uint32_t *ids) \
 GLE(void,     glDeleteFramebuffers,      int32_t n, uint32_t *ids) \
 GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) \
+GLE(void,     glDiscardFramebufferEXT,   uint32_t target, uint32_t numAttachments, const uint32_t* attachments) \
 GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
@@ -3924,6 +4057,7 @@ void gl_check_exts() {
 		const char* ext = (const char *)glGetStringi(GL_EXTENSIONS, i);
 		if (strcmp(ext, "GL_AMD_vertex_shader_layer"                     ) == 0) gl_caps[skg_cap_tex_layer_select] = true;
 		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2"         ) == 0) gl_caps[skg_cap_tiled_multisample] = true;
+		if (strcmp(ext, "GL_EXT_discard_framebuffer"                     ) == 0) gl_caps[skg_cap_discard_framebuffer] = true;
 		if (strcmp(ext, "GL_OVR_multiview2"                              ) == 0) gl_caps[skg_cap_multiview] = true;
 		if (strcmp(ext, "GL_OVR_multiview_multisampled_render_to_texture") == 0) gl_caps[skg_cap_multiview_tiled_multisample] = true;
 		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc"               ) == 0) gl_caps[skg_cap_fmt_pvrtc1] = true;
@@ -4059,6 +4193,8 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	glEnable   (GL_TEXTURE_CUBE_MAP_SEAMLESS);
 #endif
 
+	glDepthRangef(0,1);
+
 	return 1;
 }
 
@@ -4103,6 +4239,11 @@ void skg_draw_begin() {
 
 ///////////////////////////////////////////
 
+void skg_tex_target_discard(skg_tex_t *render_target) {
+}
+
+///////////////////////////////////////////
+
 void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	gl_active_rendertarget = render_target;
 	gl_current_framebuffer = render_target == nullptr
@@ -4130,7 +4271,7 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 void skg_target_clear(bool depth, const float *clear_color_4) {
 	uint32_t clear_mask = 0;
 	if (depth) {
-		clear_mask = GL_DEPTH_BUFFER_BIT;
+		clear_mask = GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
 		// If DepthMask is false, glClear won't clear depth
 		
 		PIPELINE_CHECK(gl_pipeline.depth_write, true)
@@ -4970,7 +5111,7 @@ void main() {
 	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	skg_tex_set_contents(&result._surface, nullptr, result.width, result.height);
 
-	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
+	result._surface_depth = skg_tex_create(skg_tex_type_zbuffer, skg_use_static, depth_format, skg_mip_none);
 	skg_tex_set_contents(&result._surface_depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._surface, &result._surface_depth);
 
@@ -5070,14 +5211,14 @@ void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 
 ///////////////////////////////////////////
 
-uint32_t gl_tex_target(skg_tex_type_ type, int32_t array_count, int32_t multisample) {
+uint32_t gl_tex_target(skg_use_ tex_use, int32_t array_count, int32_t multisample) {
 	if (multisample > 1) {
 		return array_count == 1
 			? GL_TEXTURE_2D_MULTISAMPLE
 			: GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
 	} else {
 		return array_count > 1
-			? (type == skg_tex_type_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D_ARRAY)
+			? ((tex_use & skg_use_cubemap) > 0 ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D_ARRAY)
 			: GL_TEXTURE_2D;
 	}
 }
@@ -5125,7 +5266,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result._physical_multisample = physical_multisample;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
-	result._target     = gl_tex_target(type, array_count, physical_multisample);
+	result._target     = gl_tex_target(result.use, array_count, physical_multisample);
 
 	// Check if this is an external texture
 	gl_pipeline.tex_bind[0] = result._texture; // Similar to a PIPELINE_CHECK
@@ -5137,7 +5278,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 		result._target = GL_TEXTURE_EXTERNAL_OES;
 	}
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 
@@ -5176,9 +5317,9 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result._physical_multisample = 1;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
-	result._target     = gl_tex_target(type, 2, result._physical_multisample);
+	result._target     = gl_tex_target(result.use, 2, result._physical_multisample);
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * 1);
 		glGenFramebuffers(1, result._framebuffer_layers);
 
@@ -5207,9 +5348,9 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 
 	glGenTextures(1, &result._texture);
-	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, 1);
+	skg_tex_settings(&result, (use & skg_use_cubemap) > 0 ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 1);
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 	}
@@ -5341,10 +5482,11 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 
 ///////////////////////////////////////////
 
-void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
+void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy) {
 	tex->_address    = address;
 	tex->_sample     = sample;
 	tex->_anisotropy = anisotropy;
+	tex->_compare    = compare;
 
 	uint32_t mode;
 	switch (address) {
@@ -5371,7 +5513,7 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_T, mode);
-	if (tex->type == skg_tex_type_cubemap) {
+	if ((tex->use & skg_use_cubemap) > 0) {
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
 	}
 	glTexParameteri(tex->_target, GL_TEXTURE_MIN_FILTER, min_filter);
@@ -5379,6 +5521,24 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 #ifdef _SKG_GL_DESKTOP
 	glTexParameterf(tex->_target, GL_TEXTURE_MAX_ANISOTROPY_EXT, sample == skg_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
+	
+	if (compare != skg_sample_compare_none) {
+		uint32_t comparison;
+		switch (compare) {
+			case skg_sample_compare_none:          comparison = GL_LESS;    break; // Shouldn't matter, but this is what we've been using
+			case skg_sample_compare_less:          comparison = GL_LESS;    break;
+			case skg_sample_compare_less_or_eq:    comparison = GL_LEQUAL;  break;
+			case skg_sample_compare_greater:       comparison = GL_GREATER; break;
+			case skg_sample_compare_greater_or_eq: comparison = GL_GEQUAL;  break;
+			case skg_sample_compare_equal:         comparison = GL_EQUAL;   break;
+			case skg_sample_compare_not_equal:     comparison = GL_NOTEQUAL;break;
+			case skg_sample_compare_always:        comparison = GL_ALWAYS;  break;
+			case skg_sample_compare_never:         comparison = GL_NEVER;   break;
+			default: comparison = GL_LESS;
+		}
+		glTexParameteri(tex->_target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(tex->_target, GL_TEXTURE_COMPARE_FUNC, comparison);
+	}
 
 	int32_t err = glGetError();
 	while (err != 0) {
@@ -5418,7 +5578,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 	tex->array_count           = array_count;
 	tex->multisample           = multisample; // multisample render to texture is technically an MSAA surface, but functions like a normal single sample texture.
 	tex->_physical_multisample = gl_caps[skg_cap_tiled_multisample] ? 1 : multisample;
-	tex->_target               = gl_tex_target(tex->type, tex->array_count, tex->_physical_multisample);
+	tex->_target               = gl_tex_target(tex->use, tex->array_count, tex->_physical_multisample);
 
 	glActiveTexture(skg_settings_tex_slot);
 	glBindTexture(tex->_target, tex->_texture);
@@ -5432,7 +5592,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 	uint32_t layout        =           skg_tex_fmt_to_gl_layout (tex->format);
 	uint32_t type          =           skg_tex_fmt_to_gl_type   (tex->format);
 	bool     is_compressed =           skg_tex_fmt_is_compressed(tex->format);
-	if (tex->type == skg_tex_type_cubemap) {
+	if ((tex->use & skg_use_cubemap) > 0) {
 		if (array_count != 6) {
 			skg_log(skg_log_warning, "Cubemaps need 6 data frames");
 			return;
@@ -5454,8 +5614,8 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 			if        (tex->_target == GL_TEXTURE_2D_MULTISAMPLE) {
 			} else if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) {
 			} else if (tex->_target == GL_TEXTURE_2D_ARRAY) {
-				if (is_compressed) glCompressedTexSubImage3D(tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, mip_bytes, mip_data);
-				else               glTexSubImage3D          (tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, type,      mip_data);
+				if (is_compressed) glCompressedTexSubImage3D(tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, layout, mip_bytes, mip_data);
+				else               glTexSubImage3D          (tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, layout, type,      mip_data);
 			} else if (tex->_target == GL_TEXTURE_CUBE_MAP) {
 				if (is_compressed) glCompressedTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, mip_bytes,    mip_data);
 				else               glTexImage2D          (GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, layout, type, mip_data);
@@ -5484,7 +5644,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 		}
 	}
 
-	if (tex->type == skg_tex_type_rendertarget) {
+	if (tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget) {
 		tex->_framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * tex->array_count);
 		glGenFramebuffers(tex->array_count, tex->_framebuffer_layers);
 
@@ -5502,7 +5662,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 		}
 	}
 
-	skg_tex_settings(tex, tex->_address, tex->_sample, tex->_anisotropy);
+	skg_tex_settings(tex, tex->_address, tex->_sample, tex->_compare, tex->_anisotropy);
 }
 
 ///////////////////////////////////////////
@@ -5633,13 +5793,15 @@ void skg_tex_clear(skg_bind_t bind) {
 
 void skg_tex_destroy(skg_tex_t *tex) {
 	// Make sure it's not bound or cached in our pipeline state
-	int32_t slot_count = sizeof(gl_pipeline.tex_bind) / sizeof(gl_pipeline.tex_bind[0]);
-	for (int32_t i = 0; i < slot_count; i++) {
-		if (gl_pipeline.tex_bind[i] != tex->_texture) continue;
+	if (tex->_target) {
+		int32_t slot_count = sizeof(gl_pipeline.tex_bind) / sizeof(gl_pipeline.tex_bind[0]);
+		for (int32_t i = 0; i < slot_count; i++) {
+			if (gl_pipeline.tex_bind[i] != tex->_texture) continue;
 
-		glActiveTexture(GL_TEXTURE0 + i);
-		glBindTexture  (tex->_target, 0);
-		gl_pipeline.tex_bind[i] = 0;
+			glActiveTexture(GL_TEXTURE0 + i);
+			glBindTexture  (tex->_target, 0);
+			gl_pipeline.tex_bind[i] = 0;
+		}
 	}
 	
 	uint32_t tex_list[] = { tex->_texture };
@@ -6764,6 +6926,17 @@ uint32_t skg_tex_fmt_pitch(skg_tex_fmt_ format, int32_t width) {
 
 bool skg_tex_fmt_is_compressed(skg_tex_fmt_ format) {
 	return format >= skg_tex_fmt_compressed_start;
+}
+
+///////////////////////////////////////////
+
+bool skg_tex_fmt_is_depth(skg_tex_fmt_ format) {
+	switch (format) {
+	case skg_tex_fmt_depth16:
+	case skg_tex_fmt_depth32:
+	case skg_tex_fmt_depthstencil: return true;
+	default:                       return false;
+	}
 }
 
 ///////////////////////////////////////////

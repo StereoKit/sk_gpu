@@ -90,6 +90,7 @@ typedef struct skg_tex_t {
 	ID3D11RenderTargetView    *_target_view;
 	ID3D11RenderTargetView   **_target_array_view;
 	ID3D11DepthStencilView    *_depth_view;
+	ID3D11DepthStencilView   **_depth_array_view;
 } skg_tex_t;
 
 typedef struct skg_swapchain_t {

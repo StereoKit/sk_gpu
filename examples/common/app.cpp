@@ -202,7 +202,7 @@ bool app_init() {
 		colors[i] = { c8,c8,c8,c8 };
 	} }
 	app_tex = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
-	skg_tex_settings    (&app_tex, skg_tex_address_clamp, skg_tex_sample_linear, 0);
+	skg_tex_settings    (&app_tex, skg_tex_address_clamp, skg_tex_sample_linear, skg_sample_compare_none, 0);
 	skg_tex_set_contents(&app_tex, colors, w, h);
 	skg_tex_name        (&app_tex, "checker_tex");
 	free(colors);
@@ -237,7 +237,7 @@ bool app_init() {
 		colors[i] = { c8,c8,c8,c8 };
 	} }
 	app_particle = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
-	skg_tex_settings    (&app_particle, skg_tex_address_clamp, skg_tex_sample_linear, 0);
+	skg_tex_settings    (&app_particle, skg_tex_address_clamp, skg_tex_sample_linear, skg_sample_compare_none, 0);
 	skg_tex_set_contents(&app_particle, colors, w, h);
 	skg_tex_name        (&app_particle, "particle_tex");
 	free(colors);
@@ -262,8 +262,8 @@ bool app_init() {
 	} }
 	app_tex_gradient_srgb   = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32, skg_mip_generate);
 	app_tex_gradient_linear = skg_tex_create(skg_tex_type_image, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_generate);
-	skg_tex_settings    (&app_tex_gradient_srgb,   skg_tex_address_clamp, skg_tex_sample_linear, 0);
-	skg_tex_settings    (&app_tex_gradient_linear, skg_tex_address_clamp, skg_tex_sample_linear, 0);
+	skg_tex_settings    (&app_tex_gradient_srgb,   skg_tex_address_clamp, skg_tex_sample_linear, skg_sample_compare_none, 0);
+	skg_tex_settings    (&app_tex_gradient_linear, skg_tex_address_clamp, skg_tex_sample_linear, skg_sample_compare_none, 0);
 	skg_tex_set_contents(&app_tex_gradient_srgb,   colors, gw, gh);
 	skg_tex_set_contents(&app_tex_gradient_linear, colors, gw, gh);
 	skg_tex_name        (&app_tex_gradient_srgb,   "gradient_srgb_tex");
@@ -296,21 +296,21 @@ bool app_init() {
 			}
 		}
 		app_tex_colspace[c] = skg_tex_create(skg_tex_type_image, skg_use_dynamic, skg_tex_fmt_rgba32, skg_mip_none);
-		skg_tex_settings    (&app_tex_colspace[c], skg_tex_address_clamp, skg_tex_sample_linear, 1);
+		skg_tex_settings    (&app_tex_colspace[c], skg_tex_address_clamp, skg_tex_sample_linear, skg_sample_compare_none, 1);
 		skg_tex_set_contents(&app_tex_colspace[c], space_colors, grad_size, grad_size);
 		bmp_write(app_col_name[c], grad_size, grad_size, (uint8_t*)space_colors);
 	}
 	free(space_colors);
 
 	app_target       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
-	app_target_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depth16,       skg_mip_none);
+	app_target_depth = skg_tex_create(skg_tex_type_zbuffer,      skg_use_static, skg_tex_fmt_depth16,       skg_mip_none);
 	skg_tex_set_contents(&app_target,       nullptr, 512, 512);
 	skg_tex_set_contents(&app_target_depth, nullptr, 512, 512);
 	skg_tex_attach_depth(&app_target, &app_target_depth);
 	skg_tex_name        (&app_target,       "main_rtex");
 	skg_tex_name        (&app_target_depth, "depth_rtex");
 
-	app_cubemap = skg_tex_create(skg_tex_type_cubemap, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
+	app_cubemap = skg_tex_create(skg_tex_type_image, (skg_use_)(skg_use_static | skg_use_cubemap), skg_tex_fmt_rgba32, skg_mip_none);
 	skg_color32_t *cube_cols[6];
 	const int32_t  cube_face_size = 64;
 	for (size_t f = 0; f < 6; f++) {

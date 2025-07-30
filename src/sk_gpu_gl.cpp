@@ -192,6 +192,9 @@
 #define GL_TEXTURE_WIDTH 0x1000
 #define GL_TEXTURE_HEIGHT 0x1001
 #define GL_TEXTURE_INTERNAL_FORMAT 0x1003
+#define GL_TEXTURE_COMPARE_MODE 0x884C
+#define GL_TEXTURE_COMPARE_FUNC 0x884D
+#define GL_COMPARE_REF_TO_TEXTURE 0x884E
 #define GL_REPEAT 0x2901
 #define GL_CLAMP_TO_EDGE 0x812F
 #define GL_MIRRORED_REPEAT 0x8370
@@ -205,6 +208,7 @@
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
+#define GL_DEPTH_EXT 0x1801
 #define GL_BUFFER  0x82E0
 #define GL_SHADER  0x82E1
 #define GL_PROGRAM 0x82E2
@@ -350,6 +354,7 @@ GLE(void,     glDisable,                 uint32_t cap) \
 GLE(void,     glPolygonMode,             uint32_t face, uint32_t mode) \
 GLE(void,     glDepthMask,               uint8_t flag) \
 GLE(void,     glDepthFunc,               uint32_t func) \
+GLE(void,     glDepthRangef,             float n, float f) \
 GLE(void,     glColorMask,               uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) \
 GLE(uint32_t, glGetError,                ) \
 GLE(void,     glGetProgramiv,            uint32_t program, uint32_t pname, int32_t *params) \
@@ -379,6 +384,7 @@ GLE(void,     glGenTextures,             int32_t n, uint32_t *textures) \
 GLE(void,     glGenFramebuffers,         int32_t n, uint32_t *ids) \
 GLE(void,     glDeleteFramebuffers,      int32_t n, uint32_t *ids) \
 GLE(void,     glBindFramebuffer,         uint32_t target, uint32_t framebuffer) \
+GLE(void,     glDiscardFramebufferEXT,   uint32_t target, uint32_t numAttachments, const uint32_t* attachments) \
 GLE(void,     glFramebufferTexture,      uint32_t target, uint32_t attachment, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTexture2D,    uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) \
 GLE(void,     glFramebufferTextureLayer, uint32_t target, uint32_t attachment, uint32_t texture, int32_t level, int32_t layer) \
@@ -815,6 +821,7 @@ void gl_check_exts() {
 		const char* ext = (const char *)glGetStringi(GL_EXTENSIONS, i);
 		if (strcmp(ext, "GL_AMD_vertex_shader_layer"                     ) == 0) gl_caps[skg_cap_tex_layer_select] = true;
 		if (strcmp(ext, "GL_EXT_multisampled_render_to_texture2"         ) == 0) gl_caps[skg_cap_tiled_multisample] = true;
+		if (strcmp(ext, "GL_EXT_discard_framebuffer"                     ) == 0) gl_caps[skg_cap_discard_framebuffer] = true;
 		if (strcmp(ext, "GL_OVR_multiview2"                              ) == 0) gl_caps[skg_cap_multiview] = true;
 		if (strcmp(ext, "GL_OVR_multiview_multisampled_render_to_texture") == 0) gl_caps[skg_cap_multiview_tiled_multisample] = true;
 		if (strcmp(ext, "GL_IMG_texture_compression_pvrtc"               ) == 0) gl_caps[skg_cap_fmt_pvrtc1] = true;
@@ -950,6 +957,8 @@ int32_t skg_init(const char *app_name, void *adapter_id) {
 	glEnable   (GL_TEXTURE_CUBE_MAP_SEAMLESS);
 #endif
 
+	glDepthRangef(0,1);
+
 	return 1;
 }
 
@@ -994,6 +1003,11 @@ void skg_draw_begin() {
 
 ///////////////////////////////////////////
 
+void skg_tex_target_discard(skg_tex_t *render_target) {
+}
+
+///////////////////////////////////////////
+
 void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level) {
 	gl_active_rendertarget = render_target;
 	gl_current_framebuffer = render_target == nullptr
@@ -1021,7 +1035,7 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 void skg_target_clear(bool depth, const float *clear_color_4) {
 	uint32_t clear_mask = 0;
 	if (depth) {
-		clear_mask = GL_DEPTH_BUFFER_BIT;
+		clear_mask = GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
 		// If DepthMask is false, glClear won't clear depth
 		
 		PIPELINE_CHECK(gl_pipeline.depth_write, true)
@@ -1861,7 +1875,7 @@ void main() {
 	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	skg_tex_set_contents(&result._surface, nullptr, result.width, result.height);
 
-	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
+	result._surface_depth = skg_tex_create(skg_tex_type_zbuffer, skg_use_static, depth_format, skg_mip_none);
 	skg_tex_set_contents(&result._surface_depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._surface, &result._surface_depth);
 
@@ -1961,14 +1975,14 @@ void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 
 ///////////////////////////////////////////
 
-uint32_t gl_tex_target(skg_tex_type_ type, int32_t array_count, int32_t multisample) {
+uint32_t gl_tex_target(skg_use_ tex_use, int32_t array_count, int32_t multisample) {
 	if (multisample > 1) {
 		return array_count == 1
 			? GL_TEXTURE_2D_MULTISAMPLE
 			: GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
 	} else {
 		return array_count > 1
-			? (type == skg_tex_type_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D_ARRAY)
+			? ((tex_use & skg_use_cubemap) > 0 ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D_ARRAY)
 			: GL_TEXTURE_2D;
 	}
 }
@@ -2016,7 +2030,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result._physical_multisample = physical_multisample;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
-	result._target     = gl_tex_target(type, array_count, physical_multisample);
+	result._target     = gl_tex_target(result.use, array_count, physical_multisample);
 
 	// Check if this is an external texture
 	gl_pipeline.tex_bind[0] = result._texture; // Similar to a PIPELINE_CHECK
@@ -2028,7 +2042,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 		result._target = GL_TEXTURE_EXTERNAL_OES;
 	}
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 
@@ -2067,9 +2081,9 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result._physical_multisample = 1;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
-	result._target     = gl_tex_target(type, 2, result._physical_multisample);
+	result._target     = gl_tex_target(result.use, 2, result._physical_multisample);
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * 1);
 		glGenFramebuffers(1, result._framebuffer_layers);
 
@@ -2098,9 +2112,9 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 
 	glGenTextures(1, &result._texture);
-	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, 1);
+	skg_tex_settings(&result, (use & skg_use_cubemap) > 0 ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 1);
 
-	if (type == skg_tex_type_rendertarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 	}
@@ -2232,10 +2246,11 @@ void skg_tex_attach_depth(skg_tex_t *tex, skg_tex_t *depth) {
 
 ///////////////////////////////////////////
 
-void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy) {
+void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy) {
 	tex->_address    = address;
 	tex->_sample     = sample;
 	tex->_anisotropy = anisotropy;
+	tex->_compare    = compare;
 
 	uint32_t mode;
 	switch (address) {
@@ -2262,7 +2277,7 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_T, mode);
-	if (tex->type == skg_tex_type_cubemap) {
+	if ((tex->use & skg_use_cubemap) > 0) {
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
 	}
 	glTexParameteri(tex->_target, GL_TEXTURE_MIN_FILTER, min_filter);
@@ -2270,6 +2285,24 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 #ifdef _SKG_GL_DESKTOP
 	glTexParameterf(tex->_target, GL_TEXTURE_MAX_ANISOTROPY_EXT, sample == skg_tex_sample_anisotropic ? anisotropy : 1.0f);
 #endif
+	
+	if (compare != skg_sample_compare_none) {
+		uint32_t comparison;
+		switch (compare) {
+			case skg_sample_compare_none:          comparison = GL_LESS;    break; // Shouldn't matter, but this is what we've been using
+			case skg_sample_compare_less:          comparison = GL_LESS;    break;
+			case skg_sample_compare_less_or_eq:    comparison = GL_LEQUAL;  break;
+			case skg_sample_compare_greater:       comparison = GL_GREATER; break;
+			case skg_sample_compare_greater_or_eq: comparison = GL_GEQUAL;  break;
+			case skg_sample_compare_equal:         comparison = GL_EQUAL;   break;
+			case skg_sample_compare_not_equal:     comparison = GL_NOTEQUAL;break;
+			case skg_sample_compare_always:        comparison = GL_ALWAYS;  break;
+			case skg_sample_compare_never:         comparison = GL_NEVER;   break;
+			default: comparison = GL_LESS;
+		}
+		glTexParameteri(tex->_target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(tex->_target, GL_TEXTURE_COMPARE_FUNC, comparison);
+	}
 
 	int32_t err = glGetError();
 	while (err != 0) {
@@ -2309,7 +2342,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 	tex->array_count           = array_count;
 	tex->multisample           = multisample; // multisample render to texture is technically an MSAA surface, but functions like a normal single sample texture.
 	tex->_physical_multisample = gl_caps[skg_cap_tiled_multisample] ? 1 : multisample;
-	tex->_target               = gl_tex_target(tex->type, tex->array_count, tex->_physical_multisample);
+	tex->_target               = gl_tex_target(tex->use, tex->array_count, tex->_physical_multisample);
 
 	glActiveTexture(skg_settings_tex_slot);
 	glBindTexture(tex->_target, tex->_texture);
@@ -2323,7 +2356,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 	uint32_t layout        =           skg_tex_fmt_to_gl_layout (tex->format);
 	uint32_t type          =           skg_tex_fmt_to_gl_type   (tex->format);
 	bool     is_compressed =           skg_tex_fmt_is_compressed(tex->format);
-	if (tex->type == skg_tex_type_cubemap) {
+	if ((tex->use & skg_use_cubemap) > 0) {
 		if (array_count != 6) {
 			skg_log(skg_log_warning, "Cubemaps need 6 data frames");
 			return;
@@ -2345,8 +2378,8 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 			if        (tex->_target == GL_TEXTURE_2D_MULTISAMPLE) {
 			} else if (tex->_target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) {
 			} else if (tex->_target == GL_TEXTURE_2D_ARRAY) {
-				if (is_compressed) glCompressedTexSubImage3D(tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, mip_bytes, mip_data);
-				else               glTexSubImage3D          (tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, tex->_format, type,      mip_data);
+				if (is_compressed) glCompressedTexSubImage3D(tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, layout, mip_bytes, mip_data);
+				else               glTexSubImage3D          (tex->_target,                           m, 0, 0, array_idx, mip_width, mip_height, 1, layout, type,      mip_data);
 			} else if (tex->_target == GL_TEXTURE_CUBE_MAP) {
 				if (is_compressed) glCompressedTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, mip_bytes,    mip_data);
 				else               glTexImage2D          (GL_TEXTURE_CUBE_MAP_POSITIVE_X+array_idx , m, tex->_format, mip_width, mip_height, 0, layout, type, mip_data);
@@ -2375,7 +2408,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 		}
 	}
 
-	if (tex->type == skg_tex_type_rendertarget) {
+	if (tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget) {
 		tex->_framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * tex->array_count);
 		glGenFramebuffers(tex->array_count, tex->_framebuffer_layers);
 
@@ -2393,7 +2426,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 		}
 	}
 
-	skg_tex_settings(tex, tex->_address, tex->_sample, tex->_anisotropy);
+	skg_tex_settings(tex, tex->_address, tex->_sample, tex->_compare, tex->_anisotropy);
 }
 
 ///////////////////////////////////////////
@@ -2524,13 +2557,15 @@ void skg_tex_clear(skg_bind_t bind) {
 
 void skg_tex_destroy(skg_tex_t *tex) {
 	// Make sure it's not bound or cached in our pipeline state
-	int32_t slot_count = sizeof(gl_pipeline.tex_bind) / sizeof(gl_pipeline.tex_bind[0]);
-	for (int32_t i = 0; i < slot_count; i++) {
-		if (gl_pipeline.tex_bind[i] != tex->_texture) continue;
+	if (tex->_target) {
+		int32_t slot_count = sizeof(gl_pipeline.tex_bind) / sizeof(gl_pipeline.tex_bind[0]);
+		for (int32_t i = 0; i < slot_count; i++) {
+			if (gl_pipeline.tex_bind[i] != tex->_texture) continue;
 
-		glActiveTexture(GL_TEXTURE0 + i);
-		glBindTexture  (tex->_target, 0);
-		gl_pipeline.tex_bind[i] = 0;
+			glActiveTexture(GL_TEXTURE0 + i);
+			glBindTexture  (tex->_target, 0);
+			gl_pipeline.tex_bind[i] = 0;
+		}
 	}
 	
 	uint32_t tex_list[] = { tex->_texture };

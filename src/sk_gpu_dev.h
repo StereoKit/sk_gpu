@@ -98,9 +98,9 @@ typedef enum skg_buffer_type_ {
 
 typedef enum skg_tex_type_ {
 	skg_tex_type_image,
-	skg_tex_type_cubemap,
 	skg_tex_type_rendertarget,
-	skg_tex_type_depth,
+	skg_tex_type_zbuffer,
+	skg_tex_type_depthtarget,
 } skg_tex_type_;
 
 typedef enum skg_use_ {
@@ -108,6 +108,7 @@ typedef enum skg_use_ {
 	skg_use_dynamic       = 1 << 2,
 	skg_use_compute_read  = 1 << 3,
 	skg_use_compute_write = 1 << 4,
+	skg_use_cubemap       = 1 << 5,
 	skg_use_compute_readwrite = skg_use_compute_read | skg_use_compute_write
 } skg_use_;
 
@@ -132,6 +133,18 @@ typedef enum skg_tex_sample_ {
 	skg_tex_sample_point,
 	skg_tex_sample_anisotropic
 } skg_tex_sample_;
+
+typedef enum skg_sample_compare_ {
+	skg_sample_compare_none = 0,
+	skg_sample_compare_less,
+	skg_sample_compare_less_or_eq,
+	skg_sample_compare_greater,
+	skg_sample_compare_greater_or_eq,
+	skg_sample_compare_equal,
+	skg_sample_compare_not_equal,
+	skg_sample_compare_always,
+	skg_sample_compare_never,
+} skg_sample_compare_;
 
 typedef enum skg_tex_fmt_ {
 	skg_tex_fmt_none = 0,
@@ -264,6 +277,7 @@ typedef enum skg_cap_ {
 	skg_cap_tex_layer_select = 1,
 	skg_cap_wireframe,
 	skg_cap_tiled_multisample,
+	skg_cap_discard_framebuffer,
 	skg_cap_fmt_pvrtc1,
 	skg_cap_fmt_pvrtc2,
 	skg_cap_fmt_astc,
@@ -482,7 +496,7 @@ SKG_API bool                skg_tex_is_valid             (const skg_tex_t *tex);
 SKG_API void                skg_tex_copy_to              (const skg_tex_t *tex, int32_t tex_surface, skg_tex_t *destination, int32_t dest_surface);
 SKG_API void                skg_tex_copy_to_swapchain    (const skg_tex_t *tex, skg_swapchain_t *destination);
 SKG_API void                skg_tex_attach_depth         (      skg_tex_t *tex, skg_tex_t *depth);
-SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, int32_t anisotropy);
+SKG_API void                skg_tex_settings             (      skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ sample, skg_sample_compare_ compare, int32_t anisotropy);
 SKG_API void                skg_tex_set_contents         (      skg_tex_t *tex, const void *data, int32_t width, int32_t height);
 SKG_API void                skg_tex_set_contents_arr     (      skg_tex_t *tex, const void**array_data, int32_t array_count, int32_t mip_count, int32_t width, int32_t height, int32_t multisample);
 SKG_API bool                skg_tex_get_contents         (      skg_tex_t *tex, void *ref_data, size_t data_size);
@@ -492,6 +506,7 @@ SKG_API bool                skg_tex_gen_mips             (      skg_tex_t *tex);
 SKG_API void*               skg_tex_get_native           (const skg_tex_t *tex);
 SKG_API void                skg_tex_bind                 (const skg_tex_t *tex, skg_bind_t bind);
 SKG_API void                skg_tex_clear                (skg_bind_t bind);
+SKG_API void                skg_tex_target_discard       (      skg_tex_t *render_target);
 SKG_API void                skg_tex_target_bind          (      skg_tex_t *render_target, int32_t layer_idx, int32_t mip_level);
 SKG_API skg_tex_t          *skg_tex_target_get           ();
 SKG_API void                skg_tex_destroy              (      skg_tex_t *tex);
@@ -503,6 +518,7 @@ SKG_API uint32_t            skg_tex_fmt_block_size       (skg_tex_fmt_ format);
 SKG_API uint32_t            skg_tex_fmt_pitch            (skg_tex_fmt_ format, int32_t width);
 SKG_API bool                skg_tex_fmt_supported        (skg_tex_fmt_ format);
 SKG_API bool                skg_tex_fmt_is_compressed    (skg_tex_fmt_ format);
+SKG_API bool                skg_tex_fmt_is_depth         (skg_tex_fmt_ format);
 
 #include "sk_gpu_common.h"
 ///////////////////////////////////////////

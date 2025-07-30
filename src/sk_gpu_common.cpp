@@ -894,6 +894,17 @@ bool skg_tex_fmt_is_compressed(skg_tex_fmt_ format) {
 
 ///////////////////////////////////////////
 
+bool skg_tex_fmt_is_depth(skg_tex_fmt_ format) {
+	switch (format) {
+	case skg_tex_fmt_depth16:
+	case skg_tex_fmt_depth32:
+	case skg_tex_fmt_depthstencil: return true;
+	default:                       return false;
+	}
+}
+
+///////////////////////////////////////////
+
 int32_t skg_fmt_size(skg_fmt_ format) {
 	switch (format) {
 		case skg_fmt_f64: return 8;

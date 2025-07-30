@@ -4240,18 +4240,6 @@ void skg_draw_begin() {
 ///////////////////////////////////////////
 
 void skg_tex_target_discard(skg_tex_t *render_target) {
-	if (render_target->type != skg_tex_type_zbuffer || !skg_capability(skg_cap_discard_framebuffer)) return;
-
-	uint32_t attachments[] = { GL_DEPTH_EXT };
-	for (size_t i = 0; i < render_target->array_count; i++) {
-		glBindFramebuffer      (GL_FRAMEBUFFER, render_target->_framebuffer_layers[i]);
-		glDiscardFramebufferEXT(GL_FRAMEBUFFER, 1, attachments);
-	}
-
-	uint32_t err = glGetError();
-	if (err) {
-		skg_logf(skg_log_warning, "skg_tex_target_discard err: %x", err);
-	}
 }
 
 ///////////////////////////////////////////

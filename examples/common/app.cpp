@@ -303,7 +303,7 @@ bool app_init() {
 	free(space_colors);
 
 	app_target       = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
-	app_target_depth = skg_tex_create(skg_tex_type_depth,        skg_use_static, skg_tex_fmt_depth16,       skg_mip_none);
+	app_target_depth = skg_tex_create(skg_tex_type_zbuffer,      skg_use_static, skg_tex_fmt_depth16,       skg_mip_none);
 	skg_tex_set_contents(&app_target,       nullptr, 512, 512);
 	skg_tex_set_contents(&app_target_depth, nullptr, 512, 512);
 	skg_tex_attach_depth(&app_target, &app_target_depth);

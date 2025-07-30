@@ -98,7 +98,6 @@ typedef enum skg_buffer_type_ {
 
 typedef enum skg_tex_type_ {
 	skg_tex_type_image,
-	skg_tex_type_cubemap,
 	skg_tex_type_rendertarget,
 	skg_tex_type_zbuffer,
 	skg_tex_type_depthtarget,
@@ -109,6 +108,7 @@ typedef enum skg_use_ {
 	skg_use_dynamic       = 1 << 2,
 	skg_use_compute_read  = 1 << 3,
 	skg_use_compute_write = 1 << 4,
+	skg_use_cubemap       = 1 << 5,
 	skg_use_compute_readwrite = skg_use_compute_read | skg_use_compute_write
 } skg_use_;
 

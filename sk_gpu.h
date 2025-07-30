@@ -98,7 +98,6 @@ typedef enum skg_buffer_type_ {
 
 typedef enum skg_tex_type_ {
 	skg_tex_type_image,
-	skg_tex_type_cubemap,
 	skg_tex_type_rendertarget,
 	skg_tex_type_zbuffer,
 	skg_tex_type_depthtarget,
@@ -109,6 +108,7 @@ typedef enum skg_use_ {
 	skg_use_dynamic       = 1 << 2,
 	skg_use_compute_read  = 1 << 3,
 	skg_use_compute_write = 1 << 4,
+	skg_use_cubemap       = 1 << 5,
 	skg_use_compute_readwrite = skg_use_compute_read | skg_use_compute_write
 } skg_use_;
 
@@ -2385,7 +2385,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		res_desc.Texture2DArray.ArraySize       = count;
 		res_desc.Texture2DArray.MipLevels       = mip_count;
 
-		if (tex->type == skg_tex_type_cubemap) {
+		if ((tex->use & skg_use_cubemap) > 0) {
 			res_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
 		} else if (tex->array_count > 1) {
 			if (tex->multisample > 1) {
@@ -2422,7 +2422,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		stencil_desc.Format = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, false);
 		stencil_desc.Texture2DArray.FirstArraySlice = start;
 		stencil_desc.Texture2DArray.ArraySize       = count;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
 				stencil_desc.Texture2DMSArray.ArraySize       = count;
@@ -2476,7 +2476,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		target_desc.Format = format;
 		target_desc.Texture2DArray.FirstArraySlice = start;
 		target_desc.Texture2DArray.ArraySize       = count;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY;
 				target_desc.Texture2DMSArray.ArraySize       = count;
@@ -2529,7 +2529,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 	if (tex->use & skg_use_compute_write) {
 		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
 		view.Format = DXGI_FORMAT_UNKNOWN;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			view.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
 			view.Texture2DArray.FirstArraySlice = start;
 			view.Texture2DArray.ArraySize       = count;
@@ -2658,7 +2658,7 @@ ID3D11Texture2D *d3d_gen_mips_data(ID3D11DeviceContext *context, D3D11_TEXTURE2D
 	skg_tex_fmt_ mem_fmt   = skg_tex_fmt_from_native(desc.Format);
 	uint32_t     mem_pitch = skg_tex_fmt_pitch(mem_fmt, desc.Width);
 	int32_t      mips      = skg_mip_count(desc.Width, desc.Height);
-	for (int32_t i = 0; i < desc.ArraySize; i++) {
+	for (uint32_t i = 0; i < desc.ArraySize; i++) {
 		context->UpdateSubresource(tex_intermediate, i*mips, nullptr, array_data[i], mem_pitch, 0);
 	}
 
@@ -2769,8 +2769,8 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget || array_data == nullptr || array_data[0] == nullptr || generate_mips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
-		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+		if ((tex->use & skg_use_cubemap)       > 0) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+		if ((tex->use & skg_use_compute_write) > 0) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 		if (tex->type == skg_tex_type_rendertarget && tex->mips == skg_mip_generate ) desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
 		if (generate_mips) {
@@ -5111,7 +5111,7 @@ void main() {
 	result._surface = skg_tex_create(skg_tex_type_rendertarget, skg_use_static, skg_tex_fmt_rgba32_linear, skg_mip_none);
 	skg_tex_set_contents(&result._surface, nullptr, result.width, result.height);
 
-	result._surface_depth = skg_tex_create(skg_tex_type_depth, skg_use_static, depth_format, skg_mip_none);
+	result._surface_depth = skg_tex_create(skg_tex_type_zbuffer, skg_use_static, depth_format, skg_mip_none);
 	skg_tex_set_contents(&result._surface_depth, nullptr, result.width, result.height);
 	skg_tex_attach_depth(&result._surface, &result._surface_depth);
 
@@ -5211,14 +5211,14 @@ void skg_swapchain_destroy(skg_swapchain_t *swapchain) {
 
 ///////////////////////////////////////////
 
-uint32_t gl_tex_target(skg_tex_type_ type, int32_t array_count, int32_t multisample) {
+uint32_t gl_tex_target(skg_use_ tex_use, int32_t array_count, int32_t multisample) {
 	if (multisample > 1) {
 		return array_count == 1
 			? GL_TEXTURE_2D_MULTISAMPLE
 			: GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
 	} else {
 		return array_count > 1
-			? (type == skg_tex_type_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D_ARRAY)
+			? ((tex_use & skg_use_cubemap) > 0 ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D_ARRAY)
 			: GL_TEXTURE_2D;
 	}
 }
@@ -5266,7 +5266,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 	result._physical_multisample = physical_multisample;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
-	result._target     = gl_tex_target(type, array_count, physical_multisample);
+	result._target     = gl_tex_target(result.use, array_count, physical_multisample);
 
 	// Check if this is an external texture
 	gl_pipeline.tex_bind[0] = result._texture; // Similar to a PIPELINE_CHECK
@@ -5316,7 +5316,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result._physical_multisample = 1;
 	result._texture    = (uint32_t)(uint64_t)native_tex;
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
-	result._target     = gl_tex_target(type, 2, result._physical_multisample);
+	result._target     = gl_tex_target(result.use, 2, result._physical_multisample);
 
 	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * 1);
@@ -5347,7 +5347,7 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	result._format = (uint32_t)skg_tex_fmt_to_native(result.format);
 
 	glGenTextures(1, &result._texture);
-	skg_tex_settings(&result, type == skg_tex_type_cubemap ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 1);
+	skg_tex_settings(&result, (use & skg_use_cubemap) > 0 ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 1);
 
 	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
@@ -5512,7 +5512,7 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_S, mode);
 	glTexParameteri(tex->_target, GL_TEXTURE_WRAP_T, mode);
-	if (tex->type == skg_tex_type_cubemap) {
+	if ((tex->use & skg_use_cubemap) > 0) {
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, mode);
 	}
 	glTexParameteri(tex->_target, GL_TEXTURE_MIN_FILTER, min_filter);
@@ -5577,7 +5577,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 	tex->array_count           = array_count;
 	tex->multisample           = multisample; // multisample render to texture is technically an MSAA surface, but functions like a normal single sample texture.
 	tex->_physical_multisample = gl_caps[skg_cap_tiled_multisample] ? 1 : multisample;
-	tex->_target               = gl_tex_target(tex->type, tex->array_count, tex->_physical_multisample);
+	tex->_target               = gl_tex_target(tex->use, tex->array_count, tex->_physical_multisample);
 
 	glActiveTexture(skg_settings_tex_slot);
 	glBindTexture(tex->_target, tex->_texture);
@@ -5591,7 +5591,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 	uint32_t layout        =           skg_tex_fmt_to_gl_layout (tex->format);
 	uint32_t type          =           skg_tex_fmt_to_gl_type   (tex->format);
 	bool     is_compressed =           skg_tex_fmt_is_compressed(tex->format);
-	if (tex->type == skg_tex_type_cubemap) {
+	if ((tex->use & skg_use_cubemap) > 0) {
 		if (array_count != 6) {
 			skg_log(skg_log_warning, "Cubemaps need 6 data frames");
 			return;

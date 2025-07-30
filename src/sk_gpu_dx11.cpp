@@ -1520,7 +1520,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		res_desc.Texture2DArray.ArraySize       = count;
 		res_desc.Texture2DArray.MipLevels       = mip_count;
 
-		if (tex->type == skg_tex_type_cubemap) {
+		if ((tex->use & skg_use_cubemap) > 0) {
 			res_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
 		} else if (tex->array_count > 1) {
 			if (tex->multisample > 1) {
@@ -1557,7 +1557,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		stencil_desc.Format = (DXGI_FORMAT)d3d_tex_fmt_to_native(tex->format, false);
 		stencil_desc.Texture2DArray.FirstArraySlice = start;
 		stencil_desc.Texture2DArray.ArraySize       = count;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				stencil_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMSARRAY;
 				stencil_desc.Texture2DMSArray.ArraySize       = count;
@@ -1611,7 +1611,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 		target_desc.Format = format;
 		target_desc.Texture2DArray.FirstArraySlice = start;
 		target_desc.Texture2DArray.ArraySize       = count;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			if (tex->multisample > 1) {
 				target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY;
 				target_desc.Texture2DMSArray.ArraySize       = count;
@@ -1664,7 +1664,7 @@ bool skg_tex_make_view(skg_tex_t *tex, uint32_t mip_count, uint32_t array_start,
 	if (tex->use & skg_use_compute_write) {
 		D3D11_UNORDERED_ACCESS_VIEW_DESC view = {};
 		view.Format = DXGI_FORMAT_UNKNOWN;
-		if (tex->type == skg_tex_type_cubemap || tex->array_count > 1) {
+		if ((tex->use & skg_use_cubemap) > 0 || tex->array_count > 1) {
 			view.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
 			view.Texture2DArray.FirstArraySlice = start;
 			view.Texture2DArray.ArraySize       = count;
@@ -1793,7 +1793,7 @@ ID3D11Texture2D *d3d_gen_mips_data(ID3D11DeviceContext *context, D3D11_TEXTURE2D
 	skg_tex_fmt_ mem_fmt   = skg_tex_fmt_from_native(desc.Format);
 	uint32_t     mem_pitch = skg_tex_fmt_pitch(mem_fmt, desc.Width);
 	int32_t      mips      = skg_mip_count(desc.Width, desc.Height);
-	for (int32_t i = 0; i < desc.ArraySize; i++) {
+	for (uint32_t i = 0; i < desc.ArraySize; i++) {
 		context->UpdateSubresource(tex_intermediate, i*mips, nullptr, array_data[i], mem_pitch, 0);
 	}
 
@@ -1904,8 +1904,8 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void** array_data, int32_t a
 		desc.Usage            = tex->use  == skg_use_dynamic    ? D3D11_USAGE_DYNAMIC      : tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget || array_data == nullptr || array_data[0] == nullptr || generate_mips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
 		desc.CPUAccessFlags   = tex->use  == skg_use_dynamic    ? D3D11_CPU_ACCESS_WRITE   : 0;
 		if (tex->type == skg_tex_type_rendertarget) desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-		if (tex->type == skg_tex_type_cubemap     ) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
-		if (tex->use  &  skg_use_compute_write    ) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+		if ((tex->use & skg_use_cubemap)       > 0) desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+		if ((tex->use & skg_use_compute_write) > 0) desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 		if (tex->type == skg_tex_type_rendertarget && tex->mips == skg_mip_generate ) desc.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
 		if (generate_mips) {

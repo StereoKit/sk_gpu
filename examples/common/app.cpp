@@ -310,7 +310,7 @@ bool app_init() {
 	skg_tex_name        (&app_target,       "main_rtex");
 	skg_tex_name        (&app_target_depth, "depth_rtex");
 
-	app_cubemap = skg_tex_create(skg_tex_type_cubemap, skg_use_static, skg_tex_fmt_rgba32, skg_mip_none);
+	app_cubemap = skg_tex_create(skg_tex_type_image, (skg_use_)(skg_use_static | skg_use_cubemap), skg_tex_fmt_rgba32, skg_mip_none);
 	skg_color32_t *cube_cols[6];
 	const int32_t  cube_face_size = 64;
 	for (size_t f = 0; f < 6; f++) {

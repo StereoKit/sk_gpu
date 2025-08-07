@@ -882,7 +882,7 @@ void skg_pipeline_update_rasterizer(skg_pipeline_t *pipeline) {
 	desc_rasterizer.FillMode              = pipeline->wireframe ? D3D11_FILL_WIREFRAME : D3D11_FILL_SOLID;
 	desc_rasterizer.FrontCounterClockwise = true;
 	desc_rasterizer.ScissorEnable         = pipeline->scissor;
-	desc_rasterizer.DepthClipEnable       = true;
+	desc_rasterizer.DepthClipEnable       = pipeline->depth_clip;
 	switch (pipeline->cull) {
 	case skg_cull_none:  desc_rasterizer.CullMode = D3D11_CULL_NONE;  break;
 	case skg_cull_front: desc_rasterizer.CullMode = D3D11_CULL_FRONT; break;
@@ -938,6 +938,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.cull         = skg_cull_back;
 	result.wireframe    = false;
 	result.depth_write  = true;
+	result.depth_clip   = true;
 	result.depth_test   = skg_depth_test_less;
 	result.meta         = shader->meta;
 	result._vertex      = shader->_vertex;
@@ -1016,6 +1017,15 @@ void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_depth_clip(skg_pipeline_t *pipeline, bool clip) {
+	if (pipeline->depth_clip != clip) {
+		pipeline->depth_clip = clip;
+		skg_pipeline_update_rasterizer(pipeline);
+	}
+}
+
+///////////////////////////////////////////
+
 void skg_pipeline_set_color_write(skg_pipeline_t *pipeline, skg_color_write_ write) {
 	if (pipeline->color_write != write) {
 		pipeline->color_write = write;
@@ -1072,6 +1082,12 @@ bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
+}
+
+///////////////////////////////////////////
+
+bool skg_pipeline_get_depth_clip(const skg_pipeline_t *pipeline) {
+	return pipeline->depth_clip;
 }
 
 ///////////////////////////////////////////

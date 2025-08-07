@@ -158,6 +158,7 @@
 #define GL_LINE 0x1B01
 #define GL_FILL 0x1B02
 #define GL_DEPTH_TEST 0x0B71
+#define GL_DEPTH_CLAMP 0x864F
 #define GL_SCISSOR_TEST 0x0C11
 #define GL_TEXTURE_2D 0x0DE1
 #define GL_TEXTURE_2D_ARRAY 0x8C1A
@@ -483,6 +484,7 @@ typedef struct gl_pipeline_state_t {
 	skg_depth_test_   depth_test_type;
 	bool              depth_test;
 	bool              depth_write;
+	bool              depth_clip;
 	skg_color_write_  color_write;
 	bool              scissor;
 	bool              wireframe;
@@ -1568,6 +1570,7 @@ skg_pipeline_t skg_pipeline_create(skg_shader_t *shader) {
 	result.wireframe    = false;
 	result.depth_test   = skg_depth_test_less;
 	result.depth_write  = true;
+	result.depth_clip   = true;
 	result.meta         = shader->meta;
 	result._shader      = *shader;
 	skg_shader_meta_reference(result._shader.meta);
@@ -1648,6 +1651,11 @@ void skg_pipeline_bind(const skg_pipeline_t *pipeline) {
 	PIPELINE_CHECK(gl_pipeline.depth_write, pipeline->depth_write)
 		glDepthMask(pipeline->depth_write);
 	PIPELINE_CHECK_END
+	
+	PIPELINE_CHECK(gl_pipeline.depth_clip, pipeline->depth_clip)
+		if (pipeline->depth_clip) glDisable(GL_DEPTH_CLAMP);
+		else                      glEnable (GL_DEPTH_CLAMP);
+	PIPELINE_CHECK_END
 
 	bool depth_test = pipeline->depth_test != skg_depth_test_always;
 	PIPELINE_CHECK(gl_pipeline.depth_test, depth_test)
@@ -1702,6 +1710,12 @@ void skg_pipeline_set_depth_write(skg_pipeline_t *pipeline, bool write) {
 
 ///////////////////////////////////////////
 
+void skg_pipeline_set_depth_clip(skg_pipeline_t *pipeline, bool clip) {
+	pipeline->depth_clip = clip;
+}
+
+///////////////////////////////////////////
+
 void skg_pipeline_set_color_write(skg_pipeline_t *pipeline, skg_color_write_ write) {
 	pipeline->color_write = write;
 }
@@ -1741,6 +1755,12 @@ bool skg_pipeline_get_wireframe(const skg_pipeline_t *pipeline) {
 
 bool skg_pipeline_get_depth_write(const skg_pipeline_t *pipeline) {
 	return pipeline->depth_write;
+}
+
+///////////////////////////////////////////
+
+bool skg_pipeline_get_depth_clip(const skg_pipeline_t *pipeline) {
+	return pipeline->depth_clip;
 }
 
 ///////////////////////////////////////////

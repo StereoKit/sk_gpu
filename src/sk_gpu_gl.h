@@ -35,6 +35,7 @@ typedef struct skg_pipeline_t {
 	skg_cull_         cull;
 	bool              wireframe;
 	bool              depth_write;
+	bool              depth_clip;
 	skg_color_write_  color_write;
 	bool              scissor;
 	skg_depth_test_   depth_test;

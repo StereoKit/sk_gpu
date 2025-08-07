@@ -474,6 +474,8 @@ SKG_API void                skg_pipeline_set_wireframe   (      skg_pipeline_t *
 SKG_API bool                skg_pipeline_get_wireframe   (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_write (      skg_pipeline_t *pipeline, bool write);
 SKG_API bool                skg_pipeline_get_depth_write (const skg_pipeline_t *pipeline);
+SKG_API void                skg_pipeline_set_depth_clip  (      skg_pipeline_t *pipeline, bool clip);
+SKG_API bool                skg_pipeline_get_depth_clip  (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_color_write (      skg_pipeline_t *pipeline, skg_color_write_ write);
 SKG_API skg_color_write_    skg_pipeline_get_color_write (const skg_pipeline_t *pipeline);
 SKG_API void                skg_pipeline_set_depth_test  (      skg_pipeline_t *pipeline, skg_depth_test_ test);

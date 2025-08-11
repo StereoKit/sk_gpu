@@ -5794,6 +5794,9 @@ bool skg_tex_gen_mips(skg_tex_t *tex_mipped_rt) {
 		err = glGetError();
 	}
 
+	glActiveTexture(skg_settings_tex_slot);
+	glBindTexture(tex_mipped_rt->_target, tex_mipped_rt->_texture);
+
 	glGenerateMipmap(tex_mipped_rt->_target);
 
 	err = glGetError();

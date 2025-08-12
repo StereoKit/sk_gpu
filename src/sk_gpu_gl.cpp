@@ -65,8 +65,10 @@
 
 	typedef BOOL  (*wglChoosePixelFormatARB_proc)    (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats);
 	typedef HGLRC (*wglCreateContextAttribsARB_proc) (HDC hDC, HGLRC hShareContext, const int *attribList);
+	typedef BOOL  (*wglSwapIntervalEXT_proc)         (int interval);
 	wglChoosePixelFormatARB_proc    wglChoosePixelFormatARB;
 	wglCreateContextAttribsARB_proc wglCreateContextAttribsARB;
+	wglSwapIntervalEXT_proc         wglSwapIntervalEXT;
 #endif
 
 #ifdef _SKG_GL_LOAD_GLX
@@ -574,6 +576,7 @@ int32_t gl_init_wgl() {
 	// Function pointers we need to actually initialize OpenGL
 	wglChoosePixelFormatARB    = (wglChoosePixelFormatARB_proc   )wglGetProcAddress("wglChoosePixelFormatARB");
 	wglCreateContextAttribsARB = (wglCreateContextAttribsARB_proc)wglGetProcAddress("wglCreateContextAttribsARB");
+	wglSwapIntervalEXT         = (wglSwapIntervalEXT_proc        )wglGetProcAddress("wglSwapIntervalEXT");
 
 	// Shut down the dummy so we can set up OpenGL for real
 	wglMakeCurrent  (dummy_dc, 0);
@@ -646,6 +649,9 @@ int32_t gl_init_wgl() {
 		skg_log(skg_log_critical, "Couldn't activate GL context!");
 		return false;
 	}
+
+	// Turn on vsync
+	if (wglSwapIntervalEXT) wglSwapIntervalEXT(1);
 #endif // _SKG_GL_LOAD_WGL
 	return 1;
 }
@@ -1966,6 +1972,7 @@ void skg_swapchain_bind(skg_swapchain_t *swapchain) {
 	skg_tex_target_bind(&swapchain->_surface, -1, 0);
 #elif defined(_SKG_GL_LOAD_WGL)
 	wglMakeCurrent((HDC)swapchain->_hdc, gl_hrc);
+	if (wglSwapIntervalEXT) wglSwapIntervalEXT(1); // Enable VSync
 	skg_tex_target_bind(nullptr, -1, 0);
 #elif defined(_SKG_GL_LOAD_EGL)
 	eglMakeCurrent(egl_display, swapchain->_egl_surface, swapchain->_egl_surface, egl_context);

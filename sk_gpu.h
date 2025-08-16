@@ -5545,9 +5545,9 @@ void skg_tex_settings(skg_tex_t *tex, skg_tex_address_ address, skg_tex_sample_ 
 
 	uint32_t filter, min_filter;
 	switch (sample) {
-	case skg_tex_sample_linear:     filter = GL_LINEAR;  min_filter = tex->mips == skg_mip_generate ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR; break; // Technically trilinear
-	case skg_tex_sample_point:      filter = GL_NEAREST; min_filter = GL_NEAREST;                                                          break;
-	case skg_tex_sample_anisotropic:filter = GL_LINEAR;  min_filter = tex->mips == skg_mip_generate ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR; break;
+	case skg_tex_sample_linear:     filter = GL_LINEAR;  min_filter = tex->mips == skg_mip_generate ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR; break;
+	case skg_tex_sample_point:      filter = GL_NEAREST; min_filter = GL_NEAREST;                                                           break;
+	case skg_tex_sample_anisotropic:filter = GL_LINEAR;  min_filter = tex->mips == skg_mip_generate ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR; break;
 	default: filter = GL_LINEAR; min_filter = GL_LINEAR;
 	}
 

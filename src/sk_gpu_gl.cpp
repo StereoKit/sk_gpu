@@ -259,7 +259,9 @@
 #define GL_BGRA 0x80E1
 #define GL_SRGB8_ALPHA8 0x8C43
 #define GL_R11F_G11F_B10F 0x8C3A
+#define GL_UNSIGNED_INT_10F_11F_11F_REV 0x8C3B
 #define GL_RGB10_A2 0x8059
+#define GL_UNSIGNED_INT_2_10_10_10_REV 0x8368
 #define GL_RGBA32F 0x8814
 #define GL_RGBA16F 0x881A
 #define GL_RGBA16I 0x8D88
@@ -2783,8 +2785,8 @@ uint32_t skg_tex_fmt_to_gl_type(skg_tex_fmt_ format) {
 	case skg_tex_fmt_r16u:          return GL_UNSIGNED_SHORT;
 	case skg_tex_fmt_r16s:          return GL_SHORT;
 	case skg_tex_fmt_rgba64s:       return GL_SHORT;
-	case skg_tex_fmt_rgb10a2:       return GL_FLOAT;
-	case skg_tex_fmt_rg11b10:       return GL_FLOAT;
+	case skg_tex_fmt_rgb10a2:       return GL_UNSIGNED_INT_2_10_10_10_REV;
+	case skg_tex_fmt_rg11b10:       return GL_UNSIGNED_INT_10F_11F_11F_REV;
 	case skg_tex_fmt_rgba128:       return GL_FLOAT;
 	case skg_tex_fmt_depth32:       return GL_FLOAT;
 	case skg_tex_fmt_r32:           return GL_FLOAT;

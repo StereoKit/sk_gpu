@@ -2069,7 +2069,7 @@ skg_tex_t skg_tex_create_from_existing(void *native_tex, skg_tex_type_ type, skg
 		result._target = GL_TEXTURE_EXTERNAL_OES;
 	}
 
-	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 
@@ -2110,7 +2110,7 @@ skg_tex_t skg_tex_create_from_layer(void *native_tex, skg_tex_type_ type, skg_te
 	result._format     = (uint32_t)skg_tex_fmt_to_native(result.format);
 	result._target     = gl_tex_target(result.use, 2, result._physical_multisample);
 
-	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * 1);
 		glGenFramebuffers(1, result._framebuffer_layers);
 
@@ -2141,7 +2141,7 @@ skg_tex_t skg_tex_create(skg_tex_type_ type, skg_use_ use, skg_tex_fmt_ format, 
 	glGenTextures(1, &result._texture);
 	skg_tex_settings(&result, (use & skg_use_cubemap) > 0 ? skg_tex_address_clamp : skg_tex_address_repeat, skg_tex_sample_linear, skg_sample_compare_none, 1);
 
-	if (type == skg_tex_type_rendertarget || type == skg_tex_type_zbuffer || type == skg_tex_type_depthtarget) {
+	if (type == skg_tex_type_rendertarget || type == skg_tex_type_depthtarget) {
 		result._framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * result.array_count);
 		glGenFramebuffers(result.array_count, result._framebuffer_layers);
 	}
@@ -2435,7 +2435,7 @@ void skg_tex_set_contents_arr(skg_tex_t *tex, const void **array_data, int32_t a
 		}
 	}
 
-	if (tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_zbuffer || tex->type == skg_tex_type_depthtarget) {
+	if (tex->type == skg_tex_type_rendertarget || tex->type == skg_tex_type_depthtarget) {
 		tex->_framebuffer_layers = (uint32_t*)malloc(sizeof(uint32_t) * tex->array_count);
 		glGenFramebuffers(tex->array_count, tex->_framebuffer_layers);
 

@@ -1043,7 +1043,7 @@ void skg_tex_target_bind(skg_tex_t *render_target, int32_t layer_idx, int32_t mi
 void skg_target_clear(bool depth, const float *clear_color_4) {
 	uint32_t clear_mask = 0;
 	if (depth) {
-		clear_mask = GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
+		clear_mask = GL_DEPTH_BUFFER_BIT;
 		// If DepthMask is false, glClear won't clear depth
 		
 		PIPELINE_CHECK(gl_pipeline.depth_write, true)

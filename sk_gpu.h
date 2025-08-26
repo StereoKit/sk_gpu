@@ -2326,12 +2326,16 @@ bool skg_can_make_mips(skg_tex_fmt_ format) {
 	case skg_tex_fmt_bgra32_linear:
 	case skg_tex_fmt_rgba32:
 	case skg_tex_fmt_rgba32_linear: 
+	case skg_tex_fmt_rgba64f:
 	case skg_tex_fmt_rgba64u:
 	case skg_tex_fmt_rgba64s:
 	case skg_tex_fmt_rgba128:
+	case skg_tex_fmt_rg11b10:
+	case skg_tex_fmt_rgb10a2:
 	case skg_tex_fmt_depth32:
 	case skg_tex_fmt_r32:
 	case skg_tex_fmt_depth16:
+	case skg_tex_fmt_r16f:
 	case skg_tex_fmt_r16u:
 	case skg_tex_fmt_r16s:
 	case skg_tex_fmt_r8g8:

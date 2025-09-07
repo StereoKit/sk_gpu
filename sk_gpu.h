@@ -4454,9 +4454,10 @@ void skg_buffer_set_contents(skg_buffer_t *buffer, const void *data, uint32_t si
 ///////////////////////////////////////////
 
 void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind) {
-	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute)
+	if (buffer->type == skg_buffer_type_constant || buffer->type == skg_buffer_type_compute) {
 		glBindBufferBase(buffer->_target, bind.slot, buffer->_buffer);
-	else {
+		gl_pipeline.buffer_bind[buffer->type] = buffer->_buffer;
+	} else {
 		PIPELINE_CHECK(gl_pipeline.buffer_bind[buffer->type], buffer->_buffer)
 		glBindBuffer(buffer->_target, buffer->_buffer);
 		PIPELINE_CHECK_END
@@ -4467,10 +4468,14 @@ void skg_buffer_bind(const skg_buffer_t *buffer, skg_bind_t bind) {
 
 void skg_buffer_clear(skg_bind_t bind) {
 	if (bind.stage_bits == skg_stage_compute) {
-		if (bind.register_type == skg_register_constant)
+		if (bind.register_type == skg_register_constant) {
 			glBindBufferBase(GL_UNIFORM_BUFFER, bind.slot, 0);
-		if (bind.register_type == skg_register_readwrite)
+			gl_pipeline.buffer_bind[skg_buffer_type_constant] = 0;
+		}
+		if (bind.register_type == skg_register_readwrite) {
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bind.slot, 0);
+			gl_pipeline.buffer_bind[skg_buffer_type_compute] = 0;
+		}
 	}
 }
 

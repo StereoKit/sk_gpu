@@ -1,3 +1,5 @@
+> This project is superseded by [`sk_renderer`](https://github.com/StereoKit/sk_renderer)! `sk_gpu` is in use in StereoKit v0.3.11, and early v0.4 preview builds only.
+
 # sk_gpu.h
 
 sk_gpu.h is a mid-level cross-platform graphics library focused on Mixed Reality rendering, in an amalgamated single file header! It currently uses D3D11 on Windows, GLES on Android, and WebGL on the Web, and works very well with OpenXR.

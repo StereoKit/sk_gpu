@@ -118,7 +118,7 @@ void app_shader_show_log() {
 	for (int32_t i = 0; i < sksc_log_count(); i++) {
 		sksc_log_item_t item = sksc_log_get(i);
 		if (item.level > 0)
-			ImGui::Text(item.text);
+			ImGui::Text("%s", item.text);
 	}
 	ImGui::End();
 }

@@ -16,46 +16,60 @@ endif()
 include(../cmake/CPM.cmake)
 
 # For converting SPIR-V to flavors of GLSL
-CPMAddPackage(
-    NAME SPIRV-Cross
-    GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
-    GIT_TAG vulkan-sdk-1.3.275.0
-    OPTIONS 
-    "SPIRV_CROSS_CLI OFF" 
-    "SPIRV_CROSS_ENABLE_TESTS OFF" 
-    "SPIRV_CROSS_ENABLE_MSL OFF"
-)
+find_package(spirv_cross_core)
+find_package(spirv_cross_glsl)
+find_package(spirv_cross_hlsl)
+if(NOT spirv_cross_core_FOUND)
+    CPMAddPackage(
+        NAME SPIRV-Cross
+        GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
+        GIT_TAG vulkan-sdk-1.3.275.0
+        OPTIONS 
+        "SPIRV_CROSS_CLI OFF" 
+        "SPIRV_CROSS_ENABLE_TESTS OFF" 
+        "SPIRV_CROSS_ENABLE_MSL OFF"
+    )
+endif()
 
 # For SPIRV-Tools
-CPMAddPackage(
-    NAME SPIRV-Headers
-    GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
-    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Tools version
-)
+find_package(SPIRV-Headers)
+if(NOT SPIRV-Headers_FOUND)
+    CPMAddPackage(
+        NAME SPIRV-Headers
+        GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
+        GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Tools version
+    )
+endif()
 
 # For optimizing SPIR-V shaders, a baseline amount of
 # optimization is crucial for meta compatibility with
-# HLSL compilers.
-CPMAddPackage(
-    NAME SPIRV-Tools
-    GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
-    GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Headers version
-    OPTIONS
-    "SPIRV_SKIP_TESTS ON"
-    "SPIRV_SKIP_EXECUTABLES ON"
-    "SPIRV_WERROR OFF"
-)
+# HLSL compilers.   
+find_package(SPIRV-Tools)
+if(NOT SPIRV-Tools_FOUND)
+    CPMAddPackage(
+        NAME SPIRV-Tools
+        GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
+        GIT_TAG vulkan-sdk-1.3.275.0 # This version should match up with the SPIRV-Headers version
+        OPTIONS
+        "SPIRV_SKIP_TESTS ON"
+        "SPIRV_SKIP_EXECUTABLES ON"
+        "SPIRV_WERROR OFF"
+    )
+endif()
 
 # This is used to convert HLSL to SPIR-V. DXC is an
 # alternative, but is far more difficult to compile,
 # and generates a much larger binary.
-CPMAddPackage(
-    NAME glslang
-    GITHUB_REPOSITORY KhronosGroup/glslang
-    GIT_TAG 14.1.0
-    OPTIONS 
-    "SKIP_GLSLANG_INSTALL ON"
-)
+find_package(glslang)
+if(NOT glslang_FOUND)
+    CPMAddPackage(
+        NAME glslang
+        GITHUB_REPOSITORY KhronosGroup/glslang
+        GIT_TAG 14.1.0
+        OPTIONS 
+        "SKIP_GLSLANG_INSTALL ON"
+    )
+endif()
 
 ## Target definition
 
@@ -105,3 +119,13 @@ skshaderc_compile_headers(skshader_editor
     ${CMAKE_BINARY_DIR}/shaders_editor/
     "-e -t xge"
     imgui_shader.hlsl )
+
+install(TARGETS skshader_editor
+        RUNTIME DESTINATION bin)
+
+install(DIRECTORY ${CMAKE_BINARY_DIR}/shaders_editor/
+        DESTINATION share/skshader_editor/shaders
+        FILES_MATCHING PATTERN "*.h")
+
+install(FILES CascadiaMono.ttf test.png
+        DESTINATION share/skshader_editor)

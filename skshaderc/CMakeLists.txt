@@ -42,56 +42,70 @@ endif()
 include(../cmake/CPM.cmake)
 
 # For converting SPIR-V to flavors of GLSL
-CPMAddPackage(
-    NAME SPIRV-Cross
-    GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
-    GIT_TAG vulkan-sdk-1.3.296.0
-    OPTIONS 
-    "SPIRV_CROSS_CLI OFF" 
-    "SPIRV_CROSS_ENABLE_TESTS OFF"
-    "SPIRV_CROSS_ENABLE_MSL OFF"
-    "SPIRV_CROSS_ENABLE_CPP OFF"
-    "SPIRV_CROSS_ENABLE_REFLECT OFF"
-    "SPIRV_CROSS_ENABLE_C_API OFF"
-    "SPIRV_CROSS_ENABLE_UTIL OFF"
-)
+find_package(spirv_cross_core)
+find_package(spirv_cross_glsl)
+find_package(spirv_cross_hlsl)
+if(NOT spirv_cross_core_FOUND)
+    CPMAddPackage(
+        NAME SPIRV-Cross
+        GITHUB_REPOSITORY KhronosGroup/SPIRV-Cross
+        GIT_TAG vulkan-sdk-1.3.296.0
+        OPTIONS 
+        "SPIRV_CROSS_CLI OFF" 
+        "SPIRV_CROSS_ENABLE_TESTS OFF" 
+        "SPIRV_CROSS_ENABLE_MSL OFF"
+        "SPIRV_CROSS_ENABLE_CPP OFF"
+        "SPIRV_CROSS_ENABLE_REFLECT OFF"
+        "SPIRV_CROSS_ENABLE_C_API OFF"
+        "SPIRV_CROSS_ENABLE_UTIL OFF"
+    )
+endif()
 
 # For SPIRV-Tools
-CPMAddPackage(
-    NAME SPIRV-Headers
-    GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
-    GIT_TAG vulkan-sdk-1.3.296.0 # This version should match up with the SPIRV-Tools version
-)
+find_package(SPIRV-Headers)
+if(NOT SPIRV-Headers_FOUND)
+    CPMAddPackage(
+        NAME SPIRV-Headers
+        GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
+        GIT_TAG vulkan-sdk-1.3.296.0 # This version should match up with the SPIRV-Tools version
+    )
+endif()
 
 # For optimizing SPIR-V shaders, a baseline amount of
-# optimization is crucial for meta compatability with
-# HLSL compilers.
-CPMAddPackage(
-    NAME SPIRV-Tools
-    GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
-    GIT_TAG vulkan-sdk-1.3.296.0 # This version should match up with the SPIRV-Headers version
-    OPTIONS
-    "SPIRV_SKIP_TESTS ON"
-    "SPIRV_SKIP_EXECUTABLES ON"
-    "SPIRV_WERROR OFF"
-)
+# optimization is crucial for meta compatibility with
+# HLSL compilers.   
+find_package(SPIRV-Tools)
+if(NOT SPIRV-Tools_FOUND)
+    CPMAddPackage(
+        NAME SPIRV-Tools
+        GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
+        GIT_TAG vulkan-sdk-1.3.296.0 # This version should match up with the SPIRV-Headers version
+        OPTIONS
+        "SPIRV_SKIP_TESTS ON"
+        "SPIRV_SKIP_EXECUTABLES ON"
+        "SPIRV_WERROR OFF"
+    )
+endif()
 
 # This is used to convert HLSL to SPIR-V. DXC is an
 # alternative, but is far more difficult to compile,
 # and generates a much larger binary.
-CPMAddPackage(
-    NAME glslang
-    GITHUB_REPOSITORY KhronosGroup/glslang
-    GIT_TAG vulkan-sdk-1.3.296.0
-    OPTIONS 
-    "GLSLANG_ENABLE_INSTALL OFF"
-    "GLSLANG_TESTS OFF"
-    "ENABLE_GLSLANG_BINARIES OFF"
-    "ENABLE_SPVREMAPPER OFF"
-    "ENABLE_GLSLANG_JS OFF"
-    "ENABLE_HLSL ON"
-    "ENABLE_RTTI OFF"
-)
+find_package(glslang)
+if(NOT glslang_FOUND)
+    CPMAddPackage(
+        NAME glslang
+        GITHUB_REPOSITORY KhronosGroup/glslang
+        GIT_TAG vulkan-sdk-1.3.296.0
+        OPTIONS 
+        "GLSLANG_ENABLE_INSTALL OFF"
+        "GLSLANG_TESTS OFF"
+        "ENABLE_GLSLANG_BINARIES OFF"
+        "ENABLE_SPVREMAPPER OFF"
+        "ENABLE_GLSLANG_JS OFF"
+        "ENABLE_HLSL ON"
+        "ENABLE_RTTI OFF"
+    )
+endif()
 
 if (UNIX)
     set(LINUX_LIBS)
@@ -134,41 +148,8 @@ endif()
 
 set(SKSHADERC_EXE_PATH $<TARGET_FILE:skshaderc> PARENT_SCOPE)
 
+install(TARGETS skshaderc
+        RUNTIME DESTINATION bin)
+
 # functions for compiling shaders easily
-function(SKSHADERC_COMPILE_ASSETS TARGET COMMAND_STRING OUT_LIST)
-    message(STATUS "sk_gpu compiling shader assets with args '${SKSHADERC_EXE_PATH} ${COMMAND_STRING}'")
-    set(SKSHADERC_COMPILE_COMMANDS ${COMMAND_STRING})
-    separate_arguments(SKSHADERC_COMPILE_COMMANDS)
-
-    set(SHADER_LIST)
-    foreach(SHADER IN LISTS ARGN)
-        add_custom_command(
-            TARGET ${TARGET} PRE_BUILD
-            COMMAND ${SKSHADERC_EXE_PATH} ${SKSHADERC_COMPILE_COMMANDS} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}
-            VERBATIM
-        )
-        list(APPEND SHADER_LIST ${SHADER})
-    endforeach(SHADER)
-
-    set(${OUT_LIST} ${SHADER_LIST} PARENT_SCOPE)
-endfunction()
-
-function(SKSHADERC_COMPILE_HEADERS ADD_TARGET OUTPUT_FOLDER COMMAND_STRING)
-    set(SKSHADERC_COMPILE_COMMANDS "-h -o ${OUTPUT_FOLDER} ${COMMAND_STRING}")
-    message(STATUS "sk_gpu compiling shader headers with args '${SKSHADERC_EXE_PATH} ${SKSHADERC_COMPILE_COMMANDS}'")
-    separate_arguments(SKSHADERC_COMPILE_COMMANDS)
-
-    set(SHADER_LIST)
-    foreach(SHADER IN LISTS ARGN)
-        get_filename_component(SHADER_NAME ${SHADER} NAME)
-        add_custom_command(
-            OUTPUT ${OUTPUT_FOLDER}/${SHADER_NAME}.h
-            COMMAND ${SKSHADERC_EXE_PATH} ${SKSHADERC_COMPILE_COMMANDS} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}
-            VERBATIM
-        )
-        list(APPEND SHADER_LIST ${OUTPUT_FOLDER}/${SHADER_NAME}.h)
-    endforeach(SHADER)
-
-    target_include_directories(${ADD_TARGET} PRIVATE ${OUTPUT_FOLDER})
-    target_sources            (${ADD_TARGET} PRIVATE ${SHADER_LIST})
-endfunction()
+include("../cmake/sk_gpuFunctions.cmake")

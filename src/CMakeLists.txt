@@ -23,6 +23,29 @@ add_custom_command(
 )
 
 add_custom_target(sk_gpu_header ALL
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../sk_gpu.h")
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../sk_gpu.h"
+)
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}../sk_gpu.h DESTINATION include)
+add_library(sk_gpu INTERFACE)
+
+add_dependencies(sk_gpu sk_gpu_header)
+
+target_include_directories(sk_gpu INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+    $<INSTALL_INTERFACE:include>
+)
+
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../sk_gpu.h"
+        DESTINATION include)
+
+install(TARGETS sk_gpu
+        EXPORT sk_gpuTargets
+        INCLUDES DESTINATION include)
+
+install(EXPORT sk_gpuTargets
+        FILE sk_gpuTargets.cmake
+        NAMESPACE sk_gpu::
+        DESTINATION lib/cmake/sk_gpu)
+
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/sk_gpuFunctions.cmake"
+    DESTINATION lib/cmake/sk_gpu)
